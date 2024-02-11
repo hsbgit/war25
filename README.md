@@ -19,6 +19,10 @@ Warcraft II: Tides of Darkness was released in Europe in 1996. As a small kid, I
 
 I started working on this in 2021 as a single developer during my free time. Now in January 2024 I realized that additional support is required and the next logical step is to release the current development state public on github.
 
+[See Section *How to build*](#how-to-build)
+
+[See Section *How to run*](#how-to-run)
+
 ## First Impressions
 Play your favorite map in any season. Press w,s,a,d to switch the season on the fly without reloading/restarting:
 
@@ -86,10 +90,55 @@ Play the original **game music** (or add own sound files):
 
 Use the **pud browser** to load any map you want:
 
-# How to run
+
 
 # How to build
+## Linux
+Building on linux has been done on Ubuntu.
+**Note:** war2.5 can be built&run on Ubuntu also inside VirtualBox. 
+
+### 1. Install Required Packages
+```bash
+sudo apt install libsdl2-image-2.0-0 libsdl2-image-dev libsdl2-mixer-2.0-0 libsdl2-mixer-dev libsdl2-ttf-2.0-0 libsdl2-ttf-dev git cmake  
+```
+
+### 2. Compile&Install war2tools
+```bash
+git clone https://github.com/war2/war2tools.git
+cd war2tools
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+### 3. Compile&Install glfw
+```bash
+git clone https://github.com/glfw/glfw.git
+cd glfw
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+### 4. Build war25
+```bash
+git clone https://github.com/hsbgit/war25.git
+cd war25
+mkdir build
+cd build
+cmake ..
+make -j4
+```
+**DONE**
+
 ## Windows
+
+
+# How to run
 
 
 ## Linux
