@@ -158,6 +158,18 @@ To make things even more simple, a fully functional set of libs is already inclu
 * E.g., SDL2_mixer-devel-2.8.0-VC.zip
 * Unzip into 3rdparty/win/
 
+### war2tools
+war2tools has no pre-compiled release. Thus, we have to compile this lib on our own:
+
+* Clone https://github.com/war2/war2tools.git
+* Extract
+* Open with cmake-gui
+* Set "Where to build the binaries" to a new "build" folder
+* Generate
+* Compile with visual studio
+* Copy build/libpud/Release/libpud.lib and libwar2.lib into 3rdparty/win/war2tools/lib
+* Copy include folder to 3rdparty/win/war2tools/include
+
 ### CMakeLists.txt
 Change the windows 3rdparty/win/ paths to the paths corresponding with the correct lib version numbers.
 
