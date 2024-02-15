@@ -1,0 +1,32 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Agent's Traps
+Author:       Sam Demulling (agent911@hotmail.com)
+Nickname:     Agent911
+File Name:    KPtraps.pud
+Description:  Traps by Agent911
+Dimensions:   128 x 128
+Terrain:      Wasteland
+No Players:   8
+ 
+% Open Land:  37
+% Forest:     19
+% Water:      38
+% Mountains:  6
+ 
+Total Gold:   870,000 (22 mines)
+Total Oil:    240,000 (12 patches)
+Total Lumber: 249,900
+Start Mines:  30,000
+Other Mines:  40,000 - 50,000
+
+Default Res:  G=4000  L=10000  O=1400
+Default Unit: 1 Peasant, 2 Skeleton, 1 Farm, 1 Town Hall
+ 
+Game Setup:   Starting positions are adjacent so fixed order, TVB, would
+              place allies next to each other.

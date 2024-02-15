@@ -1,0 +1,32 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Cornered
+Author:       Gary A. C. Backus (gbackus@mindspring.com)
+Nickname:     Bacchus
+File Name:    KPcorner.pud
+Description:  Cornered by Bacchus
+Dimensions:   64 x 64
+Terrain:      Forest
+No Players:   4
+ 
+% Open Land:  52
+% Forest:     47
+% Water:      1
+% Mountains:  0
+ 
+Total Gold:   270,000 (5 mines)
+Total Oil:    0
+Total Lumber: 156,400
+Start Mines:  50,000
+Other Mines:  70,000
+
+Default Res:  G=3000  L=2000  O=2000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+ 
+Game Setup:   Starting positions are adjacent so fixed order, TVB, would
+              place allies next to each other.

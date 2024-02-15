@@ -1,0 +1,34 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Eight Man War
+Author:       Nathan Elkins (durane@ix.netcom.com)
+Nickname:     The Poolman
+File Name:    KP8manwr.pud
+Description:  8 Man War by Cypherius
+Dimensions:   128 x 128
+Terrain:      Winter
+No Players:   8
+ 
+% Open Land:  55
+% Forest:     27
+% Water:      1
+% Mountains:  17
+ 
+Total Gold:   880,000 (16 mines)
+Total Oil:    0
+Total Lumber: 350,600
+Start Mines:  70,000
+Other Mines:  30,000 - 50,000
+
+Default Res:  G=4000  L=2500  O=3000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+ 
+Game Setup:   Starting positions are opposite so fixed order, TVB, would
+              place allies opposite each other.  In four player games, fixed
+              order would place players in alternating slots, with empty slots
+              between them.

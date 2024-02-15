@@ -1,0 +1,36 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Ringmaster
+Author:       Jason Yeung (jyeung@sfu.ca)
+Nickname:     Pharkath
+File Name:    KPrngmst.pud
+Description:  Ringmaster by Pharkath
+Dimensions:   128 x 128
+Terrain:      Forest
+No Players:   4
+ 
+% Open Land:  34
+% Forest:     19
+% Water:      47
+% Mountains:  0
+ 
+Total Gold:   600,000 (9 mines)
+Total Oil:    240,000 (8 patches)
+Total Lumber: 243,900
+Start Mines:  60,000
+Other Mines:  60,000 - 120,000
+
+Default Res:  G=4000  L=3000  O=2000
+Default Unit: 1 Peasant, 1 Transport, 1 Farm, 1 Town Hall
+ 
+Description:  A defensive battle for the high seas.  Each player has a private
+              lake for their foundary and oil harvesting.  Get established on
+              your other island quickly, though.
+
+Game Setup:   Starting positions are opposite so fixed order, TVB, would
+              place allies opposite each other.

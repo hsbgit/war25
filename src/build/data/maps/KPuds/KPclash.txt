@@ -1,0 +1,40 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Clash
+Author:       Scott Guinn (sguinn@access.mountain.net)
+Nickname:     MogKupo
+File Name:    KPclash.pud
+Description:  Clash by MogKupo
+Dimensions:   128 x 128
+Terrain:      Forest
+No Players:   8
+ 
+% Open Land:  64
+% Forest:     36
+% Water:      0
+% Mountains:  0
+
+Total Gold:   830,000 (17 mines)
+Total Oil:    0
+Total Lumber: 493,900
+Start Mines:  50,000
+Other Mines:  30,000 - 150,000
+
+Default Res:  G=5000  L=2000  O=4000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+ 
+Description:  Similar to Plains of Snow, this map has several medium to small
+              sized gold mines with a large one in the center.  It is just an 
+              overall fun pud to play.  With so many gold mines, good recon is
+              essential, and anything is possible.  There is no sure to win
+              strat on this pud, and it should be fun on any resource level.
+
+Game Setup:   Starting positions are adjacent so fixed order, TVB, would
+              place allies next to each other in a 2vs2 or 2vs2vs2vs2 game.
+              In a 4vs4 game, fixed order would put one team on the top and
+              one team on the bottom.

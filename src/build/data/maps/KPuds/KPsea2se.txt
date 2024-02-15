@@ -1,0 +1,32 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     From Sea to Sea
+Author:       Sam Demulling (agent911@hotmail.com)
+Nickname:     Agent911
+File Name:    KPsea2se.pud
+Description:  From Sea to Sea by Agent911
+Dimensions:   128 x 128
+Terrain:      Winter
+No Players:   4
+ 
+% Open Land:  39
+% Forest:     27
+% Water:      34
+% Mountains:  0
+ 
+Total Gold:   700,000 (11 mines)
+Total Oil:    250,000 (10 patches)
+Total Lumber: 354,900
+Start Mines:  50,000
+Other Mines:  50,000 - 100,000
+
+Default Res:  G=4200  L=1800  O=500
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+ 
+Game Setup:   Starting positions are adjacent so fixed order, TVB, would
+              place allies next to each other.

@@ -1,0 +1,40 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Island of Discovery
+Author:       Cameron Petie (s328580@student.uq.edu.au)
+File Name:    KPdscisl.pud
+Description:  Discovery Isle by Cameron Petie
+Dimensions:   128 x 128
+Terrain:      Forest
+No Players:   8
+ 
+% Open Land:  33
+% Forest:     14
+% Water:      51
+% Mountains:  2
+ 
+Total Gold:   660,000 (13 mines)
+Total Oil:    160,000 (16 patches)
+Total Lumber: 177,500
+Start Mines:  50,000
+Other Mines:  40,000 - 100,000
+
+Default Res:  G=3000  L=2000  O=2000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+ 
+Description:  'Island of Discovery' is a pud that starts everyone out on small
+              islands and which then forces them into the centre large island 
+              where fighting over resources really takes place.  Gold, lumber,
+              oil, and island sizes are pretty much equal, and both sea and land
+              fighting will be required.  All resources are very scarce for an
+              eight player game so early fighting over resources should be 
+              intense.
+
+Game Setup:   Starting positions are alternating so fixed order, TVB, would
+              place allies in adjacent corners in a 4 player game and teams in
+              alternating slots in an 8 player game.

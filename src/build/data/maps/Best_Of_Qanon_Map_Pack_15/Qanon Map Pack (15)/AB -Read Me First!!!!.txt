@@ -1,0 +1,28 @@
+This map pack is brought to you by Qanon aka Warbux[z], Strata-g, Xtic-fUri and G[o]T-Pr[i]dE
+
+After Extraction.. Just drop the "Best Of Q Maps" folder into your wc2 maps folder. may look like this (C:\War2combat\maps)
+
+If you host any of these maps in Custom settings.. It enables paladins to excorcist Ogre Mages
+as well as Deathknights. (note custom settings will also put all players in fixed order) 
+(note If you edit any of these maps with map editor it will disable the paladins abilities to do this)
+
+Also added a picture of each map in the Zip for people who dont have map editor an wish to see them.
+
+(ADDED BONUS MAP - Garden Of War WL - basically TE version wit the custom map settings of exo affecting ogremages)
+Special Thanks for advisory, hosting/map testing to..
+Xurnt
+JustinSchmidtmap
+Cel
+Van
+Casi0
+Yamon
+Lambchops
+Lian$
+Tupac
+Easycompany
+Litro
+Tofu 
+Swift
+Mousey
+PaperBoy
+Ogremage

@@ -1,0 +1,42 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Inner Circle
+Author:       Duncan Marshall (ducan@total.net)
+Nickname:     Anvil
+File Name:    KPincirc.pud
+Description:  Inner Circle by Anvil
+Dimensions:   128 x 128
+Terrain:      Forest
+No Players:   8
+ 
+% Open Land:  22
+% Forest:     15
+% Water:      55
+% Mountains:  8
+ 
+Total Gold:   580,000 (12 mines)
+Total Oil:    260,000 (12 patches)
+Total Lumber: 177,900
+Start Mines:  55,000
+Other Mines:  35,000
+
+Default Res:  G=3000  L=2000  O=2000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+
+Description:  This PUD is an 8 player kind of land and sea NWTR style map.  Great
+              for ffa's since building space is very cramped so you can hit your
+              opponents from across the rocks which separate you.  You have many
+              options of attack - from controlling the sea, to sappering through,
+              to just blizzarding or D&D'ing from over the rocks and wearing your
+              opponent down that way.
+
+Game Setup:   Starting positions are alternating.  In four player games, fixed
+              order, TVB would place allies next to each other, with empty slots
+              between them.  In 4vs4 games, fixed order, TVB would place teams
+              in alternating slots.
+ 

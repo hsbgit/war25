@@ -1,0 +1,42 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Stake Your Claim
+Author:       Ryan Lurvey (NEurisko@aol.com)
+Nickname:     N Eurisko
+File Name:    KPclaim.pud
+Description:  Stake Your Claim by N Eurisko
+Dimensions:   128 x 128
+Terrain:      Winter
+No Players:   6
+ 
+% Open Land:  32
+% Forest:     24
+% Water:      43
+% Mountains:  1
+ 
+Total Gold:   900,000 (15 mines)
+Total Oil:    300,000 (12 patches)
+Total Lumber: 296,900
+Start Mines:  40,000
+Other Mines:  70,000 - 100,000
+
+Default Res:  G=3500  L=2500  O=2500
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+
+Description:  Even though water plays an important role in this PUD, this is 
+              really a land PUD. Each player starts out on a small island. With
+              the few resources you have, build a shipyard and foundry and build
+              transports to take your peasants/peons to the main land. Once
+              there, you must claim a gold mine, build a town, and destroy your
+              enemies also on the main land. This game is perfect for 2x2, and
+              six player FFA. Hope you enjoy!  Don't forget to build ships to
+              defend your transports, or better yet, attack other players and
+              try and cripple them!!!
+
+Game Setup:   Starting positions are set so that in 2vs2 TVB fixed order, allies
+              will be adjacent and opponents opposite.

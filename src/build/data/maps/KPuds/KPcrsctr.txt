@@ -1,0 +1,29 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Cross the Center
+Author:       Gary A. C. Backus (gbackus@mindspring.com)
+Nickname:     Bacchus
+File Name:    KPcrsctr.pud
+Description:  Cross the Center by Bacchus
+Dimensions:   64 x 64
+Terrain:      Forest
+No Players:   2
+ 
+% Open Land:  43
+% Forest:     25
+% Water:      32
+% Mountains:  0
+ 
+Total Gold:   220,000 (7 mines)
+Total Oil:    60,000 (4 patches)
+Total Lumber: 71,700
+Start Mines:  40,000
+Other Mines:  15,000 - 50,000
+
+Default Res:  G=2000  L=1000  O=1000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall, 1 Lumber Mill

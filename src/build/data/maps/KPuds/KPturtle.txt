@@ -1,0 +1,39 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Turtle
+Author:       Chris Harwood-Jones (chj@junction.net)
+Nickname:     zot
+File Name:    KPturtle.pud
+Description:  Turtle by Zot
+Dimensions:   128 x 128
+Terrain:      Forest
+No Players:   8
+ 
+% Open Land:  28
+% Forest:     13
+% Water:      51
+% Mountains:  8
+ 
+Total Gold:   720,000 (13 mines)
+Total Oil:    120,000 (12 patches)
+Total Lumber: 171,900
+Start Mines:  45,000
+Other Mines:  65,000 - 100,000
+
+Default Res:  G=3000  L=2000  O=100
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall, 1 Lumber Mill
+
+Description:  This pud has been designed for maximum strategic balance between
+              land and sea.  Grunts, early expansions, and sea units are all
+              potentially important.  Note that on default resources oil must be
+              *harvested* in order to upgrade one's town hall, making it a 
+              critical resource.
+
+Game Setup:   The starting positions are set up in a clockwise spiral with two
+              slots between sequential player positions so that in TVB games, the
+              players on the same team would be scattered.

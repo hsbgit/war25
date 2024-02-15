@@ -1,0 +1,89 @@
+These maps were originally downloaded from www.realm-online.com.
+
+Warcraft II Maps for v1.3x or higher
+
+   The following naming convention is used to help describe a maps properties.
+
+   Pud Name (6CHF) cxxxx Creaters Name
+
+     Pud Name - is the name of the map
+     
+     6 - number of players set to computer
+     C - player 1 and 2 are close together for cooperative play
+     F - players 1/2, 3/4, 5/6, 7/8 are paired together for cooperative play
+	 when "fixed order" is selected at the start of the game. 
+     H - the map contains Hero's (you need version 1.3 or higher for
+	 hero's to appear)
+
+     cxxxx - is the copyright date of the map
+
+     Creaters name - is thename of the creater of the map
+
+   Example: Micro5 (6C) c1997 Realm
+
+     Micro5 is the name of the map
+     There are 6 computer players
+     it's cooperative play so 1 and 2 are close together
+     copyright 1997
+     created by Realm
+
+++++++
+Last Updated 9/10/1999
+
+Legend
+ P - Human Players
+ C - Computer Players
+ R - Rescue Players
+ H - Hero's (Yes/No)- requires Warcraft v1.32 or higher
+ L - Players Set to Land Attack
+ A - Players Set to Air Attack
+ S - Players Set to Sea Attack
+
+Warcraft II Maps
+Realm		Updated  P  C  R  H  Terrain  L  A  S  Size
+-------------------------------------------------------------
+4Corners.pud	3/9/98	 2  4  -  Y  Winter   6  -  -   64x64
+AirBorn.pud	4/18/98	 2  5  -  Y  Waste    3  -  -   96x96
+Angular.pud	3/9/98	 8  -  -  -  Forest   4  4  -  128x128
+BackDoor.pud	3/9/98	 2  5  -  -  Waste    4  2  1  128x128
+Bridges.pud	3/9/98	 8  -  -  -  Swamp    5  3  -   96x96
+Carports.pud	3/9/98	 8  -  -  -  Winter   -  4  4   96x96
+Checkers.pud	3/9/98	 8  -  -  -  Winter   8  -  -  128x128
+CntrCort.pud	3/9/98	 8  -  -  -  Forest   4  4  -   96x96
+Cornered.pud	3/9/98	 2  4  2  -  Winter   4  1  1  128x128
+Cramped.pud	3/9/98	 8  -  -  -  Swamp    8  -  -   64x64
+DamPeons.pud	3/9/98	 2  6  -  Y  Swamp    6  2  -   96x96
+Drachen.pud	4/18/98	 2  4  -  -  Waste    3  2  1   96x96
+GoldPlty.pud	3/9/98	 8  -  -  -  Waste    4  4  -  128x128
+GridLock.pud	3/9/98	 8  -  -  -  Winter   6  2  -   96x96
+Island.pud	4/13/98	 2  6  -  Y  Swamp    5  1  2  128x128
+IvansWay.pud	3/9/98	 2  4  -  Y  Forest   3  2  1  128x128
+Mazeless.pud	3/9/98	 8  -  -  -  Waste    8  -  -  128x128
+Micro2.pud	3/9/98	 4  -  -  -  Waste    4  -  -   32x32
+Micro3.pud	3/9/98	 4  -  -  -  Winter   -  -  4   32x32
+Micro4.pud	3/9/98	 4  -  -  Y  Forest   4  -  -   32x32
+Micro5.pud	3/9/98	 2  6  -  -  Swamp    8  -  -   32x32
+MixedUp.pud	3/9/98	 8  -  -  -  Forest   8  -  -  128x128
+OBoy.pud	3/9/98	 8  -  -  -  Swamp    8  -  -  128x128
+PlusPak.pud	3/9/98	 8  -  -  Y  Forest   8  -  -  128x128
+PlusPak2.pud	3/9/98	 8  -  -  Y  Forest   8  -  -  128x128
+RivrEdge.pud	3/28/98	 2  4  -  -  Forest   4  1  1  128x128
+RockGrdn.pud	3/9/98	 8  -  -  -  Forest   8  -  -  128x128
+RockMe.pud	3/9/98	 2  6  -  Y  Forest   6  2  -  128x128
+SeaMe.pud	3/9/98	 2  6  -  -  Forest   3  2  3  128x128
+Speltons.pud	3/9/98	 2  6  -  -  Waste    6  2  -   96x96
+Squared.pud	3/9/98	 8  -  -  -  Forest   6  2  -  128x128
+Temple.pud	3/9/98	 8  -  -  -  Forest   -  4  4  128x128
+TheBirds.pud	3/9/98	 2  6  -  Y  Forest   3  4  1  128x128
+TheDead.pud	3/9/98	 2  2  -  -  Forest   4  -  -   64x64
+TheFort.pud	3/9/98	 2  1  -  -  Forest   3  -  -  128x128
+TheHive.pud	3/9/98	 8  -  -  Y  Forest   6  2  -  128x128
+TicTacNo.pud	3/9/98	 8  -  -  -  Waste    -  -  8  128x128
+TreeMe.pud	3/9/98	 8  -  -  Y  Winter   4  4  -   96x96
+TreeWay.pud	3/9/98	 2  6  -  -  Waste    6  2  -   64x64
+Two4Ice.pud	3/9/98	 2  2  -  -  Winter   -  1  3   96x96
+TwoBySea.pud	3/9/98	 8  -  -  Y  Forest   -  4  4  128x128
+Walnut.pud	3/9/98	 2  6  -  -  Waste    4  2  2   96x96
+WaterWay.pud	3/9/98	 2  2  -  -  Forest   3  1  -   96x96
+WatrHole.pud	3/9/98	 8  -  -  -  Winter   -  4  4   96x96
+WoodMine.pud	3/9/98	 7  -  -  -  Winter   3  2  2  128x128

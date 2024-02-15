@@ -1,0 +1,34 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Inside Out
+Author:       Kevin Olesen (kolesen@bconnex.net)     
+Nickname:     El Dorado
+File Name:    KPinout.pud
+Description:  Inside Out by El Dorado
+Dimensions:   128 x 128
+Terrain:      Winter
+No Players:   8
+ 
+% Open Land:  33
+% Forest:     19
+% Water:      48
+% Mountains:  0
+ 
+Total Gold:   400,000 (8 mines)
+Total Oil:    40,000 (8 patches)
+Total Lumber: 248,600
+Start Mines:  50,000
+Other Mines:  None
+ 
+Default Res:  G=4000  L=3000  O=2000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+ 
+Game Setup:   Starting positions are set up so that fixed order, TVB, would place
+              all players in the center with allies opposite each other in a 2vs2
+              game.  In a 4vs4 game, one team would be in the center and one team 
+              around the outside.

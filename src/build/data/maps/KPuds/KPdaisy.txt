@@ -1,0 +1,56 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Daisy War in Bloom
+Author:       April White (awhite@ati.stlawrencec.on.ca)
+Nickname:     Whitey
+File Name:    KPdaisy.pud
+Description:  Daisy War in Bloom by Whitey
+Dimensions:   128 x 128
+Terrain:      Wasteland
+No Players:   8
+ 
+% Open Land:  43
+% Forest:     38
+% Water:      0
+% Mountains:  19
+ 
+Total Gold:   820,000 (17 mines)
+Total Oil:    0
+Total Lumber: 505,700
+Start Mines:  60,000
+Other Mines:  30,000 - 100,000
+
+Default Res:  G=5000  L=3000  O=3000
+Default Unit: 1 Peasant, 1 Town Hall
+
+Game Setup:   The starting positions are set up such that a 2vs2 fixed order
+              would place allies adjacent and opponents opposite each other.
+
+================================================================================
+                      Author's Original Text File
+================================================================================
+
+Design:  Original Design
+         Shaped like a Daisy in Full Bloom
+         The outline is done in Rock
+	
+Game:   -Not suggested for play against the computer because of the rock wall
+         since the computer will not blast through.
+        -Great for Team Play or Free For All.
+	-The Starting Positions were placed so that in team play teams members 
+         would be side by side and enemies across.
+
+Credits: This Pud was designed by April White and created using Warcraft II Map 
+         Editor version 1.0.26 Blizzard Entertainment Copyright 1995
+
+Notes:   Please do Not alter this pud in anyway without my written consent.  Once
+         consent is given tht pud name must be changed and this document must
+         accompany the new pud.  Other requirements may be given at time of 
+         consent. Thank you and enjoy Daisy.pud
+
+September 12th, 1997.

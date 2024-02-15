@@ -1,0 +1,37 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Circle Maze
+Author:       Unknown
+File Name:    KPcirmaz.pud
+Description:  Circle Maze
+Dimensions:   128 x 128
+Terrain:      Forest
+No Players:   4
+ 
+% Open Land:  39
+% Forest:     61
+% Water:      0
+% Mountains:  0
+ 
+Total Gold:   560,000 (13 mines)
+Total Oil:    0
+Total Lumber: 814,900
+Start Mines:  50,000
+Other Mines:  30,000 - 80,000
+
+Default Res:  G=3000  L=2000  O=3000
+Default Unit: 2 Peasants, 1 Flying Machine, 1 Farm, 1 Town Hall
+
+Description:  A little bit like "Noway out of this Maze" but with cooler shape.
+              Everyone who likes "Noway out of this Maze" will like this level
+              also.
+
+Game Setup:   Starting positions are adjacent so fixed order, TVB, would
+              place allies next to each other.
+
+ 

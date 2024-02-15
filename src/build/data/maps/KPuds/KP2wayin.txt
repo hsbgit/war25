@@ -1,0 +1,45 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Two Ways In
+Author:       Gary A. C. Backus (gbackus@mindspring.com)
+Nickname:     Bacchus
+File Name:    KP2wayin.pud
+Description:  Two Ways In by Bacchus
+Dimensions:   64 x 64
+Terrain:      Forest
+No Players:   2
+ 
+% Open Land:  43
+% Forest:     24
+% Water:      17
+% Mountains:  16
+ 
+Total Gold:   250,000 (6 mines)
+Total Oil:    60,000 (2 patches)
+Total Lumber: 78,200
+Start Mines:  40,000
+Other Mines:  30,000 - 55,000
+
+Default Res:  G=2000  L=1500  O=7000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall, 1 Transport
+ 
+Description:  This map is a modification of the original One Way In, One Way Out.
+              The default units include a trannie to allow for either a quick
+              attack or a quick expansion to the mines on the right.  The trannie 
+              is the "First Way In."  The "Second Way In" is via sappers.  There 
+              is a river in the mountain with a small break in the river so the
+              sappers are channeled through that one pass.
+
+              The main mines are 40k, the expansion mines 55k, and the island 
+              mines are 30k each.  The distance from the main mines to the 
+              expansion mines is equidistant and the distance from each 
+              expansion mine to the river in the mountain is equidistant.  This 
+              is to allow both opponents an equal shot at sappering just to the
+              river and doing spells across at the peon gold line.
+
+     

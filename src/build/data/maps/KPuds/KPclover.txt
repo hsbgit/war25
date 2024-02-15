@@ -1,0 +1,40 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Four Leaf Clover
+Author:       Cyrille Artho (cartho@netlink.ch)
+Nickname:     Telcontar
+File Name:    KPclover.pud
+Description:  Four Leaf Clover by Telcontar
+Dimensions:   128 x 128
+Terrain:      Forest
+No Players:   4
+ 
+% Open Land:  36
+% Forest:     21
+% Water:      43
+% Mountains:  0
+ 
+Total Gold:   530,000 (7 mines)
+Total Oil:    200,000 (8 patches)
+Total Lumber: 284,500
+Start Mines:  65,000
+Other Mines:  60,000 - 150,000
+
+Default Res:  G=4000  L=2000  O=2000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall
+
+Description:  Inspired by Numenor, a creation of J. R. R. Tolkien.  All players
+              can easily wall in at first.  The starting mines are 65k and there
+              is a mine in the center surrounded by trees (150k).  If you don't 
+              want to defend that mine against three opponents, you can try to
+              get one of the mines on the islands.  They are 60k but can easily
+              be attacked by juggs.  There is plenty of wood and oil for
+              building up a fleet, though.
+
+Game Setup:   Starting positions are opposite so fixed order, TVB, would
+              place allies opposite each other.

@@ -1,0 +1,32 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Valley of the Lost Peons
+Author:       Kevin Olesen (kolesen@bconnex.net)     
+Nickname:     El Dorado
+File Name:    KPvallpn.pud
+Description:  Valley Lost Peons by El Dorado
+Dimensions:   128 x 128
+Terrain:      Wasteland
+No Players:   4
+ 
+% Open Land:  37
+% Forest:     31
+% Water:      28
+% Mountains:  4
+ 
+Total Gold:   600,000 (12 mines)
+Total Oil:    40,000 (4 patches)
+Total Lumber: 428,500
+Start Mines:  70,000
+Other Mines:  30,000 - 60,000
+
+Default Res:  G=3000  L=3000  O=2000
+Default Unit: 1 Peasant, 1 Knight, 1 Farm, 1 Town Hall
+ 
+Game Setup:   Starting positions are opposite so fixed order, TVB, would
+              place allies opposite each other.

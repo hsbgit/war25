@@ -1,0 +1,2 @@
+Only drop the "Best Of Q Maps" folder into your maps directory after you unzip/extract this file
+you do not need to drop the whole zip file in there.

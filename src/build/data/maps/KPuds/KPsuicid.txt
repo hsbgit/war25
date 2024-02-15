@@ -1,0 +1,39 @@
+This PUD has been adapted from the original for inclusion in the KPUDs.  You 
+are free to distribute the PUD, subject to possible limitations by the author 
+outlined below, but if you do so, include this file with it.  If you modify the 
+PUD, change its name.
+
+      KPUD home page http://w3.one.net/~billw/KPUD
+================================================================================
+PUD Name:     Suicide in the Center
+Author:       Cameron Petie (s328580@student.uq.edu.au)
+File Name:    KPsuicid.pud
+Description:  Suicide Center by Cameron Petie
+Dimensions:   128 x 128
+Terrain:      Forest
+No Players:   6
+ 
+% Open Land:  38
+% Forest:     16
+% Water:      43
+% Mountains:  3
+ 
+Total Gold:   680,000 (13 mines)
+Total Oil:    180,000 (12 patches)
+Total Lumber: 196,700
+Start Mines:  40,000
+Other Mines:  40,000 - 200,000
+
+Default Res:  G=3000  L=3000  O=3000
+Default Unit: 1 Peasant, 1 Farm, 1 Town Hall, 1 Guard Tower
+
+Description:  Starting positions are on small individual land pieces that all 
+              connect to a central mine. Water is definitely required as 
+              lumber resources can run out quickly and many buildings could be 
+              vunerable from the ocean depending on where you place them. Those
+              that chicken out in the central battle for gold can also move to
+              the outside mines for their own safety, but that could become a 
+              battle as well if everyone decides to use that ploy.
+ 
+Game Setup:   Starting positions are alternating so fixed order, TVB, would
+              place allies in non-adjacent slots in 3vs3 or 2vs2vs2 games.
