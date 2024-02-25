@@ -41,7 +41,7 @@ C++ is the programming language I started learning programming with. I wanted to
 
 The current game is designed using the RTS lockstep approach. This means, all relevant actions such as unit production or movements result in events that are executed at the beginning of a new gameframe (=tick). This is especially important when considering so far missing multiplayer code. The current code is far from perfect, but I think it allows you to contribute. You contribution is highly welcomed!
 
-See how to build
+[See Section *How to build*](#how-to-build)
 
 ## What is the current state of development of war2.5?
 As written, I worked for three years in my rare freetime, completely alone on this project. Nonetheless, this project has a quite advanced development state. war2.5 is playable (at least a bit)! Many game mechanics have already been implemented. However, several major components are still missing, such as proper animation and time/frame management, network, AI... Just some of the things that work:
@@ -58,7 +58,7 @@ As written, I worked for three years in my rare freetime, completely alone on th
 -	Some units already have their special abilities, e.g. demolition dwarfes can explode, ogre mages can cast runes, etc.
 -	...
 
-See how to run
+[See Section *How to run*](#how-to-run)
 
 
 ## Big Thanks
