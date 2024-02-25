@@ -24,8 +24,16 @@ I started working on this in 2021 as a single developer during my free time. Now
 [See Section *How to run*](#how-to-run)
 
 ## First Impressions
-Play your favorite map in any season. Press w,s,a,d to switch the season on the fly without reloading/restarting:
+Play your favorite map in any season. Press w,s,a,d to switch the season on the fly without reloading/restarting. Minimap can be seen at the top right.
 
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/0%20summer.png" width="45%"/>
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/0%20swamp.png" width="45%"/>
+</p>
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/0%20wasteland.png" width="45%"/>
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/0%20winter.png" width="45%"/>
+</p>
 
 
 ## Programming language: C++ and a bit of C
@@ -36,7 +44,7 @@ The current game is designed using the RTS lockstep approach. This means, all re
 See how to build
 
 ## What is the current state of development of war2.5?
-As written, I worked for three years in my rare freetime, completely alone on this project. Nonetheless, this project already has a quite advanced development state. war2.5 is somewhat playable! Just some of the things that work:
+As written, I worked for three years in my rare freetime, completely alone on this project. Nonetheless, this project has a quite advanced development state. war2.5 is playable (at least a bit)! Many game mechanics have already been implemented. However, several major components are still missing, such as proper animation and time/frame management, network, AI... Just some of the things that work:
 
 -	Compatible with 99% of the existing *.pud files. Some *.pud lead to crashes but this is sth. for later investigation
 -	Sound
@@ -77,18 +85,51 @@ As you can see, there are plenty of places to start with. You contribution is hi
 
 ## More Impressions
 **Debug mode** allows for, e.g., inspecting tiles: 
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/1%20debug_mode.png" width="100%"/>
+</p>
+
 
 **Exploration** is partially working:
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/2%20exploration.png" width="100%"/>
+</p>
+
 
 Buildings **have production queues**:
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/3%20production%20queues.png" width="60%"/>
+</p>
+
 
 Select and command as many units as you like:
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/4%20multi%20unit%20selection.png" width="60%"/>
+</p>
+
 
 Pathfinding using **AStar**:
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/5%20path%20finding%201.png" width="55%"/>
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/5%20path%20finding%202.png" width="55%"/>
+</p>
+
 
 Play the original **game music** (or add own sound files):
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/6%20music%20player.png" width="40%"/>
+</p>
+
 
 Use the **pud browser** to load any map you want:
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/7%20pud%20browser.png" width="60%"/>
+</p>
+
+
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/7%20pud%20browser%20map%20loaded.png" width="80%"/>
+</p>
 
 
 
