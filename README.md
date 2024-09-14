@@ -65,7 +65,7 @@ As written, I worked for three years in my rare freetime, completely alone on th
 This work would definitely not have been possible without
 
  - [Warcraft II PUDs utilities](https://github.com/war2/war2tools) written by Jean Guyomarc'h to handle pud files and icons
- - [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus)  which are used to initially extract media from the original Warcraft 2 copy
+ - [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus) which are used to initially extract media from the original Warcraft 2 copy
 
 ## What is missing in war2.5? What can I contribute?
 Oh well, a lot of things are either missing, buggy or might be optimized. There are small things you could start with, e.g., when double clicking a unit all visible units of the same type should be selected. And there are big things you could contribute, e.g., optimizing pathfinding. Some more examples:
@@ -224,6 +224,35 @@ Copy DLLs from their respective lib folders to the build folder
 
 
 # How to run
+This repository does not contain any Warcraft 2 assets. Hence, to run war2.5, a Warcraft 2 Battle.Net edition is required for data extraction. Your CD folder should look like this:
+
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/war2_iso_contents.png"/>
+</p>
+
+## Windows ##
+This work would definitely not have been possible without [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus) which are used to initially extract media from your original Warcraft 2 copy.
+
+* Go to [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus)
+* Go to _Releases_
+* Download wargus executable, install/extract it
+* Run (replace _your_warcraft2_cd_folder_ with the actual folder path)
+```bash
+wartool.exe your_warcraft2_cd_folder extracted_data
+```
+* Folder _extracted_data_ should now contain several folders
+* Copy the folders _extracted_data/graphics_, _extracted_data/music_ and _extracted_data/sounds_ into the war2.5 _build/data_ folder
+* The final result should look like this (the folders _maps_ and _tilesets_ where already included inside the  _build/data_ folder):
+
+<p align="center">
+  <img src="https://github.com/hsbgit/war25/blob/main/github_media/war25_build_data.png"/>
+</p>
+
+That's it, start war2.5!
+
+
+## Linux ##
+
 
 
 
