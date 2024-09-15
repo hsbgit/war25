@@ -21,7 +21,7 @@ I started working on this in 2021 as a single developer during my free time. Now
 
 [See Section *How to build*](#how-to-build)
 
-[See Section *How to run*](#how-to-run)
+[See Section *How to run*](#how-to-run-linuxwindows)
 
 ## First Impressions
 Play your favorite map in any season. Press w,s,a,d to switch the season on the fly without reloading/restarting. Minimap can be seen at the top right.
@@ -230,7 +230,7 @@ This repository does not contain any Warcraft 2 assets. Hence, to run war2.5, a 
   <img src="https://github.com/hsbgit/war25/blob/main/github_media/war2_iso_contents.png"/>
 </p>
 
-As a first step, we have to extract the assets (sounds, graphics, etc.) from the CD. This work would definitely not be possible without [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus) which are used to initially extract media from your original Warcraft 2 copy.
+As a first step, we have to extract the assets (sounds, graphics, etc.) from the CD. This work would definitely not be possible without [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus) which are used to initially extract assets from your original Warcraft 2 copy.
 
 * [Download the wartool executable](https://github.com/hsbgit/war25/raw/main/wartool/wartool.zip). The wartool executable as a part of the Wargus project allows extracting required assets from your Battle.Net CD.
 * Use wartool (Linux) or wartool.exe (Windows)
