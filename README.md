@@ -10,7 +10,7 @@ It is important to note that in order to use this open source project, **an orig
 
 
 # What is war2.5
-Warcraft II: Tides of Darkness was released in Europe in 1996. As a small kid, I immediately fell in love with this game. I spent hundreds of ours playing it, I had endless network battles with my father and sister. Since Warcraft II had a heavy influence on me and I am still in love with this game, I decided to create war2.5, which is an inofficial open source remake of Warcraft II. It has the following goals:
+Warcraft II: Tides of Darkness was released in Europe in 1996. As a small kid, I immediately fell in love with this game. I spent hundreds of ours playing it, I had endless network battles with my family and friends. Since Warcraft II had a heavy influence on me and I am still in love with this game, I decided to create war2.5, which is an inofficial open source remake of Warcraft II. It has the following goals:
 
 - Keep the original Warcraft II feeling and be compatible with existing maps
 - While offering a modern GUI and higher resolutions
@@ -37,14 +37,14 @@ Play your favorite map in any season. Press w,s,a,d to switch the season on the 
 
 
 ## Programming language: C++ and a bit of C
-C++ is the programming language I started learning programming with. I wanted to create an open source project that uses object-oriented programming (OOP) in modern C++. Thus, classes, inheritance, polymorphism and further concepts are used. My goal was to write code that is maintainable and flexible while using modern C++ such as C++17 and C++20 features. You know Warcraft II and as a programmer you expect objects of type "Mage"? Then just look into Mage.h and Mage.cpp. Interested in how Peasants mine gold? Just open CompositeStateMining.h and have a look. No guessing around in messy source files to find where a specific piece of logic might be located.
+C++ is the programming language I started learning programming with. I wanted to create an open source project that uses object-oriented programming (OOP) in modern C++. Thus, classes, inheritance, polymorphism and further concepts are used. My goal was to write code that is maintainable and flexible while using modern C++ such as C++17 and C++20 features. You know Warcraft II and as a programmer you expect objects of type "Mage"? Then just look into Mage.h and Mage.cpp. Interested in how Peasants mine gold? Just open CompositeStateMining.h and have a look. 
 
 The current game is designed using the RTS lockstep approach. This means, all relevant actions such as unit production or movements result in events that are executed at the beginning of a new gameframe (=tick). This is especially important when considering so far missing multiplayer code. The current code is far from perfect, but I think it allows you to contribute. You contribution is highly welcomed!
 
 [See Section *How to build*](#how-to-build)
 
 ## What is the current state of development of war2.5?
-As written, I worked for three years in my rare freetime, completely alone on this project. Nonetheless, this project has a quite advanced development state. war2.5 is playable (at least a bit)! Many game mechanics have already been implemented. However, several major components are still missing, such as proper animation and time/frame management, network, AI... Just some of the things that work:
+As written, I worked for three years in my rare freetime, completely alone on this project. Nonetheless, this project has a quite advanced development state. war2.5 is at least a bit playable! Many game mechanics have already been implemented. However, several major components are still missing, such as proper animation and time/frame management, network, AI... Just some of the things that work:
 
 -	Compatible with 99% of the existing *.pud files. Some *.pud lead to crashes but this is sth. for later investigation
 -	Sound
@@ -223,20 +223,18 @@ Copy DLLs from their respective lib folders to the build folder
 * SDL2.dll
 
 
-# How to run
+# How to run (Linux&Windows)
 This repository does not contain any Warcraft 2 assets. Hence, to run war2.5, a Warcraft 2 Battle.Net edition is required for data extraction. Your CD folder should look like this:
 
 <p align="center">
   <img src="https://github.com/hsbgit/war25/blob/main/github_media/war2_iso_contents.png"/>
 </p>
 
-## Windows ##
-This work would definitely not have been possible without [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus) which are used to initially extract media from your original Warcraft 2 copy.
+As a first step, we have to extract the assets (sounds, graphics, etc.) from the CD. This work would definitely not be possible without [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus) which are used to initially extract media from your original Warcraft 2 copy.
 
-* Go to [Wargus Importer and scripts for Warcraft II](https://github.com/Wargus/wargus)
-* Go to _Releases_
-* Download wargus executable, install/extract it
-* Run (replace _your_warcraft2_cd_folder_ with the actual folder path)
+* [Download the wartool executable](https://github.com/hsbgit/war25/raw/main/wartool/wartool.zip). The wartool executable as a part of the Wargus project allows extracting required assets from your Battle.Net CD.
+* Use wartool (Linux) or wartool.exe (Windows)
+* Run (replace _your_warcraft2_cd_folder_ with the actual folder path):
 ```bash
 wartool.exe your_warcraft2_cd_folder extracted_data
 ```
@@ -249,10 +247,3 @@ wartool.exe your_warcraft2_cd_folder extracted_data
 </p>
 
 That's it, start war2.5!
-
-
-## Linux ##
-
-
-
-
