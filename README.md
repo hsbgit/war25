@@ -212,6 +212,14 @@ war2tools has no pre-compiled release. Thus, we have to compile this lib on our 
 ### CMakeLists.txt
 Change the windows src/3rdparty/win/ paths to the paths corresponding with the correct lib version numbers.
 
+### CMake (cmake-gui)
+* Install and start cmake-gui
+* _Where is the source code:_ Enter absolute path to _src/_ folder
+* _Where to build the binaries:_ Enter absolute path to existing _src/build_ folder
+* Press _Configure_ button
+* Press _Generate_ button
+* E.g., Visual Studio solution file (*.sln) has been generated into _src/build_, open it
+
 **Done**, compiling and linking should work.
 
 ### Required DLLs
