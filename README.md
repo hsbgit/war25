@@ -177,25 +177,25 @@ make -j4
 ## Windows
 Unfortunately, we have can’t simply do *sudo apt-get install* all required libs when using windows. Hence, we have to get the following third party libraries on our own. However, we do not build them; We simply use the provided releases.
 
-To make things even more simple, a fully functional set of libs is already included in 3rdparty/win. This means the following steps are not required unless you want to change to another lib version.
+**To make things even more simple, a fully functional set of libs is already included in 3rdparty/win. This means the following steps are not required unless you want to change to another lib version.**
 
 ### SDL2
 * https://github.com/libsdl-org/SDL/releases
 * Download pre-compiled release for visual studio
 * E.g., SDL2-devel-2.30.0-VC.zip
-* Unzip into 3rdparty/win/, e.g., /3rdparty/win/SDL2-2.30.0/
+* Unzip into src/3rdparty/win/, e.g., src/3rdparty/win/SDL2-2.30.0/
 
 ### SDL_image
 * https://github.com/libsdl-org/SDL_image/releases
 * Download pre-compiled release for visual studio
 * E.g., SDL2_image-devel-2.8.2-VC.zip
-* Unzip into 3rdparty/win/
+* Unzip into src/3rdparty/win/
 
 ### SDL_mixer
 * https://github.com/libsdl-org/SDL_mixer/releases
 * Download pre-compiled release for visual studio
 * E.g., SDL2_mixer-devel-2.8.0-VC.zip
-* Unzip into 3rdparty/win/
+* Unzip into src/3rdparty/win/
 
 ### war2tools
 war2tools has no pre-compiled release. Thus, we have to compile this lib on our own:
@@ -206,11 +206,19 @@ war2tools has no pre-compiled release. Thus, we have to compile this lib on our 
 * Set "Where to build the binaries" to a new "build" folder
 * Generate
 * Compile with visual studio
-* Copy build/libpud/Release/libpud.lib and libwar2.lib into 3rdparty/win/war2tools/lib
-* Copy include folder to 3rdparty/win/war2tools/include
+* Copy build/libpud/Release/libpud.lib and libwar2.lib into src/3rdparty/win/war2tools/lib
+* Copy include folder to src/3rdparty/win/war2tools/include
 
 ### CMakeLists.txt
-Change the windows 3rdparty/win/ paths to the paths corresponding with the correct lib version numbers.
+Change the windows src/3rdparty/win/ paths to the paths corresponding with the correct lib version numbers.
+
+### CMake (cmake-gui)
+* Install and start cmake-gui
+* _Where is the source code:_ Enter absolute path to _src/_ folder
+* _Where to build the binaries:_ Enter absolute path to existing _src/build_ folder
+* Press _Configure_ button
+* Press _Generate_ button
+* E.g., Visual Studio solution file (*.sln) has been generated into _src/build_, open it
 
 **Done**, compiling and linking should work.
 
