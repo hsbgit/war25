@@ -21,6 +21,7 @@ class Object;
 #include <map>
 #include <vector>
 #include <cassert>
+#include <cstdint>
 
 #include "INode.h"
 #include "Texture.h"
