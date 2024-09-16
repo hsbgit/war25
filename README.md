@@ -168,9 +168,7 @@ sudo make install
 ### 4. Build war25
 ```bash
 git clone https://github.com/hsbgit/war25.git
-cd war25
-mkdir build
-cd build
+cd war25/src/build
 cmake ..
 make -j4
 ```
