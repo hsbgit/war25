@@ -497,12 +497,36 @@ Sprite ResourceManager_wartools::getCritterSprite(Direction direction, bool dead
 
 Animation ResourceManager_wartools::getUnitIdleAnimation(Unit* pUnit, Direction direction) {
 	if (pUnit->isSeaObject()) {
-		assert(mapUnitMovementAnimations.contains(typeid(*pUnit))); // Unit type considered?
-		assert(mapUnitMovementAnimations[typeid(*pUnit)].contains(direction)); // Appropriate direction considered?
+		if (!mapUnitMovementAnimations.contains(typeid(*pUnit))) {
+			std::cerr << "ERROR: Sea unit type not found in mapUnitMovementAnimations!" << std::endl;
+			// Return empty animation to prevent crash
+			return Animation();
+		}
+		if (!mapUnitMovementAnimations[typeid(*pUnit)].contains(direction)) {
+			std::cerr << "ERROR: Direction not found for sea unit type!" << std::endl;
+			// Try to use North direction as fallback
+			if (mapUnitMovementAnimations[typeid(*pUnit)].contains(Direction::N)) {
+				direction = Direction::N;
+			} else {
+				return Animation();
+			}
+		}
 	}
 	else {
-		assert(mapIdleAnimations.contains(typeid(*pUnit))); // Unit type considered?
-		assert(mapIdleAnimations[typeid(*pUnit)].contains(direction)); // Appropriate direction considered?
+		if (!mapIdleAnimations.contains(typeid(*pUnit))) {
+			std::cerr << "ERROR: Unit type not found in mapIdleAnimations!" << std::endl;
+			// Return empty animation to prevent crash
+			return Animation();
+		}
+		if (!mapIdleAnimations[typeid(*pUnit)].contains(direction)) {
+			std::cerr << "ERROR: Direction not found for unit type!" << std::endl;
+			// Try to use North direction as fallback
+			if (mapIdleAnimations[typeid(*pUnit)].contains(Direction::N)) {
+				direction = Direction::N;
+			} else {
+				return Animation();
+			}
+		}
 	}
 
 	// Get appropriate animation
@@ -517,8 +541,21 @@ Animation ResourceManager_wartools::getUnitIdleAnimation(Unit* pUnit, Direction 
 	 * with correct color
 	 */
 	 // ToDo: Correct color if a neutral unit is freed?
+	if (!textMap.contains(typeid(*pUnit))) {
+		std::cerr << "ERROR: Unit type not found in texture map!" << std::endl;
+		return a; // Return animation without texture
+	}
+
+	if (!textMap[typeid(*pUnit)].contains(pUnit->getOwner()->getColor())) {
+		std::cerr << "ERROR: Unit color not found in texture map!" << std::endl;
+		return a; // Return animation without texture
+	}
+
 	Texture* pCorrectColorTexture = textMap[typeid(*pUnit)][pUnit->getOwner()->getColor()];
-	assert(pCorrectColorTexture);
+	if (!pCorrectColorTexture) {
+		std::cerr << "ERROR: Texture pointer is null!" << std::endl;
+		return a; // Return animation without texture
+	}
 
 	// Update general animation with specific colored unit texture
 	a.setBaseTexture(pCorrectColorTexture);

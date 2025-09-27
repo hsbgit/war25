@@ -62,7 +62,7 @@ namespace gui {
 		ImGui::Checkbox("Draw units visibility ranges", &gDebugManager.m_object_drawVisibilityRanges);
 		ImGui::Checkbox("Allow selection of non allied units", &gDebugManager.m_object_allowNonAlliedSelection);
 		ImGui::Checkbox("Allow unit production even if there is not enough food", &gDebugManager.m_ignoreFood);
-
+		ImGui::Checkbox("Show worker wood search areas (green)", &gDebugManager.m_worker_showWoodSearchArea);
 
 		ImGui::Checkbox("Corpse vanishing", &gDebugManager.m_object_vanishing); // Careful: Objects are still associated with tile when not vanishing
 

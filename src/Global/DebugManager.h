@@ -33,6 +33,8 @@ public:
     bool m_ignoreFood = true;
 
     bool m_object_vanishing = true;
+
+    bool m_worker_showWoodSearchArea = false; // Show green highlights for wood search areas
 };
 
 extern DebugManager gDebugManager; // ToDo: Secure with #ifdef DEBUG

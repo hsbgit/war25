@@ -18,6 +18,7 @@
 #include "Global/GlobalAttributes.h"
 #include "Units/LandUnits/Peasant/Peasant.h"
 #include "Player.h"
+#include "Buildings/LumberMill.h"
 #include <cassert>
 
 
@@ -60,14 +61,45 @@ State* StateEnterBuildingForDelivery::process() {
         m_pOwner->getMap()->placeUnit(pFreeTileNextToResourceAcceptor, m_pOwner);
 
 
-        // ToDo: this is ugly. make it nice
-        const Resources& rBasic = m_pOwner->getOwner()->getBasicResourceProduction();
-        const Resources& rAdditional = m_pOwner->getOwner()->getAdditionResourceProduction();
+        // Deliver the correct resource type based on what the peasant is carrying
+        Peasant* pPeasant = dynamic_cast<Peasant*>(m_pOwner);
+        ResourceType carriedResource = pPeasant->currentlyCarrying();
 
-        Resources minedGold = Resources(rBasic.gold() + rAdditional.gold());
+        if (carriedResource == ResourceType::Gold) {
+            const Resources& rBasic = m_pOwner->getOwner()->getBasicResourceProduction();
+            const Resources& rAdditional = m_pOwner->getOwner()->getAdditionResourceProduction();
 
-        m_pOwner->getOwner()->addToResources(minedGold);
-        dynamic_cast<Peasant*>(m_pOwner)->setCarriedResource(ResourceType::Nothing);
+            Resources minedGold = Resources(rBasic.gold() + rAdditional.gold());
+            m_pOwner->getOwner()->addToResources(minedGold);
+        }
+        else if (carriedResource == ResourceType::Wood) {
+            const Resources& rBasic = m_pOwner->getOwner()->getBasicResourceProduction();
+            const Resources& rAdditional = m_pOwner->getOwner()->getAdditionResourceProduction();
+
+            int woodAmount = rBasic.lumber() + rAdditional.lumber();
+
+            // Check if player has at least one lumber mill for +25 bonus
+            bool hasLumberMill = false;
+            for (Object* obj : m_pOwner->getOwner()->getObjects()) {
+                LumberMill* lumberMill = dynamic_cast<LumberMill*>(obj);
+                if (lumberMill && !obj->isDead()) {
+                    // Check if building is constructed (for buildings, we can check health > 0)
+                    if (obj->getHealthPoints() > 0) {
+                        hasLumberMill = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hasLumberMill) {
+                woodAmount += 25;
+            }
+
+            Resources harvestedWood = Resources(0, woodAmount);
+            m_pOwner->getOwner()->addToResources(harvestedWood);
+        }
+
+        pPeasant->setCarriedResource(ResourceType::Nothing);
         return transitionToNextState();
     }
 

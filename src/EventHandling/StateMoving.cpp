@@ -211,8 +211,10 @@ State* StateMoving::process() {
 		m_pNextTileToMove = getNextTile(&temporarilyBlocked);
 
 		if (!m_pNextTileToMove) {
-			if (temporarilyBlocked)
-				return this;
+			if (temporarilyBlocked) {
+				// TODO: Implement proper yielding that doesn't break pathfinding
+				return this; // Still blocked, wait
+			}
 			else
 				return transitionToNextState();
 		}
@@ -244,7 +246,7 @@ State* StateMoving::process() {
 
 	// 10 -> 1 tile pro sekunde ?
 	Unit* pUnit = dynamic_cast<Unit*>(m_pOwner);
-	// Deklaration der Richtungsabhängigen Geschwindigkeit vorab
+	// Deklaration der Richtungsabhï¿½ngigen Geschwindigkeit vorab
 	int speed_x = 0;
 	int speed_y = 0;
 
@@ -285,15 +287,17 @@ State* StateMoving::process() {
 	m_tilePositionOffset_px.y += speed_y;
 	m_pOwner->setTilePositionOffset(m_tilePositionOffset_px);
 
-	// Überprüfung, ob das Ziel erreicht wurde (Übergang des Vorzeichens)
+	// ï¿½berprï¿½fung, ob das Ziel erreicht wurde (ï¿½bergang des Vorzeichens)
 	if (sgn(m_tilePositionOffset_px.x) != sgn(speed_x) || sgn(m_tilePositionOffset_px.y) != sgn(speed_y)) {
 		m_tilePositionOffset_px = { 0, 0 };
 		m_pOwner->clearTilePositionOffset();
-		m_pNextTileToMove = nullptr; // Nächstes Ziel-Tile zurücksetzen, da das aktuelle Ziel erreicht wurde
+		m_pNextTileToMove = nullptr; // Nï¿½chstes Ziel-Tile zurï¿½cksetzen, da das aktuelle Ziel erreicht wurde
 	}
 
 	return this;
 }
+
+
 
 
 

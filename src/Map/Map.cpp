@@ -61,6 +61,7 @@
 #include "Units/LandUnits/Knight.h"
 #include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
+#include "Units/LandUnits/Peasant/CompositeStateChopWood/StateChopWood.h"
 
 
 #include <pud.h>
@@ -1391,6 +1392,27 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 					r.h = 32;
 
 					pRenderer->drawFilledRect(r, 255, 255, 0, 130);
+				}
+			}
+		}
+	}
+
+	// Draw wood search areas if debug option is enabled
+	if (gDebugManager.m_worker_showWoodSearchArea) {
+		std::vector<std::vector<Tile*>> searchAreas;
+		StateLumberWood::getActiveWoodSearchAreas(searchAreas);
+
+		for (const auto& searchArea : searchAreas) {
+			for (Tile* pTile : searchArea) {
+				if (pTile && pViewPort->isTileVisible(pTile)) {
+					Rect r;
+					r.x = pViewPort->tileToPixel(pViewPort->worldToScreen_tile(pTile->getPos())).x;
+					r.y = pViewPort->tileToPixel(pViewPort->worldToScreen_tile(pTile->getPos())).y;
+					r.w = 32;
+					r.h = 32;
+
+					// Draw green border (like unit selection)
+					pRenderer->drawRect(r, 0, 255, 0);
 				}
 			}
 		}

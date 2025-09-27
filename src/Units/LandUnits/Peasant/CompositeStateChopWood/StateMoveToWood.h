@@ -30,8 +30,12 @@ public:
 
 	State* process() override;
 
+	// Set reference to composite state for position memory
+	void setCompositeState(class CompositeStateChopWood* pComposite);
+
 private:
 	State* m_pIdle;
+	class CompositeStateChopWood* m_pComposite = nullptr;
 
 	Point goldmine_tile_world;
 	Tile* m_pNextReachableTile = nullptr;

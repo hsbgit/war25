@@ -17,6 +17,7 @@
 #pragma once
 
 #include "EventHandling/State.h"
+#include "Types.h"
 #include <functional>
 
 class Peasant;
@@ -31,6 +32,10 @@ public:
 
     State* process() override;
 
+    // Methods to remember and retrieve the last wood position
+    void setLastWoodPosition(const Point& pos);
+    Point getLastWoodPosition() const;
+
 private:
     std::function<bool()> f_PeasantCarriesResource;
     std::function<bool()> f_isdead;
@@ -41,6 +46,9 @@ private:
     State* m_collectRessource = nullptr;
     State* m_returningRessource = nullptr;
     State* m_deliverRessource = nullptr;
+
+    // Remember the last wood position to return to after delivery
+    Point m_lastWoodPosition = {-1, -1};
 };
 
 

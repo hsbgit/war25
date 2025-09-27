@@ -20,6 +20,7 @@
 #include "Units/LandUnits/Peasant/CompositeStateMining/StateReturningResource.h"
 #include "Units/LandUnits/Peasant/CompositeStateMining/StateEnterBuildingForDelivery.h"
 #include "Units/LandUnits/Peasant/Peasant.h"
+#include <iostream>
 
 
 CompositeStateChopWood::CompositeStateChopWood(Peasant* pPeasant) : State(pPeasant) {
@@ -27,6 +28,12 @@ CompositeStateChopWood::CompositeStateChopWood(Peasant* pPeasant) : State(pPeasa
     m_collectRessource = new StateLumberWood(pPeasant, pPeasant->m_pIdle);
     m_returningRessource = new StateReturningResource(pPeasant, pPeasant->m_pIdle);
     m_deliverRessource = new StateEnterBuildingForDelivery(pPeasant);
+
+    // Set the move to wood state reference so StateLumberWood can return to it
+    static_cast<StateLumberWood*>(m_collectRessource)->setMoveToWoodState(m_movingToRessource);
+
+    // Set the composite state reference so StateMoveToWood can remember positions
+    static_cast<StateMoveToWood*>(m_movingToRessource)->setCompositeState(this);
 
 
     // Transitions
@@ -72,11 +79,43 @@ CompositeStateChopWood::~CompositeStateChopWood() {
 
 void CompositeStateChopWood::onEnter(const Event* pEvent) {
     assert(pEvent);
+
+    // Store the initial wood position
+    m_lastWoodPosition.x = pEvent->tileX();
+    m_lastWoodPosition.y = pEvent->tileY();
+
     m_pCurrState->onEnter(pEvent);
 }
 
 
 State* CompositeStateChopWood::process() {
+    State* oldState = m_pCurrState;
     m_pCurrState = m_pCurrState->process();
+
+    // Debug state transitions
+    if (oldState != m_pCurrState) {
+        if (m_pCurrState == m_movingToRessource) {
+            std::cerr << "DEBUG: Transitioning to MovingToResource state" << std::endl;
+            // Call onEnter without event to trigger wood position logic
+            m_pCurrState->onEnter(nullptr);
+        } else if (m_pCurrState == m_collectRessource) {
+            std::cerr << "DEBUG: Transitioning to CollectResource state" << std::endl;
+        } else if (m_pCurrState == m_returningRessource) {
+            std::cerr << "DEBUG: Transitioning to ReturningResource state" << std::endl;
+        } else if (m_pCurrState == m_deliverRessource) {
+            std::cerr << "DEBUG: Transitioning to DeliverResource state" << std::endl;
+        }
+    }
+
     return m_pCurrState;
+}
+
+
+void CompositeStateChopWood::setLastWoodPosition(const Point& pos) {
+    m_lastWoodPosition = pos;
+}
+
+
+Point CompositeStateChopWood::getLastWoodPosition() const {
+    return m_lastWoodPosition;
 }
