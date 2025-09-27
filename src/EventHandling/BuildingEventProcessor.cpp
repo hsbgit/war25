@@ -55,6 +55,11 @@ BuildingEventProcessor::BuildingEventProcessor(Object* pObject, Fraction buildin
 
 
 BuildingEventProcessor::~BuildingEventProcessor() {
+    // Clean up any completed unit waiting for placement
+    if (m_pCompletedUnit) {
+        delete m_pCompletedUnit;
+        m_pCompletedUnit = nullptr;
+    }
     // ToDo: cancel ongoing research stuff
 }
 
@@ -109,6 +114,16 @@ void BuildingEventProcessor::handleEvent(const Event& event) {
 
 
 void BuildingEventProcessor::doEventHandling() {
+    // First, try to place any completed unit that's waiting for space
+    if (m_pCompletedUnit) {
+        if (tryPlaceCompletedUnit()) {
+            m_pCompletedUnit = nullptr; // Unit successfully placed
+            m_eventQueue.pop();
+            setEventInProgress(false);
+        }
+        return; // Don't start new production while waiting to place unit
+    }
+
     // Do not change from EventProcessor::isEventInProgress() to isEventInProgress()
     // This will break the Townhall when upgrading to keep or castle!
     if(!EventProcessor::isEventInProgress() && hasQueuedEvents()) {
@@ -123,34 +138,52 @@ void BuildingEventProcessor::doEventHandling() {
         m_requiredEventTicks = calculateRequiredTicksForGameAction( m_currEventInProgressItem.researchTime() );
         setEventInProgress(true);
     } else if(EventProcessor::isEventInProgress() && (++m_tickCnt == m_requiredEventTicks)) {
-        if (eventFinished(m_eventQueue.front())) {
-            m_eventQueue.pop();
-            setEventInProgress(false);
-        } else {
-            // Unit creation failed due to no space - keep trying every few ticks
-            m_tickCnt = m_requiredEventTicks - 30; // Retry every 30 ticks (~0.5 seconds)
-        }
+        eventFinished(m_eventQueue.front());
     }
 }
 
 
-bool BuildingEventProcessor::eventFinished(const Event& event) {
+void BuildingEventProcessor::eventFinished(const Event& event) {
     ProductionItem::ItemType itemType = (ProductionItem::ItemType)event.getEventID();
 
     if (m_currEventInProgressItem.isResearchItem()) {
         TechnologyManager* pTechManager = m_pObjectOwner->getTechnologyCoordinator();
         pTechManager->researchFinished(itemType);
-        return true;
+        m_eventQueue.pop();
+        setEventInProgress(false);
+        return;
     }
- 
-    return createUnit(itemType);
+
+    // Create unit and store it if placement fails
+    m_pCompletedUnit = createUnitObject(itemType);
+    assert(m_pCompletedUnit);
+
+    // Equip with all so far researched upgrades
+    TechnologyManager* pTechManager = m_pObjectOwner->getTechnologyCoordinator();
+    pTechManager->installUpgrades(m_pCompletedUnit);
+
+    // Try to place the unit immediately
+    if (tryPlaceCompletedUnit()) {
+        m_pCompletedUnit = nullptr; // Unit successfully placed
+        m_eventQueue.pop();
+        setEventInProgress(false);
+    }
+    // If placement fails, m_pCompletedUnit remains set and will be retried in doEventHandling()
 }
 
 
-bool BuildingEventProcessor::createUnit(ProductionItem::ItemType unitType) {
-    int tileSize = (unitType > ProductionItem::ItemType::LANDUNITS_END) ? 2 : 1;
+bool BuildingEventProcessor::tryPlaceCompletedUnit() {
+    if (!m_pCompletedUnit) {
+        return false;
+    }
 
-    Object::Type landAirSea = getUnitDomain(unitType); 
+    // Determine tile size based on unit type
+    int tileSize = 1; // Default for land units
+    if (m_pCompletedUnit->isSeaObject() || m_pCompletedUnit->isAirObject()) {
+        tileSize = 2; // Sea and air units are larger
+    }
+
+    Object::Type landAirSea = m_pCompletedUnit->getType();
     Tile* pTile = getObject()->getMap()->getFreeTileAroundBuilding(getObject(), tileSize, landAirSea);
 
     if (!pTile) {
@@ -160,15 +193,8 @@ bool BuildingEventProcessor::createUnit(ProductionItem::ItemType unitType) {
         return false;
     }
 
-
-    Object* pObject = createUnitObject(unitType);
-    assert(pObject);
-   
-
-    // Equip with all so far researched upgrades
-    TechnologyManager* pTechManager = m_pObjectOwner->getTechnologyCoordinator();
-    pTechManager->installUpgrades(pObject);
-    getObject()->getMap()->placeUnit(pTile, pObject);
+    // Place the unit
+    getObject()->getMap()->placeUnit(pTile, m_pCompletedUnit);
     return true;
 }
 

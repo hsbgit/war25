@@ -57,8 +57,8 @@ protected:
 	void queueEvent(const Event& event) {}
 
 private:
-	bool eventFinished(const Event& event);
-	bool createUnit(ProductionItem::ItemType unitType);
+	void eventFinished(const Event& event);
+	bool tryPlaceCompletedUnit();
 
 	Object::Type getUnitDomain(ProductionItem::ItemType unitType);
 	Object* createUnitObject(ProductionItem::ItemType unitType);
@@ -91,4 +91,7 @@ private:
 
 	Map* m_pMap;
 	Fraction m_buildingFraction;
+
+	// Store completed unit waiting for placement
+	Object* m_pCompletedUnit = nullptr;
 };
