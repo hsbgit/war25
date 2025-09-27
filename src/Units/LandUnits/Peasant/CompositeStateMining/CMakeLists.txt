@@ -1,19 +1,18 @@
-# -----------------------------------------------------------------------------
-# This project is licensed under the GNU General Public License v3.0.
-# See the LICENSE file in the root directory or <https://www.gnu.org/licenses/>.
-# -----------------------------------------------------------------------------
-SET(SRC_LIST
-    ${SRC_LIST}
-    ${CMAKE_CURRENT_SOURCE_DIR}/CompositeStateMining.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/CompositeStateMining.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/StateCollectGold.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/StateCollectGold.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/StateEnterBuildingForDelivery.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/StateEnterBuildingForDelivery.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/StateMoveToGoldmine.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/StateMoveToGoldmine.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/StateReturningResource.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/StateReturningResource.h
-    PARENT_SCOPE)
+# war25 Peasant Mining component library
+set(MINING_SOURCES
+    CompositeStateMining.cpp
+    CompositeStateMining.h
+    StateCollectGold.cpp
+    StateCollectGold.h
+    StateEnterBuildingForDelivery.cpp
+    StateEnterBuildingForDelivery.h
+    StateMoveToGoldmine.cpp
+    StateMoveToGoldmine.h
+    StateReturningResource.cpp
+    StateReturningResource.h
+)
+
+add_library(war25_peasant_mining OBJECT ${MINING_SOURCES})
+target_link_libraries(war25_peasant_mining PUBLIC war25_common)
 
 

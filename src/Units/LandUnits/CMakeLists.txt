@@ -1,24 +1,23 @@
-# -----------------------------------------------------------------------------
-# This project is licensed under the GNU General Public License v3.0.
-# See the LICENSE file in the root directory or <https://www.gnu.org/licenses/>.
-# -----------------------------------------------------------------------------
+# war25 LandUnits component library
 add_subdirectory(Dwarfes)
 add_subdirectory(Peasant)
 
-SET(SRC_LIST
-    ${SRC_LIST}
-    ${CMAKE_CURRENT_SOURCE_DIR}/Archer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Archer.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Ballista.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Ballista.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Footman.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Footman.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Knight.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Knight.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Mage.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Mage.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Skeleton.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Skeleton.h
-    PARENT_SCOPE)
+set(LAND_UNITS_SOURCES
+    Archer.cpp
+    Archer.h
+    Ballista.cpp
+    Ballista.h
+    Footman.cpp
+    Footman.h
+    Knight.cpp
+    Knight.h
+    Mage.cpp
+    Mage.h
+    Skeleton.cpp
+    Skeleton.h
+)
+
+add_library(war25_units_land OBJECT ${LAND_UNITS_SOURCES})
+target_link_libraries(war25_units_land PUBLIC war25_common)
 
 

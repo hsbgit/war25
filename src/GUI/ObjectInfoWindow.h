@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2024 P. Last
+Copyright (C) 2024 P. Last
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -18,35 +18,57 @@
 
 #include "Window.h"
 #include <set>
+#include <chrono>
 
 class Object;
+// Forward-Decl reicht für den Header:
+enum class Fraction;
 
 namespace gui {
+
 	class ObjectInfoWindow : public ImGuiWindow {
 	public:
-		ObjectInfoWindow(const std::set<Object*>& selectedObjects) : m_selectedObjects(selectedObjects) {
-
-		}
+		explicit ObjectInfoWindow(const std::set<Object*>& selectedObjects)
+			: m_selectedObjects(selectedObjects) {}
 
 		void onLeftClicked(const Point& tile_world);
 		void onRightClicked(const Point& tile_world);
 
-		inline bool isActionButtonActive() const {
-			return m_selectedAction != -1;
-		}
+		inline bool isActionButtonActive() const { return m_selectedAction != kNoAction; }
 
 		void draw() override;
 
+		// optional: durch Auswahl blättern (Tab/Shift+Tab nutzt diese)
+		void cycleSelection(int delta);
+		Object* currentObject() const { return m_pCurrSelectedObject; }
+
 	private:
+		// render
 		void renderUnitInfo();
 		void renderArmedInfo();
 		void renderBuildingInfo();
 		void renderBuildingProgressIndicatorAndEvents();
 		void renderActions();
 
-		int m_selectedAction = -1;
-		Object* m_pCurrSelectedObject = nullptr;
-		const std::set<Object*>& m_selectedObjects; // Reference to keep everything automatically synchronized with 'm_selectedObjects' of class Game (dead units are removed etc.)
-	};
-}
+		// utils
+		void ensureValidCurrentSelection();
+		static const char* factionLabel(Fraction f);
 
+		template<class Vec>
+		bool isValidActionIndex(int idx, const Vec& v) const {
+			return idx >= 0 && idx < static_cast<int>(v.size());
+		}
+
+		void playAcknowledgeDebounced(std::chrono::milliseconds minInterval);
+
+	private:
+		static constexpr int kNoAction = -1;
+
+		int     m_selectedAction = kNoAction;
+		Object* m_pCurrSelectedObject = nullptr;
+		const std::set<Object*>& m_selectedObjects;
+
+		std::chrono::steady_clock::time_point m_lastAcknowledgeTs{};
+	};
+
+} // namespace gui

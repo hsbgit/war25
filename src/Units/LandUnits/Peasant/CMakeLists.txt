@@ -1,15 +1,14 @@
-# -----------------------------------------------------------------------------
-# This project is licensed under the GNU General Public License v3.0.
-# See the LICENSE file in the root directory or <https://www.gnu.org/licenses/>.
-# -----------------------------------------------------------------------------
+# war25 Peasant component library
 add_subdirectory(CompositeStateChopWood)
 add_subdirectory(CompositeStateConstructBuilding)
 add_subdirectory(CompositeStateMining)
 
-SET(SRC_LIST
-    ${SRC_LIST}
-    ${CMAKE_CURRENT_SOURCE_DIR}/Peasant.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Peasant.h
-    PARENT_SCOPE)
+set(PEASANT_SOURCES
+    Peasant.cpp
+    Peasant.h
+)
+
+add_library(war25_units_peasant OBJECT ${PEASANT_SOURCES})
+target_link_libraries(war25_units_peasant PUBLIC war25_common)
 
 

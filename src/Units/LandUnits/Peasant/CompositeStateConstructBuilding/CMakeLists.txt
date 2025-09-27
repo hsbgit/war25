@@ -1,11 +1,10 @@
-# -----------------------------------------------------------------------------
-# This project is licensed under the GNU General Public License v3.0.
-# See the LICENSE file in the root directory or <https://www.gnu.org/licenses/>.
-# -----------------------------------------------------------------------------
-SET(SRC_LIST
-    ${SRC_LIST}
-    ${CMAKE_CURRENT_SOURCE_DIR}/CompositeStateConstructBuilding.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/CompositeStateConstructBuilding.h
-    PARENT_SCOPE)
+# war25 Peasant ConstructBuilding component library
+set(CONSTRUCTBUILDING_SOURCES
+    CompositeStateConstructBuilding.cpp
+    CompositeStateConstructBuilding.h
+)
+
+add_library(war25_peasant_constructbuilding OBJECT ${CONSTRUCTBUILDING_SOURCES})
+target_link_libraries(war25_peasant_constructbuilding PUBLIC war25_common)
 
 

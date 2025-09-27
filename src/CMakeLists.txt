@@ -1,94 +1,94 @@
 # -----------------------------------------------------------------------------
+# war25 - Modern CMake Implementation
 # This project is licensed under the GNU General Public License v3.0.
-# See the LICENSE file in the root directory or <https://www.gnu.org/licenses/>.
 # -----------------------------------------------------------------------------
+cmake_minimum_required(VERSION 3.20)
+project(war25 LANGUAGES CXX)
 
-# ----------------------------------------------------------------------------
-# !!! ToDo: This file needs a big refactoring !!!
-# ----------------------------------------------------------------------------
-
-SET(project_name war25) 
-project(${project_name})
-cmake_minimum_required(VERSION 3.0.2)
+# Modern C++ standards
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Enable debug if required
-set (CMAKE_BUILD_TYPE  Debug)
-
-
-#set(Boost_USE_STATIC_LIBS OFF)
-#find_package(Boost COMPONENTS *boost libraries here*)
-
-
-if (WIN32)
-# C++ standard is set as a command line option in visual studio
-# https://stackoverflow.com/questions/41308933/how-to-enable-c17-compiling-in-visual-studio 
-
-# SDL2
-SET(SDL2_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2-2.30.0/include)
-#SET(SDL2_DIRECT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2/include/SDL2)
-SET(SDL2_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2-2.30.0/lib/x64/SDL2.lib)
-
-# SDL_image
-SET(SDL_IMAGE_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2_image-2.8.2/include)
-SET(SDL_IMAGE_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2_image-2.8.2/lib/x64/SDL2_image.lib)
-
-# SDL_mixer
-SET(SDL_MIXER_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2_mixer-2.8.0/include)
-SET(SDL2_MIXER_LIB ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2_mixer-2.8.0/lib/x64/SDL2_mixer.lib)
-#SET(SDL2_MIXER_TIMIDITY_LIB ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/SDL2/lib/timidity.lib)
-#SET(SDL2_MIXER_NATIVE_MIDI_LIB ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/SDL2/lib/native_midi.lib) # Requires Winmm.lib
-
-# war2tools
-SET(WAR2TOOLS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/war2tools/include)
-SET(LIBPUD_LIB ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/war2tools/lib/libpud.lib)
-SET(LIBWAR2_LIB ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/war2tools/lib/libwar2.lib)
-
-else ()
-find_package(SDL2 REQUIRED)
-find_package(PNG REQUIRED)
-find_package(glfw3 REQUIRED)
-
-SET(SDL2_INCLUDE_DIR /usr/local/include/SDL2/)
-include_directories(${SDL2_INCLUDE_DIRS})
-SET(SDL_IMAGE_LIBRARY /usr/lib/x86_64-linux-gnu/libSDL2_image-2.0.so)
-SET(SDL2_TTF SDL2_ttf)
-SET(SDL2_MIXER_LIB SDL2_mixer)
-
-SET(GL3W_INCLUDE_DIR /usr/local/include/gl3w/)
-
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-
-
-# Headers (pud.h and war2.h) are copied to /usr/local/include during installation, no action required here
-SET(LIBPUD_LIB /usr/local/lib/libpud.so)
-SET(LIBWAR2_LIB /usr/local/lib/libwar2.so)
-
-SET(GLFW_LIB /usr/local/lib/libglfw3.a)
-
+# Build type configuration
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+# Create interface library for common settings
+add_library(war25_common INTERFACE)
 
+# Platform-specific dependency configuration
+if(WIN32)
+    # Windows dependencies (bundled)
+    set(WAR25_SDL2_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2-2.30.0")
+    set(WAR25_SDL2_IMAGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2_image-2.8.2")
+    set(WAR25_SDL2_MIXER_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/SDL2_mixer-2.8.0")
+    set(WAR25_WAR2TOOLS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/win/war2tools")
 
+    target_include_directories(war25_common INTERFACE
+        "${WAR25_SDL2_ROOT}/include"
+        "${WAR25_SDL2_IMAGE_ROOT}/include"
+        "${WAR25_SDL2_MIXER_ROOT}/include"
+        "${WAR25_WAR2TOOLS_ROOT}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
 
+    target_link_libraries(war25_common INTERFACE
+        "${WAR25_SDL2_ROOT}/lib/x64/SDL2.lib"
+        "${WAR25_SDL2_IMAGE_ROOT}/lib/x64/SDL2_image.lib"
+        "${WAR25_SDL2_MIXER_ROOT}/lib/x64/SDL2_mixer.lib"
+        "${WAR25_WAR2TOOLS_ROOT}/lib/libpud.lib"
+        "${WAR25_WAR2TOOLS_ROOT}/lib/libwar2.lib"
+        Winmm.lib
+    )
 
+else()
+    # Linux/Unix dependencies (system packages)
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    find_package(Threads REQUIRED)
+    find_package(PkgConfig REQUIRED)
 
-# The last '.' is important to allow proper header file including, e.g., #include <Global/Object.h>
-include_directories(
-${SDL2_INCLUDE_DIR}
-${SDL2_DIRECT_INCLUDE_DIR}
-${SDL_IMAGE_INCLUDE}
-${SDL_MIXER_INCLUDE}
-${GL3W_INCLUDE_DIR}
-#${GLFW_INCLUDE_DIR}
-#${PNG_INCLUDE_DIR}
-#${PNG_INCLUDES_DIR}
-#${ZLIB_INCLUDE_DIR}
-${WAR2TOOLS_INCLUDE_DIR}
-.)
+    # Use pkg-config for SDL2 libraries when possible
+    pkg_check_modules(SDL2 REQUIRED sdl2)
+    pkg_check_modules(SDL2_IMAGE sdl2_image)
+    pkg_check_modules(SDL2_MIXER sdl2_mixer)
 
-# Stackoverflow: add source in a subdirectory to a cmake project
+    target_include_directories(war25_common INTERFACE
+        ${SDL2_INCLUDE_DIRS}
+        "/usr/local/include/gl3w"
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
+    # Fallback for missing system packages - use older style libraries
+    set(SDL2_LIBS ${SDL2_LIBRARIES})
+    if(NOT SDL2_IMAGE_FOUND)
+        list(APPEND SDL2_LIBS "SDL2_image")
+    else()
+        list(APPEND SDL2_LIBS ${SDL2_IMAGE_LIBRARIES})
+    endif()
+
+    if(NOT SDL2_MIXER_FOUND)
+        list(APPEND SDL2_LIBS "SDL2_mixer")
+    else()
+        list(APPEND SDL2_LIBS ${SDL2_MIXER_LIBRARIES})
+    endif()
+
+    target_link_libraries(war25_common INTERFACE
+        ${SDL2_LIBS}
+        "/usr/local/lib/libpud.so"
+        "/usr/local/lib/libwar2.so"
+        "/usr/local/lib/libglfw3.a"
+        Threads::Threads
+        dl
+        GL
+    )
+
+    target_compile_options(war25_common INTERFACE ${SDL2_CFLAGS_OTHER})
+endif()
+
+# Component libraries
 add_subdirectory(Buildings)
 add_subdirectory(EventHandling)
 add_subdirectory(Global)
@@ -98,30 +98,44 @@ add_subdirectory(Map)
 add_subdirectory(Units)
 add_subdirectory(Resources)
 
+# Main executable sources (only root level files)
+file(GLOB MAIN_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+)
 
+# Filter out any CMake build files that might have been included
+list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*CMakeFiles.*")
+list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*cmake-build.*")
+list(FILTER MAIN_SOURCES EXCLUDE REGEX ".*build.*")
 
-aux_source_directory(. SRC_LIST)
+# Create main executable with all object libraries
+add_executable(${PROJECT_NAME}
+    ${MAIN_SOURCES}
+    $<TARGET_OBJECTS:war25_buildings>
+    $<TARGET_OBJECTS:war25_eventhandling>
+    $<TARGET_OBJECTS:war25_global>
+    $<TARGET_OBJECTS:war25_gui>
+    $<TARGET_OBJECTS:war25_magic>
+    $<TARGET_OBJECTS:war25_map>
+    $<TARGET_OBJECTS:war25_units>
+    $<TARGET_OBJECTS:war25_units_air>
+    $<TARGET_OBJECTS:war25_units_land>
+    $<TARGET_OBJECTS:war25_units_sea>
+    $<TARGET_OBJECTS:war25_units_resource>
+    $<TARGET_OBJECTS:war25_units_dwarfes>
+    $<TARGET_OBJECTS:war25_units_peasant>
+    $<TARGET_OBJECTS:war25_peasant_chopwood>
+    $<TARGET_OBJECTS:war25_peasant_constructbuilding>
+    $<TARGET_OBJECTS:war25_peasant_mining>
+    $<TARGET_OBJECTS:war25_resources>
+)
 
-add_executable(${PROJECT_NAME} ${SRC_LIST})
+# Link only the external dependencies (no internal libraries needed anymore)
+target_link_libraries(${PROJECT_NAME} PRIVATE war25_common)
 
-
-# -Wall -Wextra -pedantic -Werror
-# add_compile_options(-j2) not working
-#target_compile_options(${PROJECT_NAME} PRIVATE "-j 2"")
-#SET(CMAKE_CXX_FLAGS "-j 2")
-
-
-
-target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARY} ${SDL_IMAGE_LIBRARY} ${SDL2_TTF} ${SDL2_MIXER_LIB} ${SDL2_MIXER_TIMIDITY_LIB} ${SDL2_MIXER_NATIVE_MIDI_LIB} ${LIBWAR2_LIB} ${LIBPUD_LIB})
-if (WIN32)
-# Winmm.lib is required by ${SDL2_MIXER_NATIVE_MIDI_LIB}
-target_link_libraries(${PROJECT_NAME} Winmm.lib)
-else ()
-target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARIES} ${GLFW_LIB} glfw -lpthread dl GL)
-endif()
-
-#target_link_libraries(${PROJECT_NAME} ${SDL2_LIBRARY} ${SDL_IMAGE_LIBRARY} ${SDL2_TTF} ${SDL2_MIXER_LIB} ${LIBWAR2_LIB} ${LIBPUD_LIB} ${GLFW_LIB} dl GL) #  ${PNG_LIBRARIES}   ${ZLIB_LIBRARY}
-
-# only linux...
-#target_link_libraries(${project_name} -lpthread)
-
+# Platform-specific compile definitions
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    $<$<PLATFORM_ID:Windows>:WIN32_LEAN_AND_MEAN>
+    $<$<PLATFORM_ID:Windows>:NOMINMAX>
+)

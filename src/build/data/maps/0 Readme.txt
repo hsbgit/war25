@@ -1,1 +1,0 @@
-These are some freely available maps which can be loaded inside war2.5

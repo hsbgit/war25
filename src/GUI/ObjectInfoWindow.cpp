@@ -1,20 +1,21 @@
 /*
-	Copyright (C) 2024 P. Last
+Copyright (C) 2024 P. Last
 
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-	GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program. If not, see <https://www.gnu.org/licenses/>.
+    You should have received a copy of the GNU General Public License
+    along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 #include "ObjectInfoWindow.h"
+
 #include "HelperFunctions.h"
 #include "EventHandling/EventBroker.h"
 #include "Resources/SoundManager.h"
@@ -26,368 +27,352 @@
 #include "Player.h"
 #include "Units/LandUnits/Peasant/Peasant.h"
 #include "Magic/IMagical.h"
-#include <cassert>
-#include <sstream>
 
+// jetzt wo wir die Typen kennen:
+#include "Global/Action.h"        // Action + Action::ActionType
+#include "Global/Fractions.h"      // enum class Fraction
+
+#include <algorithm>
+#include <string>
+#include <vector>
+
+namespace {
+constexpr ImU32  kIconBorderSelected   = IM_COL32( 45,150,255,255);
+constexpr ImU32  kIconBorderUnselected = IM_COL32( 66,150,250,102);
+constexpr ImVec4 kBuffColor            = ImVec4(0.176f, 0.588f, 1.000f, 1.0f);
+constexpr int    kActionsPerRow        = 3;
+} // namespace
 
 namespace gui {
-	void ObjectInfoWindow::onLeftClicked(const Point& tile_world) {
-		std::vector<Action> vecActions = m_pCurrSelectedObject->getActions();
-		assert(vecActions.size()); // There must be a selected object and a corresponding action
 
-		Action& action = vecActions[m_selectedAction];
-
-		assert(action.getActionType() == Action::ActionType::WithWorldTile);
-		action.trigger(tile_world);
-
-		m_selectedAction = -1;
-	}
-
-
-	void ObjectInfoWindow::onRightClicked(const Point& tile_world) {
-		m_selectedAction = -1;
-
-		for (Object* o : m_selectedObjects) {
-			Unit* pUnit = dynamic_cast<Unit*>(o);
-			if (pUnit) {
-				std::vector<Action> actions = pUnit->getActions();
-
-				auto it = std::find_if(actions.begin(), actions.end(),
-					[](const Action& a) { return a.getEventID() == (EventID)GeneralActions::Move; });
-
-				if (it != actions.end()) {
-					g_pEventBroker.lockEventProcessor((*it).getEventProcessorID());
-					(*it).trigger(tile_world);
-				}
-			}
-		}
-
-		// Just play the "Of course", "Yes my lord" etc. sounds for the main selected unit
-		// Otherwise, e.g., 20 units are selected, we would get a loud scratchy acknowledge as 20 sound files would be played simultanously
-		if (m_pCurrSelectedObject)
-			m_pCurrSelectedObject->playSoundAcknowledge();
-	}
-
-
-	void ObjectInfoWindow::draw() {
-		if (!m_visible)
-			return;
-
-		if (ImGui::IsKeyDown(ImGuiKey_Escape)) {
-			m_selectedAction = -1;
-		}
-
-		if (!m_selectedObjects.size())
-			return;
-
-		if (!m_selectedObjects.contains(m_pCurrSelectedObject)) // The selected unit just died or is initially a nullptr
-			m_pCurrSelectedObject = *m_selectedObjects.begin(); // Simply take the first unit of the remaining ones as the new selected unit
-
-
-	  //  ImGui::SetNextWindowPos(ImGui::GetIO().MousePos, ImGuiCond_Always);
-		ImGui::Begin("Unit Selection Window");
-
-
-		/*
-		const int rightButton = 1;
-		if(ImGui::IsMouseReleased(rightButton)) {
-			m_visible = false; // todo richtig machen
-		}
-		*/
-
-
-
-
-		// heal als zaubeer: https://wowpedia.fandom.com/wiki/Paladin_(Warcraft_II)
-
-		// Render icons for all selected units
-
-		ImVec2 button_sz(40, 40);
-		ImGuiStyle& style = ImGui::GetStyle();
-		float window_visible_x2 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
-
-		int pushID = 0;
-		for (Object* pObj : m_selectedObjects) {
-			ImGui::PushID(pushID);
-
-			ImGui::BeginGroup(); // To group icon width progressbar
-
-			ImColor c = ImColor(66, 150, 250, 102);
-			if (pObj == m_pCurrSelectedObject) {
-				c = ImColor(45, 150, 255, 255); // Highlight currently selected unit from list individually
-			}
-
-			if (renderImageButton(pObj->icon(), c)) {
-				m_pCurrSelectedObject = pObj;
-				m_pCurrSelectedObject->onClicked();
-			}
-			renderProgressBar(pObj->getRelativeHealth());
-			ImGui::EndGroup();
-
-			//ImGui::Button("Box", button_sz);
-			float last_button_x2 = ImGui::GetItemRectMax().x;
-			float next_button_x2 = last_button_x2 + style.ItemSpacing.x + button_sz.x; // Expected position if next button was on same line
-			if (pushID + 1 < m_selectedObjects.size() && next_button_x2 < window_visible_x2)
-				ImGui::SameLine();
-
-			++pushID;
-			ImGui::PopID();
-		}
-
-		// Render general information valid for units and buildings
-		ImGui::Separator();
-		assert(m_pCurrSelectedObject);
-
-		ImGui::TextUnformatted((m_pCurrSelectedObject->getName()).c_str());
-		ImGui::SameLine();
-		if (m_pCurrSelectedObject->getFraction() == Fraction::Alliance)
-			ImGui::Text("(Alliance)");
-		else if (m_pCurrSelectedObject->getFraction() == Fraction::Orc)
-			ImGui::Text("(Orc)");
-		else
-			ImGui::Text("(Neutral)");
-
-
-		ImGui::SameLine();
-		ImGui::TextUnformatted(("(" + m_pCurrSelectedObject->getOwner()->getName() + ")").c_str());
-		ImGui::Separator();
-
-
-		std::string strHealth = "Health: " + std::to_string(m_pCurrSelectedObject->getHealthPoints()) + '/' + std::to_string(m_pCurrSelectedObject->getMaxHealthPoints());
-		ImGui::Text("%s", strHealth.c_str());
-
-
-		if (dynamic_cast<Unit*>(m_pCurrSelectedObject)) {
-			renderUnitInfo();
-		}
-		else if (dynamic_cast<Building*>(m_pCurrSelectedObject)) {
-			renderBuildingInfo();
-		}
-		else {
-			throw std::logic_error("Unit is neither a unit nor a building!");
-		}
-
-		renderActions();
-		renderBuildingProgressIndicatorAndEvents();
-
-
-		ImGui::NewLine();
-		ImGui::Button("Close");
-		ImGui::End();
-	}
-
-
-	void ObjectInfoWindow::renderActions() {
-		const int maxActionsPerRow = 3;
-		std::vector<Action> vecActions = m_pCurrSelectedObject->getActions();
-
-		if (!vecActions.size())
-			return;
-
-		ImGui::Separator();
-		ImGui::Text("Actions:"); // Problem: Empty actions!
-
-		for (int i = 0; i < vecActions.size(); ++i) {
-			if (i % 3 != 0)
-				ImGui::SameLine();
-
-			Action& action = vecActions[i];
-
-			if (action.getActionType() == Action::ActionType::EmptyAction) {
-				ImGui::Dummy(ImVec2(1.0, 1.0));
-				continue;
-			}
-
-			/*
-			 * 04.12.2021: So far there is a Bug within ImageButton: It uses the textureID
-			 * as internal ID what is okay if there is just one button. However, all our button icons
-			 * are located inside the same texture -> only the first one is clickable.
-			 *
-			 * Workaround: PushID, see https://github.com/ocornut/imgui/issues/2464
-			 */
-			ImGui::PushID((int)i + 7653);
-
-			ImVec4 c = (i == m_selectedAction) ? ImVec4(255, 0, 0, 102) : DefaultButtonColor;
-
-			if (renderImageButton(action.icon(), c)) {
-				g_pEventBroker.lockEventProcessor(action.getEventProcessorID());
-				g_pSoundManager->playWAV("ui/click.wav");
-
-				Building* pBuilding = dynamic_cast<Building*>(m_pCurrSelectedObject);
-				Peasant* pPeasant = dynamic_cast<Peasant*>(m_pCurrSelectedObject);
-
-				// Building actions can be executed immediately as they to not have a target tile
-				if (pBuilding != nullptr) {
-					assert(action.getActionType() == Action::ActionType::TriggerOnly);
-					action.trigger();
-				}
-				/**  else if (pPeasant != nullptr) {
-					   // sub menus??
-				   }*/
-				else {
-					if (action.getActionType() == Action::ActionType::TriggerOnly)
-						action.trigger();
-					else {
-						// The selected object is a land or air unit. The action must be connected to a tile the user left clicks on
-						m_selectedAction = i;
-					}
-				}
-			}
-
-			ImGui::PopID();
-		}
-	}
-
-
-	void ObjectInfoWindow::renderArmedInfo() {
-		// Building: Armor, damage, range sight
-
-		ImGui::Separator();
-		std::stringstream ssArmor;
-		ssArmor << "Armor : " << m_pCurrSelectedObject->getArmor();
-		ImGui::Text("%s", ssArmor.str().c_str());
-
-		if (m_pCurrSelectedObject->m_upgradeStats.additionalArmor()) {
-			//if (pArmed->additionalArmor()) {
-			ImGui::SameLine();
-			ImGui::TextColored(ImColor(45, 150, 255, 255), "%s", ("(+" + std::to_string(m_pCurrSelectedObject->m_upgradeStats.additionalArmor()) + ")").c_str());
-		}
-
-		const IArmed* pArmed = dynamic_cast<const IArmed*>(m_pCurrSelectedObject);
-		if (pArmed && pArmed->isArmed()) { // Actually only the Scout Tower implements IArmed and is unarmed without upgrade...
-			int basicDamage = pArmed->getBasicDamage();
-			int basicPiercing = pArmed->getBasicPiercingDamage();
-
-			ImGui::Text("%s", ("Damage: " + std::to_string(basicPiercing) + "-" + std::to_string(basicDamage + basicPiercing)).c_str());
-
-			if (m_pCurrSelectedObject->m_upgradeStats.additionalPiercingDamage()) {
-				ImGui::SameLine();
-				ImGui::TextColored(ImColor(45, 150, 255, 255), "%s", ("(+" + std::to_string(m_pCurrSelectedObject->m_upgradeStats.additionalPiercingDamage()) + ")").c_str());
-			}
-
-			ImGui::Text("%s", ("Range : " + std::to_string(pArmed->attackRange())).c_str());
-			if (m_pCurrSelectedObject->m_upgradeStats.additionalRange()) {
-				ImGui::SameLine();
-				ImGui::TextColored(ImColor(45, 150, 255, 255), "%s", ("(+" + std::to_string(m_pCurrSelectedObject->m_upgradeStats.additionalRange()) + ")").c_str());
-			}
-
-			if (pArmed->canAttackAirUnits()) {
-				ImGui::SameLine();
-				ImGui::TextColored(ImColor(45, 150, 255, 255), "Can attack air units");
-			}
-		}
-	}
-
-
-	void ObjectInfoWindow::renderUnitInfo() {
-		const Critter* pCritter = dynamic_cast<const Critter*>(m_pCurrSelectedObject);
-
-		// Special case: Critter is the only land unit that is NOT armed
-		// Hierarchy is: Object <- LandUnit (Armed) <- Critter
-		// We prevent rendering any armed information for critter by using the cast
-		if (pCritter == nullptr)
-			renderArmedInfo();
-
-		std::string strSight = "Sight : " + std::to_string(m_pCurrSelectedObject->getSight());
-		ImGui::Text("%s", strSight.c_str());
-		if (m_pCurrSelectedObject->m_upgradeStats.additionalSight()) {
-			ImGui::SameLine();
-			ImGui::TextColored(ImColor(45, 150, 255, 255), "%s", ("(+" + std::to_string(m_pCurrSelectedObject->m_upgradeStats.additionalSight()) + ")").c_str());
-		}
-
-		std::string strSpeed = "Speed : " + std::to_string(dynamic_cast<const Unit*>(m_pCurrSelectedObject)->getSpeed());
-		ImGui::Text("%s", strSpeed.c_str());
-
-		// Magical?
-		const IMagical* pMagical = dynamic_cast<const IMagical*>(m_pCurrSelectedObject);
-
-		if (pMagical != nullptr) {
-			ImGui::Separator();
-			ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.204f, 0.443f, 0.651f, 1.0f));
-			char buf[32];
-#ifdef _WIN32 
-			sprintf_s(buf, sizeof(buf), "%i", pMagical->getMana());
-#else 
-			snprintf(buf, sizeof(buf), "%i", pMagical->getMana());
+// --------- Auswahl vor/zurück (per Tab/Shift+Tab) ----------
+void ObjectInfoWindow::cycleSelection(int delta) {
+    if (m_selectedObjects.empty()) return;
+    ensureValidCurrentSelection();
+    if (!m_pCurrSelectedObject) return;
+
+    std::vector<Object*> order(m_selectedObjects.begin(), m_selectedObjects.end());
+    auto it  = std::find(order.begin(), order.end(), m_pCurrSelectedObject);
+    int idx  = (it == order.end()) ? 0 : static_cast<int>(std::distance(order.begin(), it));
+    int size = static_cast<int>(order.size());
+    idx = (idx + delta) % size;
+    if (idx < 0) idx += size;
+    m_pCurrSelectedObject = order[idx];
+}
+
+void ObjectInfoWindow::onLeftClicked(const Point& tile_world) {
+    if (!m_pCurrSelectedObject) return;
+    auto actions = m_pCurrSelectedObject->getActions();
+    if (!isValidActionIndex(m_selectedAction, actions)) return;
+
+    auto& action = actions[m_selectedAction];
+    if (action.getActionType() != Action::ActionType::WithWorldTile) {
+        m_selectedAction = kNoAction;
+        return;
+    }
+    action.trigger(tile_world);
+    m_selectedAction = kNoAction;
+}
+
+void ObjectInfoWindow::playAcknowledgeDebounced(std::chrono::milliseconds minInterval) {
+    const auto now = std::chrono::steady_clock::now();
+    if (now - m_lastAcknowledgeTs >= minInterval) {
+        if (m_pCurrSelectedObject) m_pCurrSelectedObject->playSoundAcknowledge();
+        m_lastAcknowledgeTs = now;
+    }
+}
+
+void ObjectInfoWindow::onRightClicked(const Point& tile_world) {
+    m_selectedAction = kNoAction;
+    if (m_selectedObjects.empty()) return;
+
+    for (Object* o : m_selectedObjects) {
+        if (auto* pUnit = dynamic_cast<Unit*>(o)) {
+            auto actions = pUnit->getActions();
+            const auto it = std::find_if(actions.begin(), actions.end(),
+                [](const Action& a){ return a.getEventID() == static_cast<EventID>(GeneralActions::Move); });
+            if (it != actions.end()) {
+                g_pEventBroker.lockEventProcessor(it->getEventProcessorID());
+                it->trigger(tile_world);
+            }
+        }
+    }
+    // kein Krach bei Multi-Select
+    playAcknowledgeDebounced(std::chrono::milliseconds(250));
+}
+
+void ObjectInfoWindow::draw() {
+    if (!m_visible) return;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_selectedAction = kNoAction;
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
+        if (ImGui::GetIO().KeyShift) cycleSelection(-1);
+        else                         cycleSelection(+1);
+    }
+
+    if (m_selectedObjects.empty()) return;
+    ensureValidCurrentSelection();
+    if (!m_pCurrSelectedObject) return;
+
+    if (!ImGui::Begin("Unit Selection Window")) {
+        ImGui::End();
+        return;
+    }
+
+    // --- Icon-Leiste ---
+    const ImVec2 buttonSz(40, 40);
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float windowRight = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+
+    int id = 0;
+    for (Object* pObj : m_selectedObjects) {
+        ImGui::PushID(id);
+        ImGui::BeginGroup();
+
+        const ImU32 border = (pObj == m_pCurrSelectedObject) ? kIconBorderSelected : kIconBorderUnselected;
+        if (renderImageButton(pObj->icon(), ImColor(border))) {
+            m_pCurrSelectedObject = pObj;
+            m_pCurrSelectedObject->onClicked();
+        }
+        renderProgressBar(pObj->getRelativeHealth());
+        ImGui::EndGroup();
+
+        const float lastX2 = ImGui::GetItemRectMax().x;
+        const float nextX2 = lastX2 + style.ItemSpacing.x + buttonSz.x;
+        if (id + 1 < static_cast<int>(m_selectedObjects.size()) && nextX2 < windowRight) ImGui::SameLine();
+
+        ++id;
+        ImGui::PopID();
+    }
+
+    // --- Basis-Infos ---
+    ImGui::Separator();
+    ImGui::TextUnformatted(m_pCurrSelectedObject->getName().c_str());
+    ImGui::SameLine(); ImGui::Text("(%s)", factionLabel(m_pCurrSelectedObject->getFraction()));
+    if (auto* owner = m_pCurrSelectedObject->getOwner()) {
+        ImGui::SameLine(); ImGui::Text("(%s)", owner->getName().c_str());
+    }
+    ImGui::Separator();
+    ImGui::Text("Health: %d/%d",
+        m_pCurrSelectedObject->getHealthPoints(),
+        m_pCurrSelectedObject->getMaxHealthPoints());
+
+    // Typ-spezifisch
+    if (dynamic_cast<Unit*>(m_pCurrSelectedObject)) {
+        renderUnitInfo();
+    } else if (dynamic_cast<Building*>(m_pCurrSelectedObject)) {
+        renderBuildingInfo();
+    } else {
+        ImGui::Separator();
+        ImGui::TextColored(ImVec4(1,0.6f,0.2f,1), "Unknown object type");
+    }
+
+    renderActions();
+    renderBuildingProgressIndicatorAndEvents();
+
+    ImGui::NewLine();
+    if (ImGui::Button("Close")) {
+        m_visible = false;
+        m_selectedAction = kNoAction;
+    }
+    ImGui::End();
+}
+
+void ObjectInfoWindow::renderActions() {
+    if (!m_pCurrSelectedObject) return;
+    auto actions = m_pCurrSelectedObject->getActions();
+    if (actions.empty()) return;
+
+    ImGui::Separator();
+    ImGui::TextUnformatted("Actions:");
+
+    for (int i = 0; i < static_cast<int>(actions.size()); ++i) {
+        if (i % kActionsPerRow != 0) ImGui::SameLine();
+
+        auto& action = actions[i];
+        if (action.getActionType() == Action::ActionType::EmptyAction) {
+            ImGui::Dummy(ImVec2(1.0f, 1.0f));
+            continue;
+        }
+
+        ImGui::PushID(i + 7653);
+        const ImVec4 color = (i == m_selectedAction) ? ImVec4(1, 0, 0, 0.4f) : DefaultButtonColor;
+
+        if (renderImageButton(action.icon(), color)) {
+            g_pEventBroker.lockEventProcessor(action.getEventProcessorID());
+            g_pSoundManager->playWAV("ui/click.wav");
+
+            const auto* pBuilding = dynamic_cast<const Building*>(m_pCurrSelectedObject);
+            if (pBuilding) {
+                // Gebäudeaktionen: sofort
+                if (action.getActionType() == Action::ActionType::TriggerOnly) {
+                    action.trigger();
+                } else {
+                    // falls ein Gebäude doch ein Tile bräuchte (sollte nicht vorkommen):
+                    m_selectedAction = i;
+                }
+            } else {
+                if (action.getActionType() == Action::ActionType::TriggerOnly) {
+                    action.trigger();
+                } else { // WithWorldTile/SubMenus
+                    m_selectedAction = i; // wartet auf Linksklick
+                }
+            }
+        }
+
+        // einfacher Tooltip (ausbaubar, wenn Action name/description hat)
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Type: %d", static_cast<int>(action.getActionType()));
+            ImGui::Text("EventID: %d", static_cast<int>(action.getEventID()));
+            ImGui::EndTooltip();
+        }
+
+        ImGui::PopID();
+    }
+}
+
+void ObjectInfoWindow::renderArmedInfo() {
+    ImGui::Separator();
+    ImGui::Text("Armor : %d", m_pCurrSelectedObject->getArmor());
+    if (m_pCurrSelectedObject->m_upgradeStats.additionalArmor()) {
+        ImGui::SameLine();
+        ImGui::TextColored(kBuffColor, "(+%d)", m_pCurrSelectedObject->m_upgradeStats.additionalArmor());
+    }
+
+    if (const auto* pArmed = dynamic_cast<const IArmed*>(m_pCurrSelectedObject)) {
+        if (pArmed->isArmed()) {
+            const int baseDmg      = pArmed->getBasicDamage();
+            const int basePiercing = pArmed->getBasicPiercingDamage();
+            ImGui::Text("Damage: %d-%d", basePiercing, baseDmg + basePiercing);
+            if (m_pCurrSelectedObject->m_upgradeStats.additionalPiercingDamage()) {
+                ImGui::SameLine();
+                ImGui::TextColored(kBuffColor, "(+%d)", m_pCurrSelectedObject->m_upgradeStats.additionalPiercingDamage());
+            }
+
+            ImGui::Text("Range : %d", pArmed->attackRange());
+            if (m_pCurrSelectedObject->m_upgradeStats.additionalRange()) {
+                ImGui::SameLine();
+                ImGui::TextColored(kBuffColor, "(+%d)", m_pCurrSelectedObject->m_upgradeStats.additionalRange());
+            }
+
+            if (pArmed->canAttackAirUnits()) {
+                ImGui::SameLine();
+                ImGui::TextColored(kBuffColor, "Can attack air units");
+            }
+        }
+    }
+}
+
+void ObjectInfoWindow::renderUnitInfo() {
+    const auto* pCritter = dynamic_cast<const Critter*>(m_pCurrSelectedObject);
+    if (!pCritter) renderArmedInfo();
+
+    ImGui::Text("Sight : %d", m_pCurrSelectedObject->getSight());
+    if (m_pCurrSelectedObject->m_upgradeStats.additionalSight()) {
+        ImGui::SameLine();
+        ImGui::TextColored(kBuffColor, "(+%d)", m_pCurrSelectedObject->m_upgradeStats.additionalSight());
+    }
+
+    if (const auto* pUnit = dynamic_cast<const Unit*>(m_pCurrSelectedObject)) {
+        ImGui::Text("Speed : %d", pUnit->getSpeed());
+    }
+
+    if (const auto* pMagical = dynamic_cast<const IMagical*>(m_pCurrSelectedObject)) {
+        ImGui::Separator();
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.204f, 0.443f, 0.651f, 1.0f));
+        char buf[32];
+    #ifdef _WIN32
+        sprintf_s(buf, sizeof(buf), "%d", pMagical->getMana());
+    #else
+        snprintf(buf, sizeof(buf), "%d", pMagical->getMana());
+    #endif
+        ImGui::ProgressBar(
+            static_cast<float>(pMagical->getMana()) / static_cast<float>(pMagical->getMaxMana()),
+            ImVec2(0.0f, 0.0f), buf);
+        ImGui::PopStyleColor();
+    }
+}
+
+void ObjectInfoWindow::renderBuildingInfo() {
+    if (const auto* pGoldMine = dynamic_cast<const GoldMine*>(m_pCurrSelectedObject)) {
+        const auto gold = static_cast<const IResourceMine*>(pGoldMine)->availableResources().gold();
+        static const ImVec4 colorGold(1.0f, 0.84f, 0.0f, 1.0f);
+        ImGui::TextColored(colorGold, "Gold left: %d", gold);
+    }
+
+    if (const auto* pFarm = dynamic_cast<const Farm*>(m_pCurrSelectedObject)) {
+        ImGui::TextUnformatted("Food Usage:");
+        ImGui::Text("Grown: %d", pFarm->getOwner()->getAvailableFood());
+        ImGui::Text("Used : %d", pFarm->getOwner()->getUsedFood());
+    }
+
+    if (const auto* pTownhall = dynamic_cast<const Townhall*>(m_pCurrSelectedObject)) {
+        const Resources& base = pTownhall->getOwner()->getBasicResourceProduction();
+        const Resources& add  = pTownhall->getOwner()->getAdditionResourceProduction();
+
+        ImGui::TextUnformatted("Production:");
+        ImGui::Text("Gold  : %d +%d",   base.gold(),   add.gold());
+        ImGui::Text("Lumber: %d +%d",   base.lumber(), add.lumber());
+        ImGui::Text("Oil   : %d +%d",   base.oil(),    add.oil());
+    }
+}
+
+void ObjectInfoWindow::renderBuildingProgressIndicatorAndEvents() {
+    const auto* pEH = dynamic_cast<const BuildingEventProcessor*>(m_pCurrSelectedObject);
+    if (!pEH) return;
+
+    if (pEH->isEventInProgress()) {
+        ImGui::Separator();
+        ImGui::TextUnformatted("Current Event Progress:");
+        const Sprite sprite = pEH->getCurrentEventIcon();
+        renderImage(sprite);
+        ImGui::SameLine();
+
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.0f, 0.7f, 0.0f, 1.0f));
+        ImGui::ProgressBar(pEH->getRelativeProgressOfCurrentEvent(), ImVec2(0.0f, 0.0f));
+        ImGui::PopStyleColor();
+        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+    }
+
+    if (!pEH->isEventInProgress()) return;
+    if (g_pEventBroker.isEventProcessorLocked(pEH->getID())) return;
+
+    const auto queued = pEH->getQueuedEventIcons();
+    if (!queued.empty()) {
+        ImGui::NewLine();
+        ImGui::Separator();
+        ImGui::TextUnformatted("Queued Events");
+        for (const auto& sprite : queued) {
+            renderImage(sprite);
+            ImGui::SameLine();
+        }
+    }
+}
+
+void ObjectInfoWindow::ensureValidCurrentSelection() {
+    if (!m_pCurrSelectedObject) {
+        if (!m_selectedObjects.empty())
+            m_pCurrSelectedObject = *m_selectedObjects.begin();
+        return;
+    }
+#if __cpp_lib_erase_if || __cplusplus >= 202002L
+    if (!m_selectedObjects.contains(m_pCurrSelectedObject)) {
+        m_pCurrSelectedObject = m_selectedObjects.empty() ? nullptr : *m_selectedObjects.begin();
+    }
+#else
+    if (m_selectedObjects.find(m_pCurrSelectedObject) == m_selectedObjects.end()) {
+        m_pCurrSelectedObject = m_selectedObjects.empty() ? nullptr : *m_selectedObjects.begin();
+    }
 #endif
-			ImGui::ProgressBar((float)pMagical->getMana() / (float)pMagical->getMaxMana(), ImVec2(0.0f, 0.0f), buf);
-			ImGui::PopStyleColor();
-		}
-		}
+}
 
+const char* ObjectInfoWindow::factionLabel(Fraction f) {
+    switch (f) {
+        case Fraction::Alliance: return "Alliance";
+        case Fraction::Orc:      return "Orc";
+        default:                 return "Neutral";
+    }
+}
 
-	void ObjectInfoWindow::renderBuildingInfo() {
-		// Iface quelle
-		const GoldMine* pGoldMine = dynamic_cast<const GoldMine*>(m_pCurrSelectedObject);
-		if (pGoldMine) {
-			std::stringstream ssInfoGold;
-			ssInfoGold << "Gold left: " << dynamic_cast<const IResourceMine*>(pGoldMine)->availableResources().gold();
-			static ImVec4 colorGold = ImVec4(1.0f, 0.84f, 0.0f, 1.00f);
-			ImGui::TextColored(colorGold, "%s", ssInfoGold.str().c_str());
-		}
-
-
-		const Farm* pFarm = dynamic_cast<const Farm*>(m_pCurrSelectedObject);
-		if (pFarm) {
-			ImGui::Text("Food Usage:");
-			ImGui::TextUnformatted(("Grown:  " + std::to_string(pFarm->getOwner()->getAvailableFood())).c_str());
-			ImGui::TextUnformatted(("Used :  " + std::to_string(pFarm->getOwner()->getUsedFood())).c_str());
-		}
-
-
-		const Townhall* pTownhall = dynamic_cast<const Townhall*>(m_pCurrSelectedObject);
-		if (pTownhall) {
-			const Resources& rBasic = pTownhall->getOwner()->getBasicResourceProduction();
-			const Resources& rAdditional = pTownhall->getOwner()->getAdditionResourceProduction();
-
-			ImGui::Text("Production:");
-			ImGui::TextUnformatted(("Gold  : " + std::to_string(rBasic.gold()) + " +" + std::to_string(rAdditional.gold())).c_str()); // auftrennen und mit color das +?
-			ImGui::TextUnformatted(("Lumber: " + std::to_string(rBasic.lumber()) + " +" + std::to_string(rAdditional.lumber())).c_str());
-			ImGui::TextUnformatted(("Oil   : " + std::to_string(rBasic.oil()) + " +" + std::to_string(rAdditional.oil())).c_str());
-		}
-
-		// arrow und cannon tower -> render armed info  
-		//renderArmedInfo
-	}
-
-
-	void ObjectInfoWindow::renderBuildingProgressIndicatorAndEvents() {
-		// Progress Indicator
-		const BuildingEventProcessor* pEH = dynamic_cast<const BuildingEventProcessor*>(m_pCurrSelectedObject);
-
-		if (pEH && pEH->isEventInProgress()) {
-			ImGui::Separator();
-			ImGui::Text("Current Event Progress:");
-
-			Sprite sprite = dynamic_cast<const BuildingEventProcessor*>(m_pCurrSelectedObject)->getCurrentEventIcon();
-			renderImage(sprite);
-
-			ImGui::SameLine();
-
-			ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.0f, 0.7f, 0.0f, 1.0f));
-			ImGui::ProgressBar(pEH->getRelativeProgressOfCurrentEvent(), ImVec2(0.0f, 0.0f));   // % Completed
-			ImGui::PopStyleColor();
-			ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-		}
-
-
-		// Queued Events
-		if (pEH && pEH->isEventInProgress()) {
-			if (g_pEventBroker.isEventProcessorLocked(pEH->getID()))
-				return;
-
-			std::vector<Sprite> vecIcons = dynamic_cast<const BuildingEventProcessor*>(m_pCurrSelectedObject)->getQueuedEventIcons();
-
-			if (vecIcons.size()) {
-				ImGui::NewLine();
-				ImGui::Separator();
-				ImGui::Text("Queued Events");
-
-				for (const auto& sprite : vecIcons) {
-					renderImage(sprite);
-					ImGui::SameLine();
-				}
-			}
-		}
-	}
-	}
+} // namespace gui

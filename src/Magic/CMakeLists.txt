@@ -1,16 +1,15 @@
-# -----------------------------------------------------------------------------
-# This project is licensed under the GNU General Public License v3.0.
-# See the LICENSE file in the root directory or <https://www.gnu.org/licenses/>.
-# -----------------------------------------------------------------------------
-SET(SRC_LIST
-    ${SRC_LIST}
-    ${CMAKE_CURRENT_SOURCE_DIR}/Buff.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Buff.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/IMagical.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/IMagical.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Runes.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Runes.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/SpellExecutor.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/SpellExecutor.h
-    PARENT_SCOPE)
+# war25 Magic component library
+set(MAGIC_SOURCES
+    Buff.cpp
+    Buff.h
+    IMagical.cpp
+    IMagical.h
+    Runes.cpp
+    Runes.h
+    SpellExecutor.cpp
+    SpellExecutor.h
+)
+
+add_library(war25_magic OBJECT ${MAGIC_SOURCES})
+target_link_libraries(war25_magic PUBLIC war25_common)
 
