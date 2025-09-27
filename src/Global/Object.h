@@ -251,10 +251,9 @@ protected:
 
 public:
 	void onClicked();
-	virtual void playSoundAcknowledge() { }; // Empty by default
+	virtual void playSoundSelected() = 0;
 
 protected:
-	virtual void playSoundSelected() = 0;
 
 
 	inline void setDyingSound(const std::string& strPath) {

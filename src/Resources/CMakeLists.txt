@@ -6,6 +6,8 @@ set(RESOURCES_SOURCES
     resourcemanager_wartools.h
     Sound.cpp
     Sound.h
+    SoundCache.cpp
+    SoundCache.h
     SoundManager.cpp
     SoundManager.h
 )

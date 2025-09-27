@@ -195,45 +195,40 @@ void Unit::playSoundSelected() {
 
 
 
-void Unit::playSoundAcknowledge() {
-	playRandomSound(m_vecSoundsAcknowledge);
+
+
+
+#include "Global/ErrorHandler.h"
+
+namespace {
+    void loadSoundsFromDirectory(const std::string& dirPath, std::vector<std::string>& soundVec,
+                                const std::string& baseFolder) {
+        if (!std::filesystem::exists(dirPath)) {
+            return; // Some units don't have all sound types
+        }
+
+        try {
+            for (const auto& entry : std::filesystem::directory_iterator(dirPath)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".wav") {
+                    soundVec.push_back(baseFolder + entry.path().filename().string());
+                }
+            }
+        } catch (const std::filesystem::filesystem_error& e) {
+            War25::Error::ErrorHandler::logWarning("Failed to load sounds from " + dirPath + ": " + e.what());
+        }
+    }
 }
 
-
-
-// todo: split body in 1 method
 void Unit::setSoundBaseDirectory(const std::string& strPathToSoundFolder) {
-	namespace fs = std::filesystem;
-
 	// Some units switch sounds when upgrade, e.g. Knight and Paladin. Hence, we clean the vectors when this method is called
 	m_vecSoundsSelected.clear();
 	m_vecSoundsAnnoyed.clear();
 	m_vecSoundsAcknowledge.clear();
 
-	// Some units do not have selected sounds, e.g., the gnomish flying machine
-	if (std::filesystem::exists(SoundManager::strFolderPrefix + strPathToSoundFolder + "selected/")) {
-		for (const auto& entry : fs::directory_iterator(SoundManager::strFolderPrefix + strPathToSoundFolder + "selected/")) {
-			if (entry.is_regular_file() && fs::path(entry.path()).extension() == ".wav") {
-				m_vecSoundsSelected.push_back(strPathToSoundFolder + "selected/" + entry.path().filename().string());
-			}
-		}
-	}
+	// Load sounds using the new helper function
+	const std::string fullBasePath = SoundManager::strFolderPrefix + strPathToSoundFolder;
 
-	// Some units do not have annoyed sounds, e.g., the gryphon rider
-	if (std::filesystem::exists(SoundManager::strFolderPrefix + strPathToSoundFolder + "annoyed/")) {
-		for (const auto& entry : fs::directory_iterator(SoundManager::strFolderPrefix + strPathToSoundFolder + "annoyed/")) {
-			if (entry.is_regular_file() && fs::path(entry.path()).extension() == ".wav") {
-				m_vecSoundsAnnoyed.push_back(strPathToSoundFolder + "annoyed/" + entry.path().filename().string());
-			}
-		}
-	}
-
-
-	if (std::filesystem::exists(SoundManager::strFolderPrefix + strPathToSoundFolder + "acknowledgement/")) {
-		for (const auto& entry : fs::directory_iterator(SoundManager::strFolderPrefix + strPathToSoundFolder + "acknowledgement/")) {
-			if (entry.is_regular_file() && fs::path(entry.path()).extension() == ".wav") {
-				m_vecSoundsAcknowledge.push_back(strPathToSoundFolder + "acknowledgement/" + entry.path().filename().string());
-			}
-		}
-	}
+	loadSoundsFromDirectory(fullBasePath + "selected/", m_vecSoundsSelected, strPathToSoundFolder + "selected/");
+	loadSoundsFromDirectory(fullBasePath + "annoyed/", m_vecSoundsAnnoyed, strPathToSoundFolder + "annoyed/");
+	loadSoundsFromDirectory(fullBasePath + "acknowledgement/", m_vecSoundsAcknowledge, strPathToSoundFolder + "acknowledgement/");
 }

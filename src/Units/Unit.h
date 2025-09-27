@@ -112,7 +112,6 @@ protected:
 protected:
 	// Object
 	void playSoundSelected() override;
-	void playSoundAcknowledge() override;
 	void setSoundBaseDirectory(const std::string& strPathToSoundFolder);
 	std::vector<std::string> m_vecSoundsSelected, m_vecSoundsAnnoyed, m_vecSoundsAcknowledge;
 

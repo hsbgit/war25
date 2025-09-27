@@ -14,8 +14,10 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
-int windowWidth = 1600;
-int windowHeight = 1280;
+#include "Global/Constants.h"
+
+int windowWidth = War25::Constants::DEFAULT_WINDOW_WIDTH;
+int windowHeight = War25::Constants::DEFAULT_WINDOW_HEIGHT;
 
 #include <iostream>
 #include <SDL.h>
@@ -103,11 +105,8 @@ int main(int, char**)
     // https://dewitters.com/dewitters-gameloop/
     // The following variables must be initialized after SDL_Init since 'g_tick_ms' is global and
     // further code relies on it
-    const int TICKS_PER_SECOND = 40; // Currently 25ms per tick as 1000ms / 40 ticks = 25ms/tick
-    const int SKIP_TICKS = 1000 / TICKS_PER_SECOND;
+    using namespace War25::Constants;
     static_assert(1000 % TICKS_PER_SECOND == 0);
-    const int TICK_DURATION_MS = SKIP_TICKS;
-    const int MAX_FRAMESKIP = 10;
 
     float gameSpeedFactor = 1.0;
 

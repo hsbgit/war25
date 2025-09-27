@@ -2,10 +2,16 @@
 set(GLOBAL_SOURCES
     Action.cpp
     Action.h
+    Constants.h
     DebugManager.cpp
     DebugManager.h
+    ErrorHandler.cpp
+    ErrorHandler.h
+    ForwardDeclarations.h
     GlobalAttributes.cpp
     GlobalAttributes.h
+    MathUtils.h
+    MemoryPool.h
     Object.cpp
     Object.h
     PseudoRandom.cpp

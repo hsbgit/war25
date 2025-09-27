@@ -36,11 +36,13 @@ Copyright (C) 2024 P. Last
 #include <string>
 #include <vector>
 
+#include "Global/Constants.h"
+
 namespace {
-constexpr ImU32  kIconBorderSelected   = IM_COL32( 45,150,255,255);
-constexpr ImU32  kIconBorderUnselected = IM_COL32( 66,150,250,102);
+constexpr ImU32  kIconBorderSelected   = War25::Constants::ICON_BORDER_SELECTED;
+constexpr ImU32  kIconBorderUnselected = War25::Constants::ICON_BORDER_UNSELECTED;
 constexpr ImVec4 kBuffColor            = ImVec4(0.176f, 0.588f, 1.000f, 1.0f);
-constexpr int    kActionsPerRow        = 3;
+constexpr int    kActionsPerRow        = War25::Constants::ACTIONS_PER_ROW;
 } // namespace
 
 namespace gui {
@@ -60,7 +62,7 @@ void ObjectInfoWindow::cycleSelection(int delta) {
     m_pCurrSelectedObject = order[idx];
 
     if (m_pCurrSelectedObject) {
-        m_pCurrSelectedObject->playSoundAcknowledge();
+        m_pCurrSelectedObject->playSoundSelected();
     }
 }
 
@@ -81,7 +83,7 @@ void ObjectInfoWindow::onLeftClicked(const Point& tile_world) {
 void ObjectInfoWindow::playAcknowledgeDebounced(std::chrono::milliseconds minInterval) {
     const auto now = std::chrono::steady_clock::now();
     if (now - m_lastAcknowledgeTs >= minInterval) {
-        if (m_pCurrSelectedObject) m_pCurrSelectedObject->playSoundAcknowledge();
+        if (m_pCurrSelectedObject) m_pCurrSelectedObject->playSoundSelected();
         m_lastAcknowledgeTs = now;
     }
 }
@@ -102,7 +104,7 @@ void ObjectInfoWindow::onRightClicked(const Point& tile_world) {
         }
     }
     // kein Krach bei Multi-Select
-    playAcknowledgeDebounced(std::chrono::milliseconds(250));
+    playAcknowledgeDebounced(War25::Constants::SOUND_DEBOUNCE_INTERVAL);
 }
 
 void ObjectInfoWindow::draw() {
