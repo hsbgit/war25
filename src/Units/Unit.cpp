@@ -120,8 +120,11 @@ std::vector<Action> Unit::getActions() const {
 
 
 void Unit::doHandleDeath() {
-	getOwner()->decreaseUsedFood();
-	// ToDo: Stop all actions / states 
+	// Only decrease food for player-controlled units, not for neutral creatures like sheep
+	if (getOwner() && getOwner() != getMap()->getNeutralPlayer()) {
+		getOwner()->decreaseUsedFood();
+	}
+	// ToDo: Stop all actions / states
 }
 
 

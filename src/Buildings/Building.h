@@ -72,6 +72,7 @@ public:
 
 protected:
 	void playSoundSelected() override;
+	void playSoundAcknowledge() override;
 
 	inline void setSoundSelected(const std::string& strPath) {
 		m_strSoundSelected = strPath;

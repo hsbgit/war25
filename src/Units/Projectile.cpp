@@ -48,9 +48,16 @@ void Projectile::initializeMissile(Object* pSource, Object* pTarget) {
 
 	m_attackedID = dynamic_cast<EventProcessor*>(pTarget)->getID();
 
-	// todo: absturz war, da target nicht mehr on map -> peasant ist in mine gegangen!
-	m_originPosition = gViewport.tileToPixel(pSource->getTile()->getPos());
-	m_targetPosition = gViewport.tileToPixel(pTarget->getTile()->getPos());
+	auto* pSourceTile = pSource->getTile();
+	auto* pTargetTile = pTarget->getTile();
+
+	if (!pSourceTile || !pTargetTile) {
+		m_expired = true;
+		return;
+	}
+
+	m_originPosition = gViewport.tileToPixel(pSourceTile->getPos());
+	m_targetPosition = gViewport.tileToPixel(pTargetTile->getPos());
 
 
 	m_travelDistanceX = std::abs(m_targetPosition.x - m_originPosition.x);

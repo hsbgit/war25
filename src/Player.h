@@ -87,7 +87,7 @@ public:
 
     void decreaseUsedFood() {
         --m_usedFood;
-        assert(m_usedFood >= 0); // ToDo: Kill all sheep -> neutral player crash
+        assert(m_usedFood >= 0); // Should not happen now that neutral units are excluded
     }
 
 

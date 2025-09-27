@@ -30,6 +30,10 @@ namespace gui {
 			m_setPos = true;
 		}
 
+		void setVisible(bool visible) {
+			m_visible = visible;
+		}
+
 
 	protected:
 		void update();

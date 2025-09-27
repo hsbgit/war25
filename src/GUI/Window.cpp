@@ -19,18 +19,12 @@
 
 namespace gui { 
     void ImGuiWindow::update() {
-        const int rightButton = 1;
-        if(ImGui::IsMouseReleased(rightButton)) {
-            m_visible = false; // todo richtig machen
-        }
-
-
         if(m_setPos) {
             ImGui::SetNextWindowPos(ImVec2((float)m_newPos.x, (float)m_newPos.y));
             m_setPos = false;
         }
 
-        ImGui::SetNextWindowSize(ImVec2(0.0,0.0));
+        ImGui::SetNextWindowSize(ImVec2(0.0f, 0.0f));
     }
 }
 

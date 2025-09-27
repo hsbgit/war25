@@ -34,19 +34,14 @@
 #include "Units/Critter.h"
 #include "Buildings/Goldmine.h"
 #include "GUI/MiniMap.h"
-#include "Player.h" // Debug, can be removed
+#include "Player.h"
 #include <iostream>
-
-
-// For non virtual box maybe better?
-//#include "GUI/imgui/imgui_impl_opengl3_loader.h"
-//#include "GUI/imgui/imgui_impl_opengl3.h"
 
 #include "GUI/imgui/imgui_impl_sdl2.h"
 #include "GUI/imgui/imgui_impl_sdlrenderer2.h"
 
 #include <stdio.h>
-#include "GUI/imgui/gl3w/GL/gl3w.h"   // This example is using gl3w to access OpenGL functions (because it is small). You may use glew/glad/glLoadGen/etc. whatever already works for you.
+#include "GUI/imgui/gl3w/GL/gl3w.h"
 #include <SDL_opengl.h>
 
 
@@ -72,7 +67,7 @@ gui::DebugSpellWindow gSpellWindow;
 
 
 
-Game::Game(SDL_Window* window, const std::string& strPathToPUDFile) : window(window), m_infoWindow(m_selectedObjects) {
+Game::Game(SDL_Window* window, const std::string& strPathToPUDFile) : window(window), wDisplaySettings(window), m_infoWindow(m_selectedObjects) {
     SDL_GetWindowSize(window, &m_windowWidth, &m_windowHeight);
     g_pRessourceManager->setCursor(CursorTypes::HumanGauntlet);
 
@@ -172,6 +167,10 @@ void Game::doEventHandling() {
             }
             else if (event.key.keysym.sym == SDLK_ESCAPE) {
                 m_selectedObjects.clear();
+            }
+            else if (event.key.keysym.sym == SDLK_F11) {
+                wDisplaySettings.setVisible(true);
+                wDisplaySettings.setPosition({100, 100});
             }
         }
 
@@ -422,6 +421,7 @@ void Game::doRendering() {
 
     //ifdebug
     gSpellWindow.draw();
+    wDisplaySettings.draw();
 
     ImGui::ShowMetricsWindow();
 
@@ -479,6 +479,26 @@ void Game::doRendering() {
     ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
 
     g_pRenderer->present();
+}
+
+void Game::applyDisplaySettings() {
+    if (wDisplaySettings.needsApplySettings()) {
+        auto newRes = wDisplaySettings.getSelectedResolution();
+        bool fullscreen = wDisplaySettings.isFullscreenEnabled();
+
+        if (fullscreen) {
+            SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+        } else {
+            SDL_SetWindowFullscreen(window, 0);
+            SDL_SetWindowSize(window, newRes.width, newRes.height);
+            SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        }
+
+        SDL_GetWindowSize(window, &m_windowWidth, &m_windowHeight);
+        gViewport.updateWindowSize(m_windowWidth, m_windowHeight);
+
+        wDisplaySettings.resetApplyFlag();
+    }
 }
 
 

@@ -189,6 +189,11 @@ void Building::playSoundSelected() {
 	}
 }
 
+void Building::playSoundAcknowledge() {
+	// For buildings, acknowledge sound is the same as selected sound
+	playSoundSelected();
+}
+
 
 std::vector<Action> Building::getActions() const {
 	if (isUnderConstruction())

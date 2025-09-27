@@ -14,8 +14,8 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
-const int windowWidth = 1600;
-const int windowHeight = 1280;
+int windowWidth = 1600;
+int windowHeight = 1280;
 
 #include <iostream>
 #include <SDL.h>
@@ -51,10 +51,8 @@ const int windowHeight = 1280;
 
 // ----------------------------------------------------------------------------------------------------
 bool buildMode = false;
-bool quit = false;
 
 #include "Resources/resourcemanager_wartools.h"
-
 
 int buildingType = 0; // rathaus, barracks, scout tower, farm, lumbermill, blacksmith
 
@@ -167,7 +165,6 @@ int main(int, char**)
     //std::string strPathToPudFile = "data/maps/ClanEviLMapPackv1.0/ClanEviLMPv1.0/Other/8 ALeRiA WiDe ScArLeT.pud"; // Lag test
 
 
-    
     while (strPathToPudFile.size()) {
         Game game(window, strPathToPudFile);
 
@@ -191,6 +188,7 @@ int main(int, char**)
                 std::cerr << "SKIPPED TOO MANY FRAMES" << std::endl;
             }
 
+            game.applyDisplaySettings();
             game.doRendering();
         }
 

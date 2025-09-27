@@ -5,6 +5,8 @@ set(GUI_SOURCES
     DebugSpellWindow.h
     DebugWindow.cpp
     DebugWindow.h
+    DisplaySettingsWindow.cpp
+    DisplaySettingsWindow.h
     HelperFunctions.cpp
     HelperFunctions.h
     MenuBarWindow.cpp

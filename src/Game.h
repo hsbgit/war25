@@ -28,6 +28,7 @@
 #include "GUI/PlayerStatsWindow.h"
 #include "GUI/MenuBarWindow.h"
 #include "GUI/ObjectInfoWindow.h"
+#include "GUI/DisplaySettingsWindow.h"
 
 
 namespace gui {
@@ -58,6 +59,7 @@ public:
     void doEventHandling();
     void doUpdate();
     void doRendering();
+    void applyDisplaySettings();
 
 
 private:
@@ -82,6 +84,7 @@ private:
     gui::MiniMap* m_pMiniMap = nullptr;
 
     gui::MusicPlayer wMusicPlayer;
+    gui::DisplaySettingsWindow wDisplaySettings;
 
     gui::ObjectInfoWindow m_infoWindow;
     std::set<Object*> m_selectedObjects;

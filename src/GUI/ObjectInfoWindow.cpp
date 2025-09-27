@@ -58,6 +58,10 @@ void ObjectInfoWindow::cycleSelection(int delta) {
     idx = (idx + delta) % size;
     if (idx < 0) idx += size;
     m_pCurrSelectedObject = order[idx];
+
+    if (m_pCurrSelectedObject) {
+        m_pCurrSelectedObject->playSoundAcknowledge();
+    }
 }
 
 void ObjectInfoWindow::onLeftClicked(const Point& tile_world) {
