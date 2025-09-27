@@ -72,11 +72,12 @@ State* StateLumberWood::process() {
 Tile* StateLumberWood::identifyCloseByWood() {
     Tile* posPeasant = m_pOwner->getTile();
 
+    // First check immediate neighbors
+    Tile* pTileWithWood = m_pOwner->getMap()->getNeighbourTileWithWood(posPeasant, 1);
 
-    Tile* pTileWithWood = m_pOwner->getMap()->getNeighbourTileWithWood(posPeasant);
-
-    if (pTileWithWood) {
-        // ToDo: Look in correct direction
+    // If no wood found nearby, search in a larger radius (up to 3 tiles away)
+    if (!pTileWithWood) {
+        pTileWithWood = m_pOwner->getMap()->getNeighbourTileWithWood(posPeasant, 3);
     }
 
     return pTileWithWood;

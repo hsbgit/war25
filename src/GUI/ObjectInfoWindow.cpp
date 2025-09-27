@@ -164,9 +164,9 @@ void ObjectInfoWindow::draw() {
         m_pCurrSelectedObject->getMaxHealthPoints());
 
     // Typ-spezifisch
-    if (dynamic_cast<Unit*>(m_pCurrSelectedObject)) {
+    if (m_pCurrSelectedObject && !m_pCurrSelectedObject->isDead() && dynamic_cast<Unit*>(m_pCurrSelectedObject)) {
         renderUnitInfo();
-    } else if (dynamic_cast<Building*>(m_pCurrSelectedObject)) {
+    } else if (m_pCurrSelectedObject && !m_pCurrSelectedObject->isDead() && dynamic_cast<Building*>(m_pCurrSelectedObject)) {
         renderBuildingInfo();
     } else {
         ImGui::Separator();

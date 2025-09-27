@@ -67,8 +67,8 @@ gui::DebugSpellWindow gSpellWindow;
 
 
 
-Game::Game(SDL_Window* window, const std::string& strPathToPUDFile) : window(window), wDisplaySettings(window), m_infoWindow(m_selectedObjects) {
-    SDL_GetWindowSize(window, &m_windowWidth, &m_windowHeight);
+Game::Game(SDL_Window* window, const std::string& strPathToPUDFile) : m_window(window), wDisplaySettings(window), m_infoWindow(m_selectedObjects) {
+    SDL_GetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
     g_pRessourceManager->setCursor(CursorTypes::HumanGauntlet);
 
     // Must be created at first 
@@ -138,7 +138,7 @@ void Game::doEventHandling() {
         ImGui_ImplSDL2_ProcessEvent(&event);
         if (event.type == SDL_QUIT)
             m_quitRequested = true;
-        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
+        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(m_window))
             m_quitRequested = true;
 
   
@@ -200,10 +200,10 @@ void Game::doEventHandling() {
             if (event.type == SDL_MOUSEBUTTONDOWN) {
                 if (event.button.button == SDL_BUTTON_LEFT) {
                     Point posClicked = { event.button.x, event.button.y };
-                    posLeftClicked = posClicked;
+                    m_inputState.leftClickPosition = posClicked;
 
                     if (!m_infoWindow.isActionButtonActive())
-                        rectDraggingActive = true;
+                        m_inputState.rectDraggingActive = true;
 
                     // Debug
                     Point tile_world = gViewport.screenToWorld_tile(gViewport.pixelToTile(posClicked));
@@ -233,7 +233,7 @@ void Game::doEventHandling() {
 
 
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    rectDraggingActive = false; // User made a selection
+                    m_inputState.rectDraggingActive = false; // User made a selection
 
                     Point posClicked = { event.button.x, event.button.y };
                     Point tile_world = gViewport.screenToWorld_tile(gViewport.pixelToTile(posClicked));
@@ -245,7 +245,7 @@ void Game::doEventHandling() {
                     else {
                         Point posLeftReleased = { event.button.x, event.button.y };
 
-                        Point points[2] = { posLeftClicked, posLeftReleased };
+                        Point points[2] = { m_inputState.leftClickPosition, posLeftReleased };
                         Rect selectionRect;
                         SDL_EnclosePoints(points, 2, nullptr, &selectionRect);
 
@@ -359,14 +359,14 @@ void Game::doRendering() {
     // Start the Dear ImGui frame
     //ImGui_ImplSDL2Renderer_NewFrame();
     ImGui_ImplSDLRenderer2_NewFrame();
-    ImGui_ImplSDL2_NewFrame(window);
+    ImGui_ImplSDL2_NewFrame(m_window);
     ImGui::NewFrame();
 
 
 
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-    if (show_demo_window)
-        ImGui::ShowDemoWindow(&show_demo_window);
+    if (m_debugSettings.showDemoWindow)
+        ImGui::ShowDemoWindow(&m_debugSettings.showDemoWindow);
 
 
     // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
@@ -377,11 +377,11 @@ void Game::doRendering() {
         ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
         ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-        ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-        ImGui::Checkbox("Another Window", &show_another_window);
+        ImGui::Checkbox("Demo Window", &m_debugSettings.showDemoWindow);      // Edit bools storing our window open/close state
+        ImGui::Checkbox("Another Window", &m_debugSettings.showAnotherWindow);
 
         ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-        ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+        ImGui::ColorEdit3("clear color", (float*)&m_debugSettings.clearColor); // Edit 3 floats representing a color
 
         if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
             counter++;
@@ -393,12 +393,12 @@ void Game::doRendering() {
     }
 
     // 3. Show another simple window.
-    if (show_another_window)
+    if (m_debugSettings.showAnotherWindow)
     {
-        ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+        ImGui::Begin("Another Window", &m_debugSettings.showAnotherWindow);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
         ImGui::Text("Hello from another window!");
         if (ImGui::Button("Close Me"))
-            show_another_window = false;
+            m_debugSettings.showAnotherWindow = false;
         ImGui::End();
     }
 
@@ -467,10 +467,10 @@ void Game::doRendering() {
     }
 
 
-    if (rectDraggingActive) {
+    if (m_inputState.rectDraggingActive) {
         int mouse_x, mouse_y;
         SDL_GetMouseState(&mouse_x, &mouse_y);
-        Rect r = { posLeftClicked.x, posLeftClicked.y, mouse_x - posLeftClicked.x, mouse_y - posLeftClicked.y };
+        Rect r = { m_inputState.leftClickPosition.x, m_inputState.leftClickPosition.y, mouse_x - m_inputState.leftClickPosition.x, mouse_y - m_inputState.leftClickPosition.y };
         g_pRenderer->drawRect(r, 0, 255, 0);
     }
 
@@ -487,14 +487,14 @@ void Game::applyDisplaySettings() {
         bool fullscreen = wDisplaySettings.isFullscreenEnabled();
 
         if (fullscreen) {
-            SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+            SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
         } else {
-            SDL_SetWindowFullscreen(window, 0);
-            SDL_SetWindowSize(window, newRes.width, newRes.height);
-            SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+            SDL_SetWindowFullscreen(m_window, 0);
+            SDL_SetWindowSize(m_window, newRes.width, newRes.height);
+            SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
         }
 
-        SDL_GetWindowSize(window, &m_windowWidth, &m_windowHeight);
+        SDL_GetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
         gViewport.updateWindowSize(m_windowWidth, m_windowHeight);
 
         wDisplaySettings.resetApplyFlag();

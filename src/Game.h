@@ -46,9 +46,14 @@ class Game {
     unsigned long cnt = 0;
 
 public:
-    Game(SDL_Window* window, const std::string& strPathToPUDFile);
+    explicit Game(SDL_Window* window, const std::string& strPathToPUDFile);
+    ~Game() = default;
 
-    bool quitRequested() const {
+    // Prevent copying
+    Game(const Game&) = delete;
+    Game& operator=(const Game&) = delete;
+
+    bool quitRequested() const noexcept {
         return m_quitRequested;
     }
 
@@ -67,13 +72,15 @@ private:
 
     void handleUnitGrouping(const Uint8* keyboardState);
 
-    bool rectDraggingActive = false;
-    SDL_Point posLeftClicked = { 0,0 };
+    struct InputState {
+        bool rectDraggingActive = false;
+        SDL_Point leftClickPosition = {0, 0};
+    } m_inputState;
 
     bool m_quitRequested = false;
 
 
-    SDL_Window* window = nullptr;
+    SDL_Window* m_window = nullptr;
     int m_windowWidth = 0, m_windowHeight = 0;
 
     // Windows ------------
@@ -91,7 +98,11 @@ private:
     std::vector<std::set<Object*>> m_savedUserSelections; // m_selectedObjects can be saved with ctrl+1-9 and restored with 1-9
 
 
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    struct DebugSettings {
+        bool showDemoWindow = true;
+        bool showAnotherWindow = false;
+        ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    } m_debugSettings;
+
+    static constexpr size_t MAX_SAVED_SELECTIONS = 10;
 };

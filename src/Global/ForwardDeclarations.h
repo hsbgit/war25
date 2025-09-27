@@ -52,8 +52,7 @@ class EventProcessor;
 class EventBroker;
 
 // Utils
-struct Point;
-struct Rect;
+#include "Types.h" // For Point and Rect typedefs
 struct AttackerStats;
 
 // STL Forward Declarations

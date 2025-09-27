@@ -4,6 +4,8 @@ set(RESOURCES_SOURCES
     Animation.h
     resourcemanager_wartools.cpp
     resourcemanager_wartools.h
+    ResourceMappings.cpp
+    ResourceMappings.h
     Sound.cpp
     Sound.h
     SoundCache.cpp

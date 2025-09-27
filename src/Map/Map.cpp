@@ -140,8 +140,8 @@ std::vector<Tile*> Map::getNeighbourTiles(Tile* pTile, int distance) {
 
 
 
-Tile* Map::getNeighbourTileWithWood(Tile* pTile) {
-	std::vector<Tile*> vecNeighbourTiles = getNeighbourTiles(pTile);
+Tile* Map::getNeighbourTileWithWood(Tile* pTile, int distance) {
+	std::vector<Tile*> vecNeighbourTiles = getNeighbourTiles(pTile, distance);
 
 	// Use erase to remove any tiles without wood
 	vecNeighbourTiles.erase(std::remove_if(vecNeighbourTiles.begin(), vecNeighbourTiles.end(),

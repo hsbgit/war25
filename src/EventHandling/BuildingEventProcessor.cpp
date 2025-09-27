@@ -117,7 +117,7 @@ void BuildingEventProcessor::doEventHandling() {
 
         m_vecQueuedEventIcons.erase(m_vecQueuedEventIcons.begin());
         m_vecQueuedProductionItems.pop();
-        
+
         // Start research
         m_tickCnt = 0;
         m_requiredEventTicks = calculateRequiredTicksForGameAction( m_currEventInProgressItem.researchTime() );
@@ -126,6 +126,9 @@ void BuildingEventProcessor::doEventHandling() {
         if (eventFinished(m_eventQueue.front())) {
             m_eventQueue.pop();
             setEventInProgress(false);
+        } else {
+            // Unit creation failed due to no space - keep trying every few ticks
+            m_tickCnt = m_requiredEventTicks - 30; // Retry every 30 ticks (~0.5 seconds)
         }
     }
 }

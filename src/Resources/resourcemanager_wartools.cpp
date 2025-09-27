@@ -16,20 +16,12 @@
 */
 
 
-// ----------------------------------------------------------------------------
-// !!! ToDo: This file needs a big refactoring !!!
-// ----------------------------------------------------------------------------
-
-
 #include "resourcemanager_wartools.h"
+#include "ResourceMappings.h"
 #include "Texture.h"
 #include "Sprite.h"
 #include "Renderer.h"
 #include "PlayerColor.h"
-
-#include "Buildings/DarkPortal.h"
-#include "Buildings/MageTower.h"
-#include "Buildings/LumberMill.h"
 
 #include <cassert>
 #include <iostream>
@@ -37,24 +29,29 @@
 #include <fstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+
 namespace fs = std::filesystem;
 
-#include "Units/LandUnits/Peasant/Peasant.h"
-#include "Units/LandUnits/Archer.h"
-#include "Units/LandUnits/Ballista.h"
-#include "Units/LandUnits/Footman.h"
-#include "Units/LandUnits/Knight.h"
-#include "Units/LandUnits/Mage.h"
-#include "Units/LandUnits/Dwarfes/Dwarfes.h"
-#include "Units/LandUnits/Skeleton.h"
-
-
+// Constants for resource loading
+namespace {
+    constexpr int PALETTE_COLOR_OFFSET = 208;
+    constexpr int PALETTE_COLOR_COUNT = 4;
+    constexpr int TILE_OFFSET_INCREMENT = 0x010;
+    constexpr int EXPLOSION_SPRITE_SIZE = 320 / 5;
+    constexpr int EXPLOSION_SPRITE_COUNT = 16;
+    constexpr int BUBBLE_WIDTH_PX = 504 / 7;
+    constexpr unsigned int DEFAULT_UNIT_IDLE_INTERVAL = 10000;
+    constexpr unsigned int VESSEL_ANIMATION_INTERVAL = 1500;
+    constexpr unsigned int EXPLOSION_INTERVAL = 100;
+    constexpr unsigned int RUNE_ANIMATION_INTERVAL = 150;
+}
 
 void ResourceManager_wartools::parseLUATileSetFile(Season season, const std::string& strFile) {
 	std::ifstream file(strFile);
 
 	if (!file) {
-		throw std::logic_error("Unable to open LUA file!");
+		throw std::runtime_error("Unable to open LUA tileset file: " + strFile);
 	}
 
 
@@ -93,18 +90,17 @@ void ResourceManager_wartools::parseLUATileSetFile(Season season, const std::str
 								std::cerr << std::hex << sub_tile_id << std::endl;
 							}
 							m_mapPUDId_to_TileSetIndex[sub_tile_id][season] = index;
-							// std::cerr<<"\t\t"<<std::hex<<sub_tile_id<<"\t"<<std::dec<<index<<std::endl;
 						}
 					}
-					catch (...) {
-
+					catch (const std::exception& e) {
+						std::cerr << "Warning: Invalid tile index in " << strFile << ": " << entry << " (" << e.what() << ")" << std::endl;
 					}
 
 					++sub_tile_id;
 				}
 			}
 
-			tile_id += 0x010;
+			tile_id += TILE_OFFSET_INCREMENT;
 		}
 	}
 
@@ -152,25 +148,31 @@ void ResourceManager_wartools::loadCursors() {
 	std::string strHumanPath = strPrefix + "ui" + PATH_SEPARATOR + "human" + PATH_SEPARATOR + "cursors" + PATH_SEPARATOR;
 
 	SDL_Surface* pSurface = IMG_Load((strHumanPath + "red_eagle.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: " + strHumanPath + "red_eagle.png");
+	}
 	m_cursors[CursorTypes::RedEagle] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 
 
 	pSurface = IMG_Load((strHumanPath + "yellow_eagle.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: " + strHumanPath + "yellow_eagle.png");
+	}
 	m_cursors[CursorTypes::YellowEagle] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 
-
 	pSurface = IMG_Load((strHumanPath + "green_eagle.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: " + strHumanPath + "green_eagle.png");
+	}
 	m_cursors[CursorTypes::GreenEagle] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 
-
 	pSurface = IMG_Load((strHumanPath + "human_gauntlet.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: " + strHumanPath + "human_gauntlet.png");
+	}
 	m_cursors[CursorTypes::HumanGauntlet] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 
@@ -180,32 +182,38 @@ void ResourceManager_wartools::loadCursors() {
 	std::string strOrcPath = strPrefix + "ui" + PATH_SEPARATOR + "orc" + PATH_SEPARATOR + "cursors" + PATH_SEPARATOR;
 
 	pSurface = IMG_Load((strOrcPath + "red_crosshairs.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: " + strOrcPath + "red_crosshairs.png");
+	}
 	m_cursors[CursorTypes::RedCrosshairs] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 
-
 	pSurface = IMG_Load((strOrcPath + "yellow_crosshairs.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: " + strOrcPath + "yellow_crosshairs.png");
+	}
 	m_cursors[CursorTypes::YellowCrosshairs] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 
-
 	pSurface = IMG_Load((strOrcPath + "green_crosshairs.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: " + strOrcPath + "green_crosshairs.png");
+	}
 	m_cursors[CursorTypes::GreenCrosshairs] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 
-
 	pSurface = IMG_Load((strOrcPath + "orcish_claw.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: " + strOrcPath + "orcish_claw.png");
+	}
 	m_cursors[CursorTypes::OrcishClaw] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 
-
 	// Neutral
 	pSurface = IMG_Load((strPrefix + "ui" + PATH_SEPARATOR + "cursors" + PATH_SEPARATOR + "magnifying_glass.png").c_str());
-	assert(pSurface);
+	if (!pSurface) {
+		throw std::runtime_error("Failed to load cursor texture: magnifying_glass.png");
+	}
 	m_cursors[CursorTypes::MagnifyingGlass] = SDL_CreateColorCursor(pSurface, 0, 0);
 	SDL_FreeSurface(pSurface);
 }
@@ -213,30 +221,22 @@ void ResourceManager_wartools::loadCursors() {
 
 
 
-#include "PlayerColor.h"
-#include <map>
-
-
-enum class eBuilding { Farm, Barracks };
-
-class BuildingContainer {
-public:
-	std::map<eBuilding, Sprite*> vecBuildings;
-	std::map<eBuilding, Sprite*> vecBuildingsUnderConstruction;
-	std::map<eBuilding, Sprite*> vecBuildingsInUse;
-};
-
-class AllianceContainer {
-public:
-	std::map<PlayerColor, BuildingContainer> mapBuildings;
-};
-
-enum class eTileSet { Summer, Winter, Wasteland };
-
-
-
 #include "Animation.h"
 #include "Units/Unit.h"
+#include "Player.h"
+#include "Global/GlobalAttributes.h"
+#include "Units/Critter.h"
+#include "Buildings/Building.h"
+
+// Unit includes
+#include "Units/LandUnits/Peasant/Peasant.h"
+#include "Units/LandUnits/Archer.h"
+#include "Units/LandUnits/Ballista.h"
+#include "Units/LandUnits/Footman.h"
+#include "Units/LandUnits/Knight.h"
+#include "Units/LandUnits/Mage.h"
+#include "Units/LandUnits/Dwarfes/Dwarfes.h"
+#include "Units/LandUnits/Skeleton.h"
 #include "Units/AirUnits/GnomishFlyingMachine.h"
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
@@ -245,13 +245,7 @@ enum class eTileSet { Summer, Winter, Wasteland };
 #include "Units/SeaUnits/Tanker.h"
 #include "Units/SeaUnits/Transport.h"
 
-#include <unordered_map>
-
-
-typedef std::unordered_map<std::string, std::type_index> MapFileNameToTypeID;
-
-
-// ToDo: Common header to include for simplicity?
+// Building includes
 #include "Buildings/Barracks.h"
 #include "Buildings/Blacksmith.h"
 #include "Buildings/Church.h"
@@ -263,132 +257,12 @@ typedef std::unordered_map<std::string, std::type_index> MapFileNameToTypeID;
 #include "Buildings/OilRefinery.h"
 #include "Buildings/Shipyard.h"
 #include "Buildings/Stables.h"
-
 #include "Buildings/Farm.h"
 #include "Buildings/Foundry.h"
-
-// Human
-MapFileNameToTypeID mapPNGFileToBuilding{
-	{"barracks.png", typeid(Barracks)},
-	{"blacksmith.png", typeid(Blacksmith)},
-	{"cannon_tower.png", typeid(ScoutTower)}, // Special case
-	{"castle.png", typeid(Townhall)}, // Special case   
-	{"church.png", typeid(Church)},
-	{"elven_lumber_mill.png", typeid(LumberMill)},
-	{"farm.png", typeid(Farm)},
-	{"foundry.png", typeid(Foundry)},
-	{"gnomish_inventor.png", typeid(GnomishInventor)},
-	{"gryphon_aviary.png", typeid(GryphonAviary)},
-	{"guard_tower.png", typeid(ScoutTower)},// Special case
-	{"keep.png", typeid(Townhall)}, // Special case
-	{"mage_tower.png", typeid(MageTower)},
-	{"oil_platform.png", typeid(OilRig)},
-	{"refinery.png", typeid(OilRefinery)},
-	{"scout_tower.png", typeid(ScoutTower)},// Special case
-	{"shipyard.png", typeid(Shipyard)},
-	{"stables.png", typeid(Stables)},
-	{"town_hall.png", typeid(Townhall)} // Special case
-
-
-	// oil_well_construction_site.png bzw. bei swamp oil_platform_construction_size
-	// refinery_construction_site
-	// shipyard_construction_site
-};
-
-
-// Orc
-MapFileNameToTypeID mapPNGFileToBuilding_Orc{
-	{"barracks.png", typeid(Barracks)},
-	{"blacksmith.png", typeid(Blacksmith)},
-	{"watch_tower.png", typeid(ScoutTower)},// Special case
-	{"cannon_tower.png", typeid(ScoutTower)}, // Special case
-	{"guard_tower.png", typeid(ScoutTower)},// Special case
-	{"fortress.png", typeid(Townhall)}, // Special case
-	{"stronghold.png", typeid(Townhall)}, // Special case
-	{"great_hall.png", typeid(Townhall)}, // Special case
-	{"altar_of_storms.png", typeid(Church)},
-	{"troll_lumber_mill.png", typeid(LumberMill)},
-	{"pig_farm.png", typeid(Farm)},
-	{"foundry.png", typeid(Foundry)},
-	{"oil_platform.png", typeid(OilRig)},
-	// oil_well_construction_site.png
-	{"refinery.png", typeid(OilRefinery)},
-	{"shipyard.png", typeid(Shipyard)},
-	{"ogre_mound.png", typeid(Stables)},
-	{"goblin_alchemist.png", typeid(GnomishInventor)},
-	{"dragon_roost.png", typeid(GryphonAviary)},
-	{"temple_of_the_damned.png", typeid(MageTower)}
-};
-
-
-
-
+#include "Buildings/LumberMill.h"
+#include "Buildings/MageTower.h"
+#include "Buildings/DarkPortal.h"
 #include "Buildings/Goldmine.h"
-#include "Buildings/Building.h"
-MapFileNameToTypeID mapPNGFileToBuilding_Neutral{
-	{"dark_portal.png", typeid(DarkPortal)},
-	// {"destroyed_site.png", typeid(GoldMine)}, // fix me
-	 {"gold_mine.png", typeid(GoldMine)}
-	 /*
-	 {"oil_patch.png", typeid(Barracks)},
-	 {"small_destroyed_site.png", typeid(Barracks)},
-	 {"wall.png", typeid(Barracks)},
-	 {"wall_construction_site.png", typeid(Blacksmith)}*/
-};
-
-
-
-// neutral
-MapFileNameToTypeID mapPNGFileToType = {
-	// Neutral 
-	{"corpses.png", typeid(Peasant)},
-	{"daemon.png", typeid(Ballista)}, // Dummy
-	{"skeleton.png", typeid(Skeleton)},
-
-	// Human
-	{"ballista.png", typeid(Ballista)},
-	{"battleship.png", typeid(Battleship)},
-	{"dwarven_demolition_squad.png", typeid(Dwarfes)},
-	{"elven_archer.png", typeid(Archer)},
-	{"elven_destroyer.png", typeid(Destroyer)},
-	{"footman.png", typeid(Footman)},
-	{"gnomish_flying_machine.png", typeid(GnomishFlyingMaschine)},
-	{"gnomish_submarine.png", typeid(GnomishSubmarine)},
-	{"gryphon_rider.png", typeid(GryphonRider)},
-	{"knight.png", typeid(Knight)},
-	{"mage.png", typeid(Mage)},
-	{"oil_tanker_empty.png", typeid(Tanker)},         // Problem!!!!
-	{"oil_tanker_full.png", typeid(Tanker)},           // Problem!!!!
-	{"peasant.png", typeid(Peasant)},                 // Problem!!!!
-	{"peasant_with_gold.png", typeid(Peasant)},       // Problem!!!!
-	{"peasant_with_wood.png", typeid(Peasant)},       // Problem!!!!
-	{"transport.png", typeid(Transport)},
-
-	// Orcs
-	{"catapult.png", typeid(Ballista)},
-	{"ogre_juggernaught.png", typeid(Battleship)},
-	{"goblin_sappers.png", typeid(Dwarfes)},
-	{"troll_axethrower.png", typeid(Archer)},
-	{"troll_destroyer.png", typeid(Destroyer)},
-	{"grunt.png", typeid(Footman)},
-	{"goblin_zeppelin.png", typeid(GnomishFlyingMaschine)},
-	{"giant_turtle.png", typeid(GnomishSubmarine)},
-	{"dragon.png", typeid(GryphonRider)},
-	{"ogre.png", typeid(Knight)},
-	{"death_knight.png", typeid(Mage)},
-	{"oil_tanker_empty.png", typeid(Tanker)},         // Problem!!!!
-	{"oil_tanker_full.png", typeid(Tanker)},           // Problem!!!!
-	{"peon.png", typeid(Peasant)},                 // Problem!!!!
-	{"peon_with_gold.png", typeid(Peasant)},       // Problem!!!!
-	{"peon_with_wood.png", typeid(Peasant)},       // Problem!!!!
-	{"transport.png", typeid(Transport)},
-	{"eye_of_kilrogg.png", typeid(Ballista)} }; // Problem!!!! (maps currently to a dummy type)
-
-
-#include "Player.h"
-#include "Global/GlobalAttributes.h"
-#include "Units/Critter.h"
-
 
 void ResourceManager_wartools::createUnitAnimations(std::type_index correspondingType, int iconSquareWidth_px, int spriteCountMoving, int spriteCountAttacking, int spriteCountDying) {
 	TextureMap& textMap = m_mapUnitTexturesHuman; // Does not matter whether orc or human, will be changed individually, e.g., in getUnitIdleAnimation
@@ -509,7 +383,7 @@ void ResourceManager_wartools::createVesselAnimations(std::type_index correspond
 		}
 
 		// Movement animations
-		unsigned int interval_ms = 1500;
+		unsigned int interval_ms = VESSEL_ANIMATION_INTERVAL;
 		Animation anim(textMap[correspondingType][color], interval_ms);
 
 		Rect r = { colOffset * iconSquareWidth_px, 0, iconSquareWidth_px, iconSquareWidth_px };
@@ -537,7 +411,7 @@ void ResourceManager_wartools::createVesselAnimations(std::type_index correspond
 		}
 
 		// Generic sinking part (bubbles in water)
-		int bubbleWidth_px = 504 / 7;
+		int bubbleWidth_px = BUBBLE_WIDTH_PX;
 		Rect rectBubbles = { 0, 6 * bubbleWidth_px, bubbleWidth_px, bubbleWidth_px };
 
 		// Bubbles are part of the neutral/units/corpses.png file. Bubbles do not have a player specific color meaning "Red" ist not important here
@@ -726,14 +600,14 @@ void ResourceManager_wartools::createidleAnimation(std::type_index corresponding
 
 
 void ResourceManager_wartools::createExplosionAnimation() {
-	int iconSquareWidth_px = 320 / 5;
-	int spriteCnt = 16;
+	int iconSquareWidth_px = EXPLOSION_SPRITE_SIZE;
+	int spriteCnt = EXPLOSION_SPRITE_COUNT;
 
 	Texture* pTexture = new Texture("data/graphics/missiles/explosion.png", m_pRenderer);
 
 	Point posOffset = { -16, -16 };
 
-	int interval_ms = 100;
+	int interval_ms = EXPLOSION_INTERVAL;
 	Animation anim(pTexture, interval_ms, true);
 
 
@@ -874,15 +748,15 @@ void ResourceManager_wartools::createidleAnimations() {
 	// See png files for row/column structure
 	//   createidleAnimation(typeid(Skeleton), 280 / 5, 1, 1, 99999);  // ToDo: Internal structure differs completely from other units...
 
-	createidleAnimation(typeid(Ballista), 320 / 5, 1, 1, 10000); // todo fix the 10000
-	createidleAnimation(typeid(Dwarfes), 280 / 5, 1, 1, 10000);
-	createidleAnimation(typeid(Archer), 360 / 5, 1, 1, 10000);
-	createidleAnimation(typeid(Footman), 360 / 5, 1, 1, 10000);
-	createidleAnimation(typeid(GnomishFlyingMaschine), 400 / 5, 1, 1, 10000);
-	createidleAnimation(typeid(GryphonRider), 400 / 5, 1, 1, 10000);
-	createidleAnimation(typeid(Knight), 360 / 5, 1, 1, 10000);
-	createidleAnimation(typeid(Mage), 360 / 5, 1, 1, 10000);
-	createidleAnimation(typeid(Peasant), 360 / 5, 1, 1, 10000);
+	createidleAnimation(typeid(Ballista), 320 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(Dwarfes), 280 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(Archer), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(Footman), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(GnomishFlyingMaschine), 400 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(GryphonRider), 400 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(Knight), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(Mage), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(Peasant), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 
 
 
@@ -1099,18 +973,17 @@ void ResourceManager_wartools::readBuildings(bool orcs) {
 		std::string strPathToSeasonFolder(strToFolder);
 		strPathToSeasonFolder += mapSeasonToPath[season];
 
-		for (const auto& [key_imgFileName, value] : mapPNGFileToBuilding) {
+		for (const auto& [key_imgFileName, value] : ResourceMappings::getHumanBuildingMap()) {
 			std::string tmp = strPathToSeasonFolder + "human/buildings/" + key_imgFileName;
 			readBuildingSprite(season, tmp, false);
 		}
 
-		for (const auto& [key_imgFileName, value] : mapPNGFileToBuilding_Orc) {
+		for (const auto& [key_imgFileName, value] : ResourceMappings::getOrcBuildingMap()) {
 			std::string tmp = strPathToSeasonFolder + "orc/buildings/" + key_imgFileName;
 			readBuildingSprite(season, tmp, true);
 		}
 
-
-		for (const auto& [key_imgFileName, value] : mapPNGFileToBuilding_Neutral) {
+		for (const auto& [key_imgFileName, value] : ResourceMappings::getNeutralBuildingMap()) {
 			std::string tmp = strPathToSeasonFolder + "neutral/buildings/" + key_imgFileName;
 
 			SDL_Surface* pSurface = IMG_Load(tmp.c_str());
@@ -1122,7 +995,7 @@ void ResourceManager_wartools::readBuildings(bool orcs) {
 			std::size_t posSlash = tmp.find_last_of('/');
 			pngPath = pngPath.erase(0, posSlash + 1);
 
-			std::type_index correspondingType = mapPNGFileToBuilding_Neutral.at(pngPath);
+			std::type_index correspondingType = ResourceMappings::getNeutralBuildingMap().at(pngPath);
 			m_mapNeutralBuildingTextures[correspondingType][season] = new Texture(pSurface, m_pRenderer, false);
 			SDL_FreeSurface(pSurface);
 		}
@@ -1176,11 +1049,11 @@ void ResourceManager_wartools::readBuildingSprite(Season season, const std::stri
 
 	BuildingTextureMap& texTargetMap = orcs ? m_mapBuildingTexturesOrc : m_mapBuildingTexturesHuman;
 
-	MapFileNameToTypeID& mapFileNameToTypeID = orcs ? mapPNGFileToBuilding_Orc : mapPNGFileToBuilding;
+	const MapFileNameToTypeID& mapFileNameToTypeID = orcs ? ResourceMappings::getOrcBuildingMap() : ResourceMappings::getHumanBuildingMap();
 
 
 	for (auto const& [color, palette] : mapPlayerPaletteColors) {
-		SDL_SetPaletteColors(pSurface->format->palette, &palette[0], 208, 4);
+		SDL_SetPaletteColors(pSurface->format->palette, &palette[0], PALETTE_COLOR_OFFSET, PALETTE_COLOR_COUNT);
 
 		std::type_index correspondingType = mapFileNameToTypeID.at(pngPath);
 		Texture* pTexture = new Texture(pSurface, m_pRenderer, false);
@@ -1263,7 +1136,7 @@ void ResourceManager_wartools::createUnitSprites(Fraction fraction) {
 			for (auto const& [color, palette] : mapPlayerPaletteColors) {
 				SDL_SetPaletteColors(pSurface->format->palette, &palette[0], 208, 4);
 
-				std::type_index correspondingType = mapPNGFileToType.at(pngPath);
+				std::type_index correspondingType = ResourceMappings::getUnitTypeMap().at(pngPath);
 				(*textMap)[correspondingType][color] = new Texture(pSurface, m_pRenderer, false);
 			}
 		}

@@ -64,7 +64,7 @@ public:
     Tile* getNextFreeTile(Tile* pTile, int maxDistance = 10);
 
     std::vector<Tile*> getNeighbourTiles(Tile* pTile, int distance = 1);
-    Tile* getNeighbourTileWithWood(Tile* pTile);
+    Tile* getNeighbourTileWithWood(Tile* pTile, int distance = 1);
 
  //   Townhall* isNextToTownhall(Tile* pTile, int distance = 1);
  //   GoldMine* isNextToGoldMine(Tile* pTile, int distance = 1);
@@ -189,17 +189,17 @@ BuildingType* Map::isNextToBuilding(Tile* pTile, int distance) {
             int y = startY + dy;
             int x = startX + dx;
 
-            // Überspringe das Zentrum (das gegebene pTile selbst)
+            // ï¿½berspringe das Zentrum (das gegebene pTile selbst)
             if (dx == 0 && dy == 0) continue;
 
             // Stelle sicher, dass die Koordinaten innerhalb der Karte sind
             if (y >= 0 && y < m_arrTileMap.size() && x >= 0 && x < m_arrTileMap[0].size()) {
                 Tile* neighbourTile = m_arrTileMap[y][x]; // Zugriff auf das Nachbartile
 
-                // Versuche, die Einheit auf dem Tile als den gesuchten Gebäudetyp zu casten
+                // Versuche, die Einheit auf dem Tile als den gesuchten Gebï¿½udetyp zu casten
                 BuildingType* pBuilding = dynamic_cast<BuildingType*>(neighbourTile->getSeaOrLandUnit());
 
-                // Wenn das Tile den gesuchten Gebäudetyp hat, gib diesen zurück
+                // Wenn das Tile den gesuchten Gebï¿½udetyp hat, gib diesen zurï¿½ck
                 if (pBuilding) {
                     return pBuilding;
                 }
@@ -207,6 +207,6 @@ BuildingType* Map::isNextToBuilding(Tile* pTile, int distance) {
         }
     }
 
-    // Wenn kein passendes Gebäude gefunden wurde, gib nullptr zurück
+    // Wenn kein passendes Gebï¿½ude gefunden wurde, gib nullptr zurï¿½ck
     return nullptr;
 }

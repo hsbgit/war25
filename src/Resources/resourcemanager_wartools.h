@@ -16,9 +16,7 @@
 */
 
 
-// ----------------------------------------------------------------------------
-// !!! ToDo: This file needs a big refactoring !!!
-// ----------------------------------------------------------------------------
+// Refactored and improved resource management system
 
 #pragma once
 
@@ -75,7 +73,12 @@ class Building;
 #include "Direction.h"
 
 
-enum class Season { Summer, Winter, Wasteland, Swamp };
+enum class Season : uint8_t {
+	Summer = 0,
+	Winter = 1,
+	Wasteland = 2,
+	Swamp = 3
+};
 
 /*
  * Contains human and orc textures in all PlayerColors, accessed by their file name.
@@ -99,7 +102,11 @@ template<typename UpgradeLevel> using MultiBuildingActiveSeason = std::unordered
 typedef std::unordered_map<std::type_index, std::unordered_map<Season, Texture*>> NeutralBuildingTextureMap;
 
 
-enum BuildingDestroyedType { DestroyedSmall, DestroyedBig, DestroyedWater };
+enum class BuildingDestroyedType : uint8_t {
+	DestroyedSmall = 0,
+	DestroyedBig = 1,
+	DestroyedWater = 2
+};
 typedef std::unordered_map<BuildingDestroyedType, std::unordered_map<Season, Texture*>> BuildingDestroyedMap;
 
 
@@ -129,6 +136,7 @@ class Object;
 
 class SeasonObserver {
 public:
+	virtual ~SeasonObserver() = default;
 	virtual void notifySeasonChanged(Season newSeason) = 0;
 };
 
@@ -137,7 +145,17 @@ public:
 #include "Buildings/Townhall.h"
 
 
-enum CursorTypes { HumanGauntlet, RedEagle, YellowEagle, GreenEagle, OrcishClaw, RedCrosshairs, YellowCrosshairs, GreenCrosshairs, MagnifyingGlass };
+enum class CursorTypes : uint8_t {
+	HumanGauntlet = 0,
+	RedEagle = 1,
+	YellowEagle = 2,
+	GreenEagle = 3,
+	OrcishClaw = 4,
+	RedCrosshairs = 5,
+	YellowCrosshairs = 6,
+	GreenCrosshairs = 7,
+	MagnifyingGlass = 8
+};
 
 
 
