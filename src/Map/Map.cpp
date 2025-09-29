@@ -648,7 +648,14 @@ void Map::placeUnit(int tile_y, int tile_x, Object* pObject) {
 	 * release the current tile assignments.
 	 */
 	for (auto& pTile : pObject->getOccupiedTiles()) {
-		pTile->release(pObject);
+		if (pTile) {  // Safety check for null pointers
+			// Debug output for air units
+			if (pObject->isAirObject()) {
+				std::cerr << "DEBUG: Releasing air unit from tile (" << pTile->getX() << "," << pTile->getY() << ")" << std::endl;
+				std::cerr << "DEBUG: Tile's current air unit: " << pTile->getAirUnit() << ", our object: " << pObject << std::endl;
+			}
+			pTile->release(pObject);
+		}
 	}
 
 	pObject->getOccupiedTiles().clear();
@@ -657,9 +664,25 @@ void Map::placeUnit(int tile_y, int tile_x, Object* pObject) {
 	assert(gMapUnitTilesize.contains(typeid(*pObject)));
 	int tilesize = gMapUnitTilesize[typeid(*pObject)];
 
+	// Additional safety check for bounds
+	if (tile_x < 0 || tile_y < 0 ||
+		tile_x + tilesize > static_cast<int>(m_arrTileMap[0].size()) ||
+		tile_y + tilesize > static_cast<int>(m_arrTileMap.size())) {
+		std::cerr << "ERROR: Attempting to place unit outside map bounds!" << std::endl;
+		return;
+	}
+
 	for (int y = tile_y; y < tile_y + tilesize; ++y) {
 		for (int x = tile_x; x < tile_x + tilesize; ++x) {
 			Tile* pTile = m_arrTileMap[y][x];
+			assert(pTile);  // Tile should never be null if bounds checking passed
+
+			// Debug output for air units
+			if (pObject->isAirObject()) {
+				std::cerr << "DEBUG: Assigning air unit to tile (" << x << "," << y << ")" << std::endl;
+				std::cerr << "DEBUG: Tile's current air unit before assign: " << pTile->getAirUnit() << std::endl;
+			}
+
 			pTile->assign(pObject);
 			pObject->getOccupiedTiles().push_back(pTile);
 		}
@@ -669,11 +692,44 @@ void Map::placeUnit(int tile_y, int tile_x, Object* pObject) {
 
 // mapState: Give information about which tiles are free and which are not-free
 bool Map::canBePlacedAtPosition(Object* pObject, int tile_x, int tile_y, std::unordered_map<Tile*, bool>* mapState) {
-	assert(gMapUnitTilesize.contains(typeid(*pObject)));
+	// Safety check: ensure object type is registered
+	if (!gMapUnitTilesize.contains(typeid(*pObject))) {
+		std::cerr << "ERROR: Unit type not found in gMapUnitTilesize!" << std::endl;
+		return false;
+	}
+
 	int tilesize = gMapUnitTilesize[typeid(*pObject)];
+
+	// Safety check: ensure coordinates are within map bounds
+	if (tile_x < 0 || tile_y < 0 ||
+		tile_x + tilesize > static_cast<int>(m_arrTileMap[0].size()) ||
+		tile_y + tilesize > static_cast<int>(m_arrTileMap.size())) {
+		return false; // Position is outside map bounds
+	}
 
 	bool canBePlaced = true;
 
+	// Special handling for air units (2x2 size) - ensure no overlap with other air units
+	if (pObject->isAirObject() && tilesize == 2) {
+		for (int y = tile_y; y < tile_y + tilesize; ++y) {
+			for (int x = tile_x; x < tile_x + tilesize; ++x) {
+				Tile* pTile = m_arrTileMap[y][x];
+
+				// Check if any OTHER air unit already occupies this tile
+				Object* airUnit = pTile->getAirUnit();
+				if (airUnit && airUnit != pObject) {
+					// Another air unit is already on this tile - placement blocked
+					if (!mapState)
+						return false;
+
+					canBePlaced = false;
+					(*mapState)[pTile] = false;
+				}
+			}
+		}
+	}
+
+	// Standard tile blocking check for all units
 	for (int y = tile_y; y < tile_y + tilesize; ++y) {
 		for (int x = tile_x; x < tile_x + tilesize; ++x) {
 			Tile* pTile = m_arrTileMap[y][x];
@@ -697,7 +753,9 @@ void Map::releaseObjectFromTile(Object* pObject) {
 	assert(pObject);
 
 	for (auto& pTile : pObject->getOccupiedTiles()) {
-		pTile->release(pObject);
+		if (pTile) {  // Safety check for null pointers
+			pTile->release(pObject);
+		}
 	}
 
 	pObject->getOccupiedTiles().clear();

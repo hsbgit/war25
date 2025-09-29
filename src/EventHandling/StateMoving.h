@@ -42,6 +42,10 @@ private:
     Tile* m_pNextTileToMove = nullptr;
     Tile* getNextTile(bool* pathTemporarilyBlocked);
     Tile* getNextPathTile(bool* pathTemporarilyBlocked);
+    Tile* findAlternativeDirection(); // Simple avoidance for air units
+    void rememberPosition(const Point& pos); // Add position to memory
+    bool isRecentPosition(const Point& pos); // Check if position was recently visited
+    bool attemptYieldingManeuver(); // Try to yield to resolve deadlocks
 
     int m_ticksPerStep;
     int m_tickCounter = 0;
@@ -57,4 +61,12 @@ private:
 
     Point m_targetPos_world;
     Tile* m_pTargetTile = nullptr;
+
+    // Position memory to prevent ping-pong oscillation
+    std::vector<Point> m_recentPositions;
+    static const int MAX_REMEMBERED_POSITIONS = 5;
+
+    // Yielding system for land unit deadlock resolution
+    int m_pathfindingFailureCount = 0;
+    static const int MAX_PATHFINDING_FAILURES = 3;
 };

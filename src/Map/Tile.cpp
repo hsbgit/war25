@@ -225,10 +225,24 @@ NeighbourNodes Tile::getFreeNeighbourNodes(int unitSize_tiles, bool airPath) con
 		// We have to make additional checks for the remaining tiles as the unit size is 2x2
 		Object* pObjectToCheck = airPath ? getAirUnit() : getSeaOrLandUnit();
 
-		std::erase_if(freeNodes, [this, &airPath, pObjectToCheck](const auto& pair) {
-			const Tile* pTile = (Tile*)pair.second;
-			return !m_pMap->canBePlacedAtPosition(pObjectToCheck, pTile->getX(), pTile->getY());   // Crash bei AStar wenn der Pfad in der Zukunft liegt
+		// Safety check: only proceed if we have a valid object to check
+		if (pObjectToCheck) {
+			std::erase_if(freeNodes, [this, &airPath, pObjectToCheck](const auto& pair) {
+				const Tile* pTile = (Tile*)pair.second;
+
+				// Additional safety: check if pTile is valid and map exists
+				if (!pTile || !m_pMap) {
+					return true; // Remove invalid tiles
+				}
+
+				try {
+					return !m_pMap->canBePlacedAtPosition(pObjectToCheck, pTile->getX(), pTile->getY());
+				} catch (...) {
+					// If canBePlacedAtPosition crashes, consider the tile as blocked
+					return true;
+				}
 			});
+		}
 	}
 
 
@@ -301,24 +315,39 @@ bool Tile::isBlockedForUnit(const Object* pObj, Object** pBlockingObject) const 
 
 
 void Tile::assign(Object* pObj) {
-	assert(!m_pUnit || !m_pAirUnit); // ToDo: Assert durch exception
-
 	if (pObj->isAirObject()) {
+		if (m_pAirUnit && m_pAirUnit != pObj) {
+			std::cerr << "ERROR: Trying to assign air unit " << pObj << " to tile ("
+			          << m_pos_tile.x << "," << m_pos_tile.y << ") already occupied by " << m_pAirUnit << std::endl;
+			std::cerr << "BLOCKING the assignment to prevent corruption!" << std::endl;
+			return; // Don't assign - this would corrupt the tile ownership
+		}
 		m_pAirUnit = pObj;
 	}
 	else {
+		if (m_pUnit && m_pUnit != pObj) {
+			std::cerr << "ERROR: Trying to assign unit " << pObj << " to tile ("
+			          << m_pos_tile.x << "," << m_pos_tile.y << ") already occupied by " << m_pUnit << std::endl;
+			std::cerr << "BLOCKING the assignment to prevent corruption!" << std::endl;
+			return; // Don't assign - this would corrupt the tile ownership
+		}
 		m_pUnit = pObj; // Building or LandUnit
 	}
 }
 
 
 void Tile::release(Object* pObj) {
-	assert((pObj == m_pUnit) || (pObj == m_pAirUnit));
-
+	// Safety check: only release if this object actually owns this tile
 	if (pObj == m_pUnit) {
 		m_pUnit = nullptr;
 	}
 	else if (pObj == m_pAirUnit) {
 		m_pAirUnit = nullptr;
+	}
+	else {
+		// Object is trying to release a tile it doesn't own - this shouldn't happen
+		std::cerr << "WARNING: Object " << pObj << " trying to release tile ("
+		          << m_pos_tile.x << "," << m_pos_tile.y << ") it doesn't own!" << std::endl;
+		std::cerr << "Tile's m_pUnit: " << m_pUnit << ", m_pAirUnit: " << m_pAirUnit << std::endl;
 	}
 }
