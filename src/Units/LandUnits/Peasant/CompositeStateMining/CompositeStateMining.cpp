@@ -86,8 +86,13 @@ CompositeStateMining::~CompositeStateMining() {
 
 void CompositeStateMining::onEnter(const Event* pEvent) {
     assert(pEvent);
-	m_pCurrState = m_movingToRessource;
-    m_movingToRessource->onEnter(pEvent);
+	if (dynamic_cast<IResourceCollector*>(m_pOwner)->currentlyCarrying() != ResourceType::Nothing) {
+		m_pCurrState = m_returningRessource;
+		m_returningRessource->onEnter();
+	} else {
+		m_pCurrState = m_movingToRessource;
+		m_movingToRessource->onEnter(pEvent);
+	}
 }
 
 void CompositeStateMining::onExit() {

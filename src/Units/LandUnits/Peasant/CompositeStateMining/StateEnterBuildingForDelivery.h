@@ -18,13 +18,13 @@
 
 #include "EventHandling/State.h"
 
-class Peasant;
+class Unit;
 class Tile;
 
 
 class StateEnterBuildingForDelivery : public State {
 public:
-    StateEnterBuildingForDelivery(Peasant* pPeasant);
+    StateEnterBuildingForDelivery(Unit* pCollector);
 
     void onEnter(const Event* pEvent = nullptr) override;
 

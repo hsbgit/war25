@@ -19,6 +19,7 @@
 #include "ResourceType.h"
 
 class Player;
+class IResourceMine;
 
 
 class IResourceCollector {
@@ -31,9 +32,18 @@ public:
 		return m_carriedResources;
 	}
 
+	IResourceMine* currentResourceMine() const {
+		return m_pCurrentResourceMine;
+	}
+
+	void setCurrentResourceMine(IResourceMine* mine) {
+		m_pCurrentResourceMine = mine;
+	}
+
 	virtual bool canCollectResource(ResourceType t) const = 0;
 
 protected:
 	Player* m_pPlayer = nullptr;
 	ResourceType m_carriedResources = ResourceType::Nothing;
+	IResourceMine* m_pCurrentResourceMine = nullptr;
 };

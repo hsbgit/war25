@@ -33,5 +33,6 @@ bool IResourceMine::enter(IResourceCollector* pPeasant) {
 
 	m_pMap->releaseObjectFromTile(dynamic_cast<Object*>(pPeasant));
 	m_mapWorkers[pPeasant] = m_miningTicks;
+	pPeasant->setCurrentResourceMine(this);
 	return true;
 }

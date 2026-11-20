@@ -18,8 +18,10 @@
 #include "Global/PseudoRandom.h"
 #include "Global/GlobalAttributes.h"
 #include "Resources/SoundManager.h"
+#include "Resources/resourcemanager_wartools.h"
 #include "Units/LandUnits/Peasant/Peasant.h"
 #include "Map/Map.h"
+#include "Direction.h"
 #include <algorithm>
 
 // Static member definition
@@ -39,6 +41,14 @@ void StateLumberWood::setMoveToWoodState(State* pMoveToWood) {
 void StateLumberWood::onEnter(const Event* pEvent) {
     m_requiredTicksForChop = calculateRequiredTicksForGameAction(5 * 1000); // 25
     m_pTileWithWood = identifyCloseByWood();
+	if (m_pTileWithWood) {
+		auto* pPeasant = dynamic_cast<Peasant*>(m_pOwner);
+		const Direction direction = getTargetCardinalDirection(
+			m_pOwner->getTile(), m_pTileWithWood);
+		pPeasant->setCurrentAnimation(g_pRessourceManager->getUnitAnimation(
+			pPeasant, direction,
+			ResourceManager_wartools::AnimationType::Working_Lumber));
+	}
 
     // Register for debug visualization
     s_activeInstances.push_back(this);
@@ -56,6 +66,8 @@ State* StateLumberWood::process() {
         // No wood on a direct neighbour tile?
         // Go back to move state to search for wood in larger area
         if (m_pMoveToWood) {
+			onExit();
+			m_pMoveToWood->onEnter();
             return m_pMoveToWood;
         }
         return m_pIdle;
@@ -69,6 +81,8 @@ State* StateLumberWood::process() {
         if (!pNewTileWithWood) {
             // Go back to move state to search for wood in larger area
             if (m_pMoveToWood) {
+				onExit();
+				m_pMoveToWood->onEnter();
                 return m_pMoveToWood;
             }
             return m_pIdle;
@@ -76,6 +90,12 @@ State* StateLumberWood::process() {
 
         m_requiredTicksForChop = calculateRequiredTicksForGameAction(5 * 1000);
         m_pTileWithWood = pNewTileWithWood;
+		auto* pPeasant = dynamic_cast<Peasant*>(m_pOwner);
+		const Direction direction = getTargetCardinalDirection(
+			m_pOwner->getTile(), m_pTileWithWood);
+		pPeasant->setCurrentAnimation(g_pRessourceManager->getUnitAnimation(
+			pPeasant, direction,
+			ResourceManager_wartools::AnimationType::Working_Lumber));
         //     g_pEventBroker.addEvent(Event(m_pOwner->geti, (EventID)PeasantActions::Harvest, m_pTileWithWood->getX(), m_pTileWithWood->getY()));
     }
 

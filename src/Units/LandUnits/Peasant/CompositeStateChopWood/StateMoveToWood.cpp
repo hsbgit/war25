@@ -55,9 +55,10 @@ void StateMoveToWood::onEnter(const Event* pEvent) {
                     std::cerr << "DEBUG: Returning to last wood position (" << lastPos.x << "," << lastPos.y << ")" << std::endl;
                 } else {
                     std::cerr << "DEBUG: Last wood position no longer has wood, searching for new wood" << std::endl;
-                    // Last position no longer has wood, search for new wood
-                    Tile* peasantTile = m_pOwner->getTile();
-                    Tile* woodTile = m_pOwner->getMap()->getNeighbourTileWithWood(peasantTile, 3);
+                    // Continue at the same forest edge. Searching around the
+                    // drop-off building made workers stop there after every
+                    // successfully delivered load.
+                    Tile* woodTile = m_pOwner->getMap()->getNeighbourTileWithWood(lastWoodTile, 8);
 
                     if (woodTile) {
                         goldmine_tile_world = woodTile->getPos();
@@ -115,8 +116,11 @@ void StateMoveToWood::onEnter(const Event* pEvent) {
 
 
 State* StateMoveToWood::process() {
-    if (!m_pNextReachableTile)
-        return m_pIdle;
+    if (!m_pNextReachableTile) {
+		onExit();
+		m_pIdle->onEnter();
+		return m_pIdle;
+	}
 
     return StateMoving::process();
 }

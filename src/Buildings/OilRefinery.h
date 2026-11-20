@@ -17,11 +17,13 @@
 #pragma once
 
 #include "Building.h"
+#include "Units/Resource/IResourceAcceptor.h"
 
-class OilRefinery : public Building {
+class OilRefinery : public Building, public IResourceAcceptor {
 public:
 	OilRefinery(Peasant* pErecter, Map* pMap);
 	OilRefinery(Player* pOwner, Fraction fraction, Map* pMap);
+	bool acceptsResource(ResourceType type) const override { return type == ResourceType::Oil; }
 
 private:
 	void setProperties();

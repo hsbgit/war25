@@ -21,6 +21,7 @@
 #include "EventHandling/EventBroker.h"
 
 class Object;
+class Player;
 
 
 class Projectile : public MapObject {
@@ -48,6 +49,7 @@ private:
 	void updatePosition();
 	void checkCollision();
 	void handleCollision();
+	void handleCatapultSplash(Object* primaryTarget);
 	void playCollisionSound();
 
 	static void clampToZero(int& value) {
@@ -62,6 +64,9 @@ private:
 	Point m_targetPosition;
 	Point m_originPosition;
 	Point m_startPosition;
+	Point m_impactTile;
+	Map* m_pMap = nullptr;
+	Player* m_pAttackerOwner = nullptr;
 	int m_totalTravelTicks = 1;
 	int m_elapsedTravelTicks = 0;
 	bool m_expired = false;

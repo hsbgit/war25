@@ -70,6 +70,21 @@ bool GoldMine::placePeasant(Peasant* pPeasant, bool withGold) {
 	}
 
 	Object::m_pMap->placeUnit(pFreeTileNextToGoldMine, pPeasant);
+	pPeasant->setCurrentResourceMine(nullptr);
+	return true;
+}
+
+
+bool GoldMine::leave(IResourceCollector* pCollector) {
+	auto it = m_mapWorkers.find(pCollector);
+	if (it == m_mapWorkers.end())
+		return false;
+	auto* peasant = dynamic_cast<Peasant*>(pCollector);
+	if (!peasant || !placePeasant(peasant, false))
+		return false;
+	m_mapWorkers.erase(it);
+	if (m_mapWorkers.empty())
+		switchImage(false);
 	return true;
 }
 
@@ -117,6 +132,7 @@ bool GoldMine::enter(IResourceCollector* pPeasant) {
 
 	Object::m_pMap->releaseObjectFromTile(dynamic_cast<Object*>(pPeasant));
 	m_mapWorkers[pPeasant] = m_miningTicks;
+	pPeasant->setCurrentResourceMine(this);
 	return true;
 }
 

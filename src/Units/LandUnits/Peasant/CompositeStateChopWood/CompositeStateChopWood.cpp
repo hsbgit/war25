@@ -81,6 +81,12 @@ CompositeStateChopWood::~CompositeStateChopWood() {
 
 void CompositeStateChopWood::onEnter(const Event* pEvent) {
     assert(pEvent);
+	if (dynamic_cast<IResourceCollector*>(m_pOwner)->currentlyCarrying() != ResourceType::Nothing) {
+		m_pCurrState = m_returningRessource;
+		m_returningRessource->onEnter();
+		return;
+	}
+	m_pCurrState = m_movingToRessource;
 
     // Store the initial wood position
     m_lastWoodPosition.x = pEvent->tileX();
@@ -91,6 +97,7 @@ void CompositeStateChopWood::onEnter(const Event* pEvent) {
 
 
 State* CompositeStateChopWood::process() {
+	m_pCurrState = m_pCurrState->checkForTransition();
     State* oldState = m_pCurrState;
     m_pCurrState = m_pCurrState->process();
 
@@ -98,8 +105,6 @@ State* CompositeStateChopWood::process() {
     if (oldState != m_pCurrState) {
         if (m_pCurrState == m_movingToRessource) {
             std::cerr << "DEBUG: Transitioning to MovingToResource state" << std::endl;
-            // Call onEnter without event to trigger wood position logic
-            m_pCurrState->onEnter(nullptr);
         } else if (m_pCurrState == m_collectRessource) {
             std::cerr << "DEBUG: Transitioning to CollectResource state" << std::endl;
         } else if (m_pCurrState == m_returningRessource) {
@@ -109,7 +114,14 @@ State* CompositeStateChopWood::process() {
         }
     }
 
-    return m_pCurrState;
+	// Keep the outer unit state machine on the composite while the lumber
+	// cycle advances internally. Otherwise delivery loses the harvesting
+	// context and the worker can stop with a stale carried-resource sprite.
+	if (m_pCurrState == m_movingToRessource || m_pCurrState == m_collectRessource ||
+		m_pCurrState == m_returningRessource || m_pCurrState == m_deliverRessource)
+		return this;
+
+	return m_pCurrState;
 }
 
 

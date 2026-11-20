@@ -17,11 +17,17 @@
 #pragma once
 
 #include "Units/Unit.h"
+#include "Units/Resource/IResourceCollector.h"
 
+class CompositeStateOil;
 
-class Tanker : public Unit {
+class Tanker : public Unit, public IResourceCollector {
 public:
 	Tanker(Player* pOwner, Fraction fraction, Map* pMap);
+	~Tanker() override;
+	void handleEvent(const Event& event) override;
+	std::vector<Action> getActions() const override;
+	bool canCollectResource(ResourceType type) const override { return type == ResourceType::Oil; }
 
 	Type getType() const override {
 		return Type::Sea;
@@ -30,4 +36,7 @@ public:
 	bool isOrganic() const override {
 		return false;
 	}
+
+private:
+	CompositeStateOil* m_harvestOil = nullptr;
 };

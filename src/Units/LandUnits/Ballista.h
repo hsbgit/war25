@@ -17,11 +17,14 @@
 #pragma once
 
 #include "Units/Unit.h"
+#include <optional>
 
 
 class Ballista : public Unit, public IArmed {
 public:
 	Ballista(Player* pOwner, Fraction fraction, Map* pMap);
+	void process() override;
+	void handleEvent(const Event& event) override;
 
 	Type getType() const override {
 		return Type::Land;
@@ -38,4 +41,19 @@ public:
 	int getAdditionalAttackRange() const override {
 		return m_upgradeStats.additionalRange();
 	}
+
+private:
+	void updateAttack();
+	void fireAtActiveTarget();
+	void cancelWindupForMovement(const Event& event);
+	void setReleasedAnimation();
+	void setAttackFrame(std::size_t frame);
+	Object* selectTarget() const;
+	Direction targetDirection(const Object* target) const;
+
+	int m_windupTicksRemaining = 0;
+	int m_attackCooldownTicksRemaining = 0;
+	int m_movementDelayTicksRemaining = 0;
+	std::optional<Event> m_pendingMovement;
+	Direction m_attackDirection = Direction::N;
 };

@@ -36,6 +36,26 @@ war25/
 
 ## Quick Start
 
+### PUD map smoke test
+
+The map test builds the current game binary and checks every loadable map using
+the same lifecycle as the PUD browser (default map -> selected map), including
+40 simulation ticks and a rendered frame:
+
+```bash
+cmake --build src/cmake-build-debug --target smoke_test_maps
+```
+
+For a focused run of one map:
+
+```bash
+cd src/cmake-build-debug
+./war25 --smoke-test-map "data/maps/example.pud" 40
+```
+
+The full runner also accepts `--jobs`, `--ticks`, and `--timeout` when invoked
+directly through `tests/smoke_test_maps.py`.
+
 ### Running Tests
 
 1. **Standalone tests** (recommended for development):

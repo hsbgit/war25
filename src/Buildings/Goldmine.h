@@ -27,6 +27,7 @@ public:
 	void process() override;
 
 	bool enter(IResourceCollector* pPeasant) override;
+	bool leave(IResourceCollector* pCollector) override;
 	void die() override;
 
 private:

@@ -19,6 +19,7 @@
 
 class DebugManager {
 public:
+	float m_gameSpeedMultiplier = 1.0f;
     bool m_map_drawTileInformation = false; // Water, Land, Destroyable, Occupied
     bool m_map_considerExploration = false;
     bool m_map_drawFogOfWar = false;

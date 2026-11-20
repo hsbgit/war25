@@ -24,6 +24,7 @@
 class Critter : public Unit, public SeasonObserver {
 public:
 	Critter(Player* pOwner, Map* pMap);
+	~Critter() override;
 
 	void process() override;
 

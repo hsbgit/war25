@@ -24,6 +24,7 @@
 #include "CompositeStateMining/CompositeStateMining.h"
 #include "CompositeStateChopWood/CompositeStateChopWood.h"
 #include "CompositeStateConstructBuilding/CompositeStateConstructBuilding.h"
+#include "Units/Resource/IResourceMine.h"
 
 // For the peasant actions (=build building)
 #include "Buildings/Church.h"
@@ -67,6 +68,10 @@ Peasant::Peasant(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fr
 	// ToDo: Connect gold with wood state if goldmine is empty
 	m_pHarvestWood = new CompositeStateChopWood(this);
 	m_pHarvestWood->addTransition(EventID(GeneralActions::Stop), m_pIdle); // Todo make me work
+	m_pHarvestWood->addTransition(EventID(GeneralActions::Move), m_pMoving);
+	m_pHarvestWood->addTransition(EventID(PeasantActions::HarvestGold), m_pHarvestGold);
+	m_pHarvestWood->addTransition(EventID(PeasantActions::HarvestWood), m_pHarvestWood);
+	m_pHarvestGold->addTransition(EventID(PeasantActions::HarvestWood), m_pHarvestWood);
 
 
 	m_pIdle->addTransition(EventID(PeasantActions::HarvestGold), m_pHarvestGold);
@@ -78,20 +83,35 @@ Peasant::Peasant(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fr
 
 		PeasantActions actionType = static_cast<PeasantActions>(action);
 		m_pIdle->addTransition(EventID(actionType), m_pConstructBuilding);
+		m_pMoving->addTransition(EventID(actionType), m_pConstructBuilding);
+		m_pHarvestGold->addTransition(EventID(actionType), m_pConstructBuilding);
+		m_pHarvestWood->addTransition(EventID(actionType), m_pConstructBuilding);
 	}
 
 
 	m_pMoving->addTransition(EventID(PeasantActions::HarvestGold), m_pHarvestGold);
 	m_pMoving->addTransition(EventID(PeasantActions::HarvestWood), m_pHarvestWood);
-	m_pMoving->addTransition(EventID(PeasantActions::BuildFarm), m_pConstructBuilding);
 }
 
 
 void Peasant::handleEvent(const Event& event) {
 	std::cerr << "Peasant: Received Event ID: " << std::dec << (int)event.getEventID() << std::endl;
+	if (!isPlacedOnMap()) {
+		IResourceMine* mine = currentResourceMine();
+		if (mine) {
+			if (!mine->leave(this))
+				return;
+		} else {
+			// Delivery buildings temporarily hide the worker as well. Remember the
+			// latest command and execute it as soon as the worker reappears.
+			m_pendingCommand = event;
+			return;
+		}
+	}
 	EventID id = event.getEventID();
 
 	bool harvestEvent = false;
+	Event normalizedEvent = event;
 
 	if ((GeneralActions)id == GeneralActions::Move || (PeasantActions)id == PeasantActions::Harvest) {
 		Point m_targetPos_world;
@@ -104,18 +124,38 @@ void Peasant::handleEvent(const Event& event) {
 
 		if (pGoldMine) {
 			std::cerr << "Peasant: Harvest Gold" << std::endl;
-			Unit::handleEvent(Event(getID(), PeasantActions::HarvestGold, m_targetPos_world.x, m_targetPos_world.y));  // Logic Gold vs Wood into game.cpp?
+			normalizedEvent = Event(getID(), PeasantActions::HarvestGold, m_targetPos_world.x, m_targetPos_world.y);
 			harvestEvent = true;
 		}
 		else if (pTargetTile->isWood()) {
 			std::cerr << "Peasant: Harvest Lumber" << std::endl;
-			Unit::handleEvent(Event(getID(), PeasantActions::HarvestWood, m_targetPos_world.x, m_targetPos_world.y));
+			normalizedEvent = Event(getID(), PeasantActions::HarvestWood, m_targetPos_world.x, m_targetPos_world.y);
 			harvestEvent = true;
 		}
 	}
 
-	if (!harvestEvent) {
-		Unit::handleEvent(event);
+	if (harvestEvent && currentlyCarrying() != ResourceType::Nothing) {
+		// Remember the requested resource, but finish the current delivery first.
+		m_pendingCommand = normalizedEvent;
+		const PeasantActions returnCycle = currentlyCarrying() == ResourceType::Wood
+			? PeasantActions::HarvestWood : PeasantActions::HarvestGold;
+		Unit::handleEvent(Event(getID(), returnCycle,
+			getTileLocation().x, getTileLocation().y));
+		return;
+	}
+	if (!harvestEvent)
+		m_pendingCommand.reset();
+
+	Unit::handleEvent(harvestEvent ? normalizedEvent : event);
+}
+
+
+void Peasant::process() {
+	Unit::process();
+	if (m_pendingCommand && currentlyCarrying() == ResourceType::Nothing && isPlacedOnMap()) {
+		Event pending = *m_pendingCommand;
+		m_pendingCommand.reset();
+		handleEvent(pending);
 	}
 }
 

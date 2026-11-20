@@ -22,7 +22,7 @@
 #include <cassert>
 
 
-StateEnterBuildingForDelivery::StateEnterBuildingForDelivery(Peasant* pPeasant) : State(pPeasant) {
+StateEnterBuildingForDelivery::StateEnterBuildingForDelivery(Unit* pCollector) : State(pCollector) {
 
 }
 
@@ -79,8 +79,9 @@ State* StateEnterBuildingForDelivery::process() {
 
 
         // Deliver the correct resource type based on what the peasant is carrying
-        Peasant* pPeasant = dynamic_cast<Peasant*>(m_pOwner);
-        ResourceType carriedResource = pPeasant->currentlyCarrying();
+		auto* pCollector = dynamic_cast<IResourceCollector*>(m_pOwner);
+		assert(pCollector);
+        ResourceType carriedResource = pCollector->currentlyCarrying();
 
         if (carriedResource == ResourceType::Gold) {
             const Resources& rBasic = m_pOwner->getOwner()->getBasicResourceProduction();
@@ -115,8 +116,14 @@ State* StateEnterBuildingForDelivery::process() {
             Resources harvestedWood = Resources(0, woodAmount);
             m_pOwner->getOwner()->addToResources(harvestedWood);
         }
+		else if (carriedResource == ResourceType::Oil) {
+			const Resources& rBasic = m_pOwner->getOwner()->getBasicResourceProduction();
+			const Resources& rAdditional = m_pOwner->getOwner()->getAdditionResourceProduction();
+			m_pOwner->getOwner()->addToResources(Resources(
+				0, 0, rBasic.oil() + rAdditional.oil()));
+		}
 
-        pPeasant->setCarriedResource(ResourceType::Nothing);
+        pCollector->setCarriedResource(ResourceType::Nothing);
         return transitionToNextState();
     }
 

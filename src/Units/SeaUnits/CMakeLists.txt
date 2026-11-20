@@ -8,10 +8,11 @@ set(SEA_UNITS_SOURCES
     GnomishSubmarine.h
     Tanker.cpp
     Tanker.h
+	CompositeStateOil.cpp
+	CompositeStateOil.h
     Transport.cpp
     Transport.h
 )
 
 add_library(war25_units_sea OBJECT ${SEA_UNITS_SOURCES})
 target_link_libraries(war25_units_sea PUBLIC war25_common)
-

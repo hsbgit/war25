@@ -318,8 +318,13 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 
 		// Attack animations
 		startOffset += spriteCountMoving;
-		// spriteCountAttacking
-		//  mapUnitAttackAnimations
+		Animation animAttacking(textMap[correspondingType][color], interval_ms);
+		for (int rowOffset = startOffset; rowOffset < startOffset + spriteCountAttacking; ++rowOffset) {
+			Rect r = { colOffset * iconSquareWidth_px, rowOffset * iconSquareWidth_px, iconSquareWidth_px, iconSquareWidth_px };
+			animAttacking.addSprite(Sprite(animAttacking.getBaseTexture(), r, posOffset, flip));
+		}
+		if (spriteCountAttacking > 0)
+			mapUnitAttackAnimations[correspondingType][direction] = animAttacking;
 
 
 		// Dying animations
@@ -440,13 +445,17 @@ Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction dire
 	assert(mapUnitMovementAnimations.contains(typeid(*pUnit))); // Unit type considered?
 	assert(mapUnitMovementAnimations[typeid(*pUnit)].contains(direction)); // Appropriate direction considered?
 
-	// Use correct texture map depending on the unit's fraction
-	TextureMap& textMap = (pUnit->getFraction() == Fraction::Orc) ? m_mapUnitTexturesOrc : m_mapUnitTexturesHuman;
+	ResourceType carriedResource = ResourceType::Nothing;
+	if (auto* pCollector = dynamic_cast<IResourceCollector*>(pUnit))
+		carriedResource = pCollector->currentlyCarrying();
 
-	// Get underlaying base texture, e.g., "giant_turtle.png" or "knight.png"
-	// with correct color 
-	// Nicht immer korrekt: z.b. wenn eine neutrale einheit übernommen wurde. Oder dann sogar automatisch korrekt?!
-	Texture* pCorrectColorTexture = textMap[typeid(*pUnit)][pUnit->getOwner()->getColor()];
+	// Working animations always use the unloaded worker sheet. The resource is
+	// only assigned after the work completes, at which point movement switches
+	// to the corresponding carried-resource sheet.
+	if (animType == AnimationType::Working_Gold || animType == AnimationType::Working_Lumber)
+		carriedResource = ResourceType::Nothing;
+
+	Texture* pCorrectColorTexture = getUnitTexture(pUnit, carriedResource);
 	assert(pCorrectColorTexture);
 
 
@@ -466,7 +475,39 @@ Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction dire
 		return a;
 	}
 
+	if (animType == AnimationType::Attacking ||
+		animType == AnimationType::Working_Gold ||
+		animType == AnimationType::Working_Lumber) {
+		assert(mapUnitAttackAnimations.contains(typeid(*pUnit)));
+		assert(mapUnitAttackAnimations[typeid(*pUnit)].contains(direction));
+		Animation a(mapUnitAttackAnimations[typeid(*pUnit)][direction]);
+		a.setBaseTexture(pCorrectColorTexture);
+		return a;
+	}
+
 	throw std::logic_error("AnimationType not yet implemented!");
+}
+
+
+Texture* ResourceManager_wartools::getUnitTexture(Unit* pUnit, ResourceType carriedResource) {
+	TextureMap& baseTextures = (pUnit->getFraction() == Fraction::Orc)
+		? m_mapUnitTexturesOrc : m_mapUnitTexturesHuman;
+	const std::type_index type = typeid(*pUnit);
+	const PlayerColor color = pUnit->getOwner()->getColor();
+
+	if ((type == typeid(Peasant) || type == typeid(Tanker)) &&
+		carriedResource != ResourceType::Nothing) {
+		auto& resourceTextures = (pUnit->getFraction() == Fraction::Orc)
+			? m_mapWorkerResourceTexturesOrc : m_mapWorkerResourceTexturesHuman;
+		if (resourceTextures.contains(carriedResource) &&
+			resourceTextures.at(carriedResource).contains(type) &&
+			resourceTextures.at(carriedResource).at(type).contains(color))
+			return resourceTextures.at(carriedResource).at(type).at(color);
+	}
+
+	if (!baseTextures.contains(type) || !baseTextures.at(type).contains(color))
+		return nullptr;
+	return baseTextures.at(type).at(color);
 }
 
 /*
@@ -518,27 +559,12 @@ Animation ResourceManager_wartools::getUnitIdleAnimation(Unit* pUnit, Direction 
 	}
 	Animation a(directional.at(direction));
 
-	// Use correct texture map depending on the unit's fraction
-	TextureMap& textMap = (pUnit->getFraction() == Fraction::Orc) ? m_mapUnitTexturesOrc : m_mapUnitTexturesHuman;
-
-	/*
-	 * Get underlaying base texture, e.g., "giant_turtle.png" or "knight.png"
-	 * with correct color
-	 */
-	 // ToDo: Correct color if a neutral unit is freed?
-	if (!textMap.contains(typeid(*pUnit))) {
-		std::cerr << "ERROR: Unit type not found in texture map!" << std::endl;
-		return a; // Return animation without texture
-	}
-
-	if (!textMap[typeid(*pUnit)].contains(pUnit->getOwner()->getColor())) {
-		std::cerr << "ERROR: Unit color not found in texture map!" << std::endl;
-		return a; // Return animation without texture
-	}
-
-	Texture* pCorrectColorTexture = textMap[typeid(*pUnit)][pUnit->getOwner()->getColor()];
+	ResourceType carriedResource = ResourceType::Nothing;
+	if (auto* pCollector = dynamic_cast<IResourceCollector*>(pUnit))
+		carriedResource = pCollector->currentlyCarrying();
+	Texture* pCorrectColorTexture = getUnitTexture(pUnit, carriedResource);
 	if (!pCorrectColorTexture) {
-		std::cerr << "ERROR: Texture pointer is null!" << std::endl;
+		std::cerr << "ERROR: Unit texture not found!" << std::endl;
 		return a; // Return animation without texture
 	}
 
@@ -1069,16 +1095,15 @@ Sprite* ResourceManager_wartools::getTileSprite(int tile_id) {
 	assert(m_pActiveTileSet); // Required tileset texture available?
 
 	// tile_id and corresponding season exist?
-	if (!m_mapPUDId_to_TileSetIndex.contains(tile_id)) {
-		std::stringstream ss;
-		ss << "Requested tile_id can not be mapped: ";
-		ss << std::dec << tile_id << "(0x" << std::hex << ")";
-
-		throw std::logic_error(ss.str());
+	if (!m_mapPUDId_to_TileSetIndex.contains(tile_id) ||
+		!m_mapPUDId_to_TileSetIndex.at(tile_id).contains(m_currentSeason)) {
+		// Custom maps occasionally use an empty/invalid tile slot. Keep the map
+		// loadable and display the first tileset cell as a visible placeholder.
+		std::cerr << "Warning: tile id 0x" << std::hex << tile_id
+			<< " has no mapping for tileset " << std::dec << static_cast<int>(m_currentSeason)
+			<< "; using placeholder" << std::endl;
+		m_mapPUDId_to_TileSetIndex[tile_id][m_currentSeason] = 0;
 	}
-
-	// ToDo: Exception
-	assert(m_mapPUDId_to_TileSetIndex[tile_id].contains(m_currentSeason));
 
 	// Just create one sprite for a tile_id, not several!
 	if (!m_tileLookUp.contains(tile_id)) {
@@ -1194,13 +1219,35 @@ void ResourceManager_wartools::createUnitSprites(Fraction fraction) {
 			SDL_Surface* pSurface = IMG_Load(entry.path().string().c_str());  // ToDo: Delete pSurface after creating Texture?
 			assert(pSurface);
 
+			TextureMap* targetMap = textMap;
+			// Eye of Kilrogg has no implementation yet and historically shared
+			// Ballista's type id, which made filesystem iteration replace the
+			// actual Orc catapult texture with the flying eye.
+			if (pngPath == "eye_of_kilrogg.png") {
+				SDL_FreeSurface(pSurface);
+				continue;
+			}
+			if (fraction == Fraction::Alliance && pngPath == "peasant_with_gold.png")
+				targetMap = &m_mapWorkerResourceTexturesHuman[ResourceType::Gold];
+			else if (fraction == Fraction::Alliance && pngPath == "peasant_with_wood.png")
+				targetMap = &m_mapWorkerResourceTexturesHuman[ResourceType::Wood];
+			else if (fraction == Fraction::Orc && pngPath == "peon_with_gold.png")
+				targetMap = &m_mapWorkerResourceTexturesOrc[ResourceType::Gold];
+			else if (fraction == Fraction::Orc && pngPath == "peon_with_wood.png")
+				targetMap = &m_mapWorkerResourceTexturesOrc[ResourceType::Wood];
+			else if (fraction == Fraction::Alliance && pngPath == "oil_tanker_full.png")
+				targetMap = &m_mapWorkerResourceTexturesHuman[ResourceType::Oil];
+			else if (fraction == Fraction::Orc && pngPath == "oil_tanker_full.png")
+				targetMap = &m_mapWorkerResourceTexturesOrc[ResourceType::Oil];
+
 			// Todo: Extract method?
 			for (auto const& [color, palette] : mapPlayerPaletteColors) {
 				SDL_SetPaletteColors(pSurface->format->palette, &palette[0], 208, 4);
 
 				std::type_index correspondingType = ResourceMappings::getUnitTypeMap().at(pngPath);
-				(*textMap)[correspondingType][color] = new Texture(pSurface, m_pRenderer, false);
+				(*targetMap)[correspondingType][color] = new Texture(pSurface, m_pRenderer, false);
 			}
+			SDL_FreeSurface(pSurface);
 		}
 	}
 }
@@ -1263,6 +1310,7 @@ ResourceManager_wartools::ResourceManager_wartools(const std::string& pathToGrap
 	readTileSetTextures();
 	readCritters();
 	readBuildings(false);
+	loadCoastalConstructionSprites();
 	//readBuilding(true);
 
 	readMissiles();
@@ -1353,6 +1401,25 @@ void ResourceManager_wartools::readMissiles() {
 	m_mapMissiles[MissileType::BallistaBolt] = new Texture(strToFolder + "ballista_bolt.png", m_pRenderer);
 	m_mapMissiles[MissileType::Cannon] = new Texture(strToFolder + "cannon.png", m_pRenderer);
 	m_mapMissiles[MissileType::CatapultRock] = new Texture(strToFolder + "catapult_rock.png", m_pRenderer);
+
+	m_pSmallFireTexture = new Texture(strToFolder + "small_fire.png", m_pRenderer);
+	m_smallFireAnimation = Animation(m_pSmallFireTexture, 100);
+	for (int y = 0; y < m_pSmallFireTexture->getHeight(); y += 32)
+		for (int x = 0; x < m_pSmallFireTexture->getWidth(); x += 32)
+			m_smallFireAnimation.addSprite(Sprite(
+				m_smallFireAnimation.getBaseTexture(), {x, y, 32, 32}));
+
+	m_pBigFireTexture = new Texture(strToFolder + "big_fire.png", m_pRenderer);
+	m_bigFireAnimation = Animation(m_pBigFireTexture, 100);
+	for (int y = 0; y < m_pBigFireTexture->getHeight(); y += 48)
+		for (int x = 0; x < m_pBigFireTexture->getWidth(); x += 48)
+			m_bigFireAnimation.addSprite(Sprite(
+				m_bigFireAnimation.getBaseTexture(), {x, y, 48, 48}));
+}
+
+
+Animation ResourceManager_wartools::getBuildingFireAnimation(bool large) const {
+	return large ? m_bigFireAnimation : m_smallFireAnimation;
 }
 
 
@@ -1382,6 +1449,36 @@ Sprite ResourceManager_wartools::getBuildingConstructionSprite(int level) {
 	assert(m_pTextureConstructionSites);
 
 	return (level == 1) ? m_pSpriteConstructionSiteSmall : m_pSpriteConstructionSiteLarge;
+}
+
+
+Sprite ResourceManager_wartools::getBuildingConstructionSprite(Building* pBuilding, int level) {
+	assert(pBuilding);
+	assert(level == 1 || level == 2);
+	const std::type_index type = typeid(*pBuilding);
+	const Fraction fraction = pBuilding->getFraction();
+	if (!m_coastalConstructionTextures.contains(type) ||
+		!m_coastalConstructionTextures.at(type).contains(fraction))
+		return getBuildingConstructionSprite(level);
+
+	Texture*& texture = m_coastalConstructionTextures.at(type).at(fraction);
+	const int side = texture->getWidth();
+	return Sprite(&texture, {0, (level - 1) * side, side, side});
+}
+
+
+void ResourceManager_wartools::loadCoastalConstructionSprites() {
+	const std::pair<std::type_index, std::string> buildings[] = {
+		{typeid(Shipyard), "shipyard_construction_site.png"},
+		{typeid(Foundry), "foundry_construction_site.png"},
+		{typeid(OilRefinery), "refinery_construction_site.png"}
+	};
+	for (const auto& [type, file] : buildings) {
+		m_coastalConstructionTextures[type][Fraction::Alliance] = new Texture(
+			"data/graphics/human/buildings/" + file, m_pRenderer);
+		m_coastalConstructionTextures[type][Fraction::Orc] = new Texture(
+			"data/graphics/orc/buildings/" + file, m_pRenderer);
+	}
 }
 
 

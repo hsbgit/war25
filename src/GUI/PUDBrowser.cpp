@@ -57,6 +57,13 @@ namespace gui {
                 readDirectoryRecursively(entry.path().string());
             }
             else if (entry.is_regular_file() && fs::path(entry.path()).extension() == ".pud") {
+                // Some map packs contain empty placeholder files named *.pud
+                // (notably icon.pud). They are not maps and must not be offered
+                // as loadable entries.
+                if (entry.file_size() < 8) {
+                    std::cerr << "Skipping invalid empty PUD file: " << entry.path() << std::endl;
+                    continue;
+                }
              //    vecMaps.push_back(entry.path().filename().string());  // Complete relative path
                  vecMaps.push_back(entry.path().string()); // Only file name
             }

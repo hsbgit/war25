@@ -19,6 +19,7 @@
 #include "Units/Unit.h"
 #include "Units/IArmed.h"
 #include "Units/Resource/IResourceCollector.h"
+#include <optional>
 
 
 class CompositeStateMining;
@@ -47,6 +48,7 @@ public:
 
 	// EventProcessor
 	void handleEvent(const Event& event) override;
+	void process() override;
 
 	// IResourceCollector
 	bool canCollectResource(ResourceType t) const override {
@@ -57,6 +59,5 @@ private:
 	CompositeStateMining* m_pHarvestGold = nullptr;
 	CompositeStateChopWood* m_pHarvestWood = nullptr;
 	CompositeStateConstructBuilding* m_pConstructBuilding = nullptr;
+	std::optional<Event> m_pendingCommand;
 };
-
-

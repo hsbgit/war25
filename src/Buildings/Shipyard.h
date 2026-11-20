@@ -17,11 +17,13 @@
 #pragma once
 
 #include "Building.h"
+#include "Units/Resource/IResourceAcceptor.h"
 
-class Shipyard : public Building {
+class Shipyard : public Building, public IResourceAcceptor {
 public:
 	Shipyard(Peasant* pErecter, Map* pMap);
 	Shipyard(Player* pOwner, Fraction fraction, Map* pMap);
+	bool acceptsResource(ResourceType type) const override { return type == ResourceType::Oil; }
 
 	// BuildingEventHandler
 	std::vector<ProductionItem::ItemType> getProductionItemList() const override;

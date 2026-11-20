@@ -18,16 +18,20 @@
 #include "Resources/SoundManager.h"
 #include "Global/Object.h"
 #include "Global/GlobalAttributes.h"
+#include "Map/Map.h"
+#include "Player.h"
 
 #include <algorithm>
 #include <cmath>
 
 
-Projectile::Projectile(ResourceManager_wartools::MissileType type, Object* pSource, Map*, Object* pTarget, const Point&)
+Projectile::Projectile(ResourceManager_wartools::MissileType type, Object* pSource, Map* pMap, Object* pTarget, const Point&)
 	: MapObject(pSource),
 	m_type(type),
 	m_sprite(g_pRessourceManager->getMissile(type)),
 	m_attackerStats(dynamic_cast<IArmed*>(pSource)->getAttackerStats()),
+	m_pMap(pMap),
+	m_pAttackerOwner(pSource->getOwner()),
 	m_expired(false) {
 
 	initializeMissile(pSource, pTarget);
@@ -64,6 +68,7 @@ void Projectile::initializeMissile(Object* pSource, Object* pTarget) {
 	};
 	const Point sourceCenter = objectCenter(pSource);
 	const Point targetCenter = objectCenter(pTarget);
+	m_impactTile = {targetCenter.x / Tile::TileWidth_px, targetCenter.y / Tile::TileWidth_px};
 	m_sprite = g_pRessourceManager->getMissile(m_type,
 		getTargetCardinalDirection(sourceCenter, targetCenter));
 
@@ -108,8 +113,37 @@ void Projectile::handleCollision() {
 	if (pObj && pObj->isPlacedOnMap()) {
 		pObj->takeDamage(m_attackerStats);
 	}
+	if (m_type == ResourceManager_wartools::MissileType::CatapultRock)
+		handleCatapultSplash(pObj);
 	
 	// Additional logic for collision
+}
+
+
+void Projectile::handleCatapultSplash(Object* primaryTarget) {
+	if (!m_pMap || !m_pAttackerOwner)
+		return;
+	AttackerStats splash(
+		std::max(1, m_attackerStats.getBasicDamage() / 2),
+		m_attackerStats.getPiercingDamage() / 2);
+	for (const auto& [color, player] : m_pMap->m_mapPlayer) {
+		if (!player || player == m_pAttackerOwner || player->isNeutral())
+			continue;
+		for (Object* object : player->getObjects()) {
+			if (!object || object == primaryTarget || object->isDead() || !object->isPlacedOnMap())
+				continue;
+			bool inSplashRadius = false;
+			for (Tile* tile : object->getOccupiedTiles()) {
+				if (std::abs(tile->getX() - m_impactTile.x) <= 1 &&
+					std::abs(tile->getY() - m_impactTile.y) <= 1) {
+					inSplashRadius = true;
+					break;
+				}
+			}
+			if (inSplashRadius)
+				object->takeDamage(splash);
+		}
+	}
 }
 
 

@@ -49,10 +49,12 @@ private:
 
     int m_ticksPerStep;
     int m_tickCounter = 0;
+	int m_ticksUntilPathCheck = 0;
 
 
     void setDirection(Direction direction);
     bool m_directionChanged = false; // True if the direction changed, e.g., from N to NW. This information is used to load the appropriate Animation
+	bool m_animationNeedsUpdate = true;
     Direction m_currentDirection = Direction::N;
 
     Path m_path; // Only used if the unit is blocked / the straight way is not working

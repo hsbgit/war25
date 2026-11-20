@@ -32,6 +32,7 @@ public:
 	virtual ~IResourceMine() {}
 
 	virtual bool enter(IResourceCollector* pPeasant);
+	virtual bool leave(IResourceCollector* pCollector) = 0;
 
 	const Resources& availableResources() const {
 		return m_availableRes;

@@ -35,8 +35,7 @@ Building::Building(Peasant* pErecter, Map* pMap, int constructionTime_s, int hea
 
 	g_pSoundManager->playWAV(this, "misc/building_construction.wav");
 
-	int constructionTime_ticks = calculateRequiredTicksForGameAction(constructionTime_s * 1000);
-	m_construction_ticksPerHitpoint = constructionTime_ticks / m_healthPointsMax;
+	m_constructionTotalTicks = calculateRequiredTicksForGameAction(constructionTime_s * 1000);
 
 	m_sprite = g_pRessourceManager->getBuildingConstructionSprite(1);
 
@@ -98,64 +97,69 @@ void Building::process() {
 	}
 
 	if (isUnderConstruction()) {
+		if (!m_constructionSpriteInitialized) {
+			m_sprite = g_pRessourceManager->getBuildingConstructionSprite(this, 1);
+			m_constructionSpriteInitialized = true;
+		}
 		handleBuildProgress();
 		return;
 	}
 
 	BuildingEventProcessor::doEventHandling();
+	updateFireAnimation();
+}
 
-	// ToDo: Make it burning when damaged
-	/*
-	float damageRatio = (float)getHealthPoints() / (float)getMaxHealthPoints();
-	if (damageRatio > 0.6) {
-		m_currState = BuildingState::HeavilyDamaged;
+
+void Building::updateFireAnimation() {
+	const float health = getRelativeHealth();
+	const FireLevel desired = health <= 1.0f / 3.0f
+		? FireLevel::Large
+		: (health <= 2.0f / 3.0f ? FireLevel::Small : FireLevel::None);
+	if (desired != m_fireLevel) {
+		m_fireLevel = desired;
+		if (m_fireLevel != FireLevel::None)
+			m_fireAnimation = g_pRessourceManager->getBuildingFireAnimation(
+				m_fireLevel == FireLevel::Large);
 	}
-	else if (damageRatio > 0.3) {
-		m_currState = BuildingState::SlightlyDamaged;
-	}    */
+	if (m_fireLevel != FireLevel::None)
+		m_fireAnimation.process();
+}
+
+
+const Sprite* Building::fireSprite() const {
+	return m_fireLevel == FireLevel::None ? nullptr : &m_fireAnimation.getCurrentFrame();
 }
 
 
 void Building::handleBuildProgress() {
-	if (m_tickCounter++ != m_construction_ticksPerHitpoint) {
+	if (m_constructionElapsedTicks >= m_constructionTotalTicks)
 		return;
+
+	++m_constructionElapsedTicks;
+	// Derive progress from total elapsed time instead of truncating a
+	// ticks-per-hitpoint value. At 1x the configured seconds are therefore
+	// exact even when the hitpoint count does not divide the tick count.
+	m_healthPoints = 1 + static_cast<int>(
+		(static_cast<long long>(m_constructionElapsedTicks) * (m_healthPointsMax - 1)) /
+		m_constructionTotalTicks);
+
+	if (m_currState == BuildingState::InConstruction1 &&
+		m_healthPoints >= m_healthPointsMax / 3) {
+		m_currState = BuildingState::InConstruction2;
+		m_sprite = g_pRessourceManager->getBuildingConstructionSprite(this, 2);
+		g_pSoundManager->playWAV(this, "misc/building_construction.wav");
 	}
-
-	m_tickCounter = 1;
-	m_healthPoints++;
-
-	switch (m_currState) {
-	case BuildingState::InConstruction1:
-	{
-		if (m_healthPoints == m_healthPointsMax / 3) {
-			m_currState = BuildingState::InConstruction2;
-			m_sprite = g_pRessourceManager->getBuildingConstructionSprite(2);
-			g_pSoundManager->playWAV(this, "misc/building_construction.wav");
-		}
+	if (m_currState == BuildingState::InConstruction2 &&
+		m_healthPoints >= m_healthPointsMax / 3 * 2) {
+		m_currState = BuildingState::InConstruction3;
+		m_sprite = g_pRessourceManager->getBuildingSprite(this, this->getFraction(), getOwner()->getColor(), true);
+		g_pSoundManager->playWAV(this, "misc/building_construction.wav");
 	}
-	break;
-
-	case BuildingState::InConstruction2:
-	{
-		if (m_healthPoints == m_healthPointsMax / 3 * 2) {
-			m_currState = BuildingState::InConstruction3;
-			m_sprite = g_pRessourceManager->getBuildingSprite(this, this->getFraction(), getOwner()->getColor(), true);
-			g_pSoundManager->playWAV(this, "misc/building_construction.wav");
-		}
-	}
-
-	case BuildingState::InConstruction3:
-	{
-		if (m_healthPoints == m_healthPointsMax) {
-			m_sprite = g_pRessourceManager->getBuildingSprite(this, this->getFraction(), getOwner()->getColor());
-			m_currState = BuildingState::Constructed;
-			onConstructionFinished();
-		}
-	}
-	break;
-
-	default:
-		break;
+	if (m_healthPoints >= m_healthPointsMax) {
+		m_healthPoints = m_healthPointsMax;
+		m_sprite = g_pRessourceManager->getBuildingSprite(this, this->getFraction(), getOwner()->getColor());
+		m_currState = BuildingState::Constructed;
+		onConstructionFinished();
 	}
 }
 

@@ -17,12 +17,19 @@
 #pragma once
 
 #include "Building.h"
+#include "Units/Resource/IResourceMine.h"
 
-class OilRig : public Building {
+class OilRig : public Building, public IResourceMine {
 public:
 	OilRig(Peasant* pErecter, Map* pMap);
-	OilRig(Player* pOwner, Fraction fraction, Map* pMap);
+	OilRig(Player* pOwner, Fraction fraction, Map* pMap, int oil = 50000);
+	void process() override;
+	bool enter(IResourceCollector* pCollector) override;
+	bool leave(IResourceCollector* pCollector) override;
+	void die() override;
 
 private:
 	void setProperties();
+	void switchImage(bool miningActive) override;
+	bool placeTanker(IResourceCollector* pCollector, bool withOil);
 };

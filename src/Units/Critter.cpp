@@ -38,6 +38,13 @@ Critter::Critter(Player* pOwner, Map* pMap) : Unit(pOwner, Fraction::Neutral, pM
 }
 
 
+Critter::~Critter() {
+	// Living critters are also destroyed during a map change. They must leave
+	// the global observer list just like critters that died during gameplay.
+	g_pRessourceManager->deregisterSeasonObserver(this);
+}
+
+
 void Critter::process() {
 	if (isDead()) {
 		m_currState = State::Dead;

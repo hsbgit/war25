@@ -16,6 +16,7 @@
 */
 #pragma once
 #include "Global/Object.h"
+#include "Resources/Animation.h"
 #include <cassert>
 
 class Peasant;
@@ -67,6 +68,8 @@ public:
 		m_sprite = sprite;
 	}
 
+	const Sprite* fireSprite() const;
+
 	inline bool isUnderConstruction() const {
 		return (m_currState == BuildingState::InConstruction1 || m_currState == BuildingState::InConstruction2 || m_currState == BuildingState::InConstruction3);
 	}
@@ -97,8 +100,13 @@ private:
 	bool releaseErecter();
 	Peasant* m_pErecter = nullptr; // Only set in the ctor with the constructionTime. In this case m_pErector is the Peasant building. He must be placed on the map when the construction is finished, see 'onConstructionFinished()' 
 	void handleBuildProgress();
-	int m_construction_ticksPerHitpoint = -1; // When built: How many ticks are required to add 1 health to the build progress? Only set if required, in the constructor with the peasant
-	int m_tickCounter = 1;
+	void updateFireAnimation();
+	enum class FireLevel { None, Small, Large };
+	FireLevel m_fireLevel = FireLevel::None;
+	Animation m_fireAnimation;
+	int m_constructionTotalTicks = -1;
+	int m_constructionElapsedTicks = 0;
+	bool m_constructionSpriteInitialized = false;
 
 	std::string m_strSoundSelected;
 };

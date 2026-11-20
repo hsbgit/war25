@@ -27,6 +27,7 @@
 #include "Map/Map.h"
 #include "EventHandling/StateIdle.h"
 #include "Global/GlobalAttributes.h"
+#include "Units/Resource/IResourceCollector.h"
 
 #include <map>
 #include <iostream>
@@ -200,6 +201,7 @@ void StateMoving::onExit() {
 
 	m_pNextTileToMove = nullptr;
 	m_directionChanged = false;
+	m_animationNeedsUpdate = true;
 
 	m_path.clear();
 
@@ -209,10 +211,21 @@ void StateMoving::onExit() {
 
 StateMoving::StateMoving(Object* pOwner) : State(pOwner) {
 	m_ticksPerStep = calculateRequiredTicksForGameAction(250);
+	m_ticksUntilPathCheck = calculateRequiredTicksForGameAction(2 * 1000);
 }
 
 
 State* StateMoving::process() {
+	// Workers and ships periodically discard their cached route. This lets
+	// resource collectors benefit from newly built drop-off buildings and all
+	// naval units react to map changes that open a shorter path.
+	const bool shouldRecheckPath = dynamic_cast<IResourceCollector*>(m_pOwner) ||
+		m_pOwner->getType() == Object::Type::Sea;
+	if (shouldRecheckPath && !m_pNextTileToMove &&
+		--m_ticksUntilPathCheck <= 0) {
+		m_path.clear();
+		m_ticksUntilPathCheck = calculateRequiredTicksForGameAction(2 * 1000);
+	}
 	Point currPos_tile = m_pOwner->getTileLocation();
 
 	// Todo: write comparision operator
@@ -326,8 +339,9 @@ State* StateMoving::process() {
 		// Update animation according to direction
 		Unit* pUnit = dynamic_cast<Unit*>(m_pOwner);
 
-		if (m_directionChanged) {
+		if (m_directionChanged || m_animationNeedsUpdate) {
 			pUnit->setCurrentAnimation(g_pRessourceManager->getUnitAnimation(pUnit, m_currentDirection, ResourceManager_wartools::AnimationType::Moving));
+			m_animationNeedsUpdate = false;
 		}
 	}
 
@@ -511,4 +525,3 @@ bool StateMoving::attemptYieldingManeuver() {
 	std::cerr << "DEBUG: No yielding position found" << std::endl;
 	return false; // No free tile found for yielding
 }
-

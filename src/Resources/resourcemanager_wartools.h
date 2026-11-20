@@ -71,6 +71,7 @@ class Building;
 #include <unordered_map>
 
 #include "Direction.h"
+#include "Units/Resource/ResourceType.h"
 
 
 enum class Season : uint8_t {
@@ -220,9 +221,11 @@ public:
 
 
 	Sprite getBuildingConstructionSprite(int level);
+	Sprite getBuildingConstructionSprite(Building* pBuilding, int level);
 	Texture* m_pTextureConstructionSites = nullptr;
 	Sprite m_pSpriteConstructionSiteSmall;
 	Sprite m_pSpriteConstructionSiteLarge;
+	std::unordered_map<std::type_index, std::unordered_map<Fraction, Texture*>> m_coastalConstructionTextures;
 
 
 
@@ -232,6 +235,7 @@ public:
 
 	Animation getUnitIdleAnimation(Unit* pUnit, Direction direction);
 	Animation getDyingAnimation(Unit* pUnit);
+	Animation getBuildingFireAnimation(bool large) const;
 
 
 	// Working nur peasant. Walking east, west, north....
@@ -258,6 +262,8 @@ public:
 
 
 	TextureMap m_mapUnitTexturesHuman, m_mapUnitTexturesOrc, m_mapUnitTexturesNeutral;
+	std::unordered_map<ResourceType, TextureMap> m_mapWorkerResourceTexturesHuman;
+	std::unordered_map<ResourceType, TextureMap> m_mapWorkerResourceTexturesOrc;
 
 	//  Animation m_idleMage, m_idleBattleShip, m_idleGryphonRider;
 
@@ -278,7 +284,9 @@ public:
 	std::map<BuffType, Sprite*> m_mapBuffSprites;
 
 private:
+	Texture* getUnitTexture(Unit* pUnit, ResourceType carriedResource);
 	void createUnitSprites(Fraction fraction);
+	void loadCoastalConstructionSprites();
 	void createidleAnimations();
 	void createidleAnimation(std::type_index correspondingType, int squareWidth_px, int rows, int cols, unsigned int interval_ms, Point posOffset);
 
@@ -326,6 +334,10 @@ private:
 	void readIcons();
 	void readMissiles();
 	std::unordered_map<MissileType, Texture*> m_mapMissiles;
+	Texture* m_pSmallFireTexture = nullptr;
+	Texture* m_pBigFireTexture = nullptr;
+	Animation m_smallFireAnimation;
+	Animation m_bigFireAnimation;
 
 	// Icons -----------------------------------------------------
 

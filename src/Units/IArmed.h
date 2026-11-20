@@ -31,7 +31,7 @@ public:
 	virtual ~IArmed();
 
 	inline AttackerStats getAttackerStats() const {
-		return AttackerStats(getBasicDamage(), getBasicPiercingDamage());
+		return AttackerStats(getBasicDamage(), getPiercingDamage());
 	}
 
 	std::set<Object*> findTargetObject(Object* pAttacker) const;

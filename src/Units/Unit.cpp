@@ -95,6 +95,11 @@ Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, in
 
 void Unit::handleEvent(const Event& event) {
 	std::cerr << "Unit: Received Event ID: " << std::dec << (int)event.getEventID() << std::endl;
+	// Workers and tankers are temporarily removed from the map while they are
+	// inside a mine or delivery building. Starting a movement state in that
+	// interval would dereference an empty occupied-tile list.
+	if (!isPlacedOnMap())
+		return;
 	m_stateMachine.handleEvent(event);
 }
 

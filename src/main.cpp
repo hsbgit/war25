@@ -85,8 +85,25 @@ std::size_t iSelected = 0;
 #endif 
 
 // Main code
-int main(int, char**)
+int main(int argc, char** argv)
 {
+    bool smokeTestMap = false;
+    int smokeTestTicks = 40;
+    std::string requestedMap;
+    if (argc >= 3 && std::string(argv[1]) == "--smoke-test-map") {
+        smokeTestMap = true;
+        requestedMap = argv[2];
+        if (argc >= 4) {
+            try {
+                smokeTestTicks = std::max(1, std::stoi(argv[3]));
+            }
+            catch (const std::exception&) {
+                std::cerr << "Invalid smoke-test tick count: " << argv[3] << std::endl;
+                return 2;
+            }
+        }
+    }
+
     // Joystick, haptic and sensor subsystems are not used and may require
     // unavailable udev permissions in containers. Initialize only what the
     // game actually needs.
@@ -113,9 +130,7 @@ int main(int, char**)
     using namespace War25::Constants;
     static_assert(1000 % TICKS_PER_SECOND == 0);
 
-    float gameSpeedFactor = 1.0;
-
-    g_tick_ms = (int)(TICK_DURATION_MS * gameSpeedFactor);
+    g_tick_ms = TICK_DURATION_MS;
     std::cout << "g_tick_ms: " << g_tick_ms << std::endl;
 
 
@@ -164,18 +179,42 @@ int main(int, char**)
     //IM_ASSERT(font != NULL);
 
 
-    std::string strPathToPudFile = "data/maps/Islands in the stream modified.pud";
+    const std::string defaultMap = "data/maps/Islands in the stream modified.pud";
+    bool smokeTestWarmup = smokeTestMap && requestedMap != defaultMap;
+    std::string strPathToPudFile = smokeTestWarmup
+        ? defaultMap
+        : (requestedMap.empty() ? defaultMap : requestedMap);
+    int exitCode = 0;
     //std::string strPathToPudFile = "data/maps/ClanEviLMapPackv1.0/ClanEviLMPv1.0/PBall/8 ALLeRiA    ScArLeT.pud"; // Viewport test
     //std::string strPathToPudFile = "data/maps/ClanEviLMapPackv1.0/ClanEviLMPv1.0/Other/8 ALeRiA WiDe ScArLeT.pud"; // Lag test
 
 
     while (strPathToPudFile.size()) {
-        Game game(window, strPathToPudFile);
+        try {
+            Game game(window, strPathToPudFile);
+
+        // Exercise the same lifecycle as the browser: first unload a running
+        // default map, then load the requested map in the same process.
+        if (smokeTestMap) {
+            std::cout << "SMOKE_TEST_MAP: " << strPathToPudFile << std::endl;
+            for (int tick = 0; tick < smokeTestTicks; ++tick) {
+                if (!game.doUpdate())
+                    break;
+            }
+            game.applyDisplaySettings();
+            game.doRendering();
+            if (smokeTestWarmup) {
+                smokeTestWarmup = false;
+                strPathToPudFile = requestedMap;
+            }
+            else {
+                strPathToPudFile.clear();
+            }
+            continue;
+        }
 
         auto previousTime = std::chrono::steady_clock::now();
         std::chrono::nanoseconds accumulatedTime{0};
-        const auto tickDuration = std::chrono::milliseconds(g_tick_ms);
-
         // Actual main loop
         while (!game.quitRequested()) {
             // Input and window events are sampled every rendered frame, not only
@@ -185,6 +224,9 @@ int main(int, char**)
             const auto now = std::chrono::steady_clock::now();
             accumulatedTime += now - previousTime;
             previousTime = now;
+			const float gameSpeed = std::clamp(gDebugManager.m_gameSpeedMultiplier, 0.25f, 4.0f);
+			const auto tickDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(
+				std::chrono::duration<double, std::milli>(g_tick_ms / gameSpeed));
 
             int processedTicks = 0;
             while (accumulatedTime >= tickDuration && processedTicks < MAX_FRAMESKIP) {
@@ -204,7 +246,17 @@ int main(int, char**)
             game.doRendering();
         }
 
-        strPathToPudFile = game.newMapRequested();
+            strPathToPudFile = game.newMapRequested();
+        }
+        catch (const std::exception& error) {
+            std::cerr << "Could not load map '" << strPathToPudFile
+                      << "': " << error.what() << std::endl;
+            if (smokeTestMap) {
+                exitCode = 2;
+                break;
+            }
+            strPathToPudFile = defaultMap;
+        }
     }
 
     // Cleanup
@@ -222,5 +274,5 @@ int main(int, char**)
     IMG_Quit();
     SDL_Quit();
 
-    return 0;
+    return exitCode;
 }

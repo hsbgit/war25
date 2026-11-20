@@ -68,6 +68,9 @@
 #include <pud.h>
 #include <cassert>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <random>
 
 #include <iostream>
 using namespace std;
@@ -75,6 +78,64 @@ using namespace std;
 
 #include "Renderer.h"
 #include "MapObject.h"
+
+
+namespace {
+Pud* openCompatiblePud(const std::string& filename) {
+	if (Pud* pud = pud_open(filename.c_str(), PUD_OPEN_MODE_R))
+		return pud;
+
+	std::ifstream input(filename, std::ios::binary);
+	const std::vector<unsigned char> bytes(
+		(std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+	if (bytes.size() < 8)
+		return nullptr;
+
+	std::vector<unsigned char> normalized;
+	normalized.reserve(bytes.size());
+	bool removedUnsupportedChunk = false;
+	std::size_t offset = 0;
+	while (offset + 8 <= bytes.size()) {
+		const std::uint32_t length = static_cast<std::uint32_t>(bytes[offset + 4]) |
+			(static_cast<std::uint32_t>(bytes[offset + 5]) << 8) |
+			(static_cast<std::uint32_t>(bytes[offset + 6]) << 16) |
+			(static_cast<std::uint32_t>(bytes[offset + 7]) << 24);
+		const std::size_t chunkEnd = offset + 8 + length;
+		if (chunkEnd > bytes.size())
+			return nullptr;
+
+		const bool isAllowChunk = bytes[offset] == 'A' && bytes[offset + 1] == 'L' &&
+			bytes[offset + 2] == 'O' && bytes[offset + 3] == 'W';
+		if (isAllowChunk) {
+			removedUnsupportedChunk = true;
+		}
+		else {
+			normalized.insert(normalized.end(), bytes.begin() + offset, bytes.begin() + chunkEnd);
+		}
+		offset = chunkEnd;
+	}
+
+	if (!removedUnsupportedChunk || offset != bytes.size())
+		return nullptr;
+
+	const auto temporaryPath = std::filesystem::temp_directory_path() /
+		("war25-pud-" + std::to_string(std::random_device{}()) + ".pud");
+	{
+		std::ofstream output(temporaryPath, std::ios::binary);
+		output.write(reinterpret_cast<const char*>(normalized.data()),
+			static_cast<std::streamsize>(normalized.size()));
+		if (!output)
+			return nullptr;
+	}
+
+	Pud* pud = pud_open(temporaryPath.string().c_str(), PUD_OPEN_MODE_R);
+	std::error_code removeError;
+	std::filesystem::remove(temporaryPath, removeError);
+	if (pud)
+		std::cerr << "Loaded map after ignoring unsupported ALOW chunk: " << filename << std::endl;
+	return pud;
+}
+}
 
 
 /*
@@ -235,8 +296,9 @@ void Map::renderMiniMapOverlay(Viewport* pViewPort) {
 			Rect r = { pos.x, pos.y, (int)(unitTileSize * Tile::TileWidth_px * scaleFactor), (int)(unitTileSize * Tile::TileWidth_px * scaleFactor) };
 
 
-			if (pObject->getFraction() != Fraction::Neutral) {
-				const SDL_Color& c = mapPlayerPaletteColors.at(pObject->getOwner()->getColor()).front(); // Simply take first color
+			const PlayerColor ownerColor = pObject->getOwner()->getColor();
+			if (ownerColor != PlayerColor::Neutral && mapPlayerPaletteColors.contains(ownerColor)) {
+				const SDL_Color& c = mapPlayerPaletteColors.at(ownerColor).front(); // Simply take first color
 				g_pRenderer->drawFilledRect(r, c.r, c.g, c.b, 255);
 			}
 			else {
@@ -343,12 +405,15 @@ void Map::createMiniMap() {
 
 Map::Map(const std::string& filename, ResourceManager_wartools* pResManagerWartools) {
 	m_pResManagerWartools = pResManagerWartools;
-	pResManagerWartools->registerSeasonObserver(this);
-	Pud* pPud = pud_open(filename.c_str(), PUD_OPEN_MODE_R);
+	Pud* pPud = openCompatiblePud(filename);
 
 	if (!pPud) {
 		throw std::logic_error("Could not open PUD file");
 	}
+
+	// Tiles must be created against this map's tileset. Register the map only
+	// after construction, so a failed load cannot leave a dangling observer.
+	pResManagerWartools->switchSeason(static_cast<Season>(pPud->era));
 
 	//Todo: w und h vertauschen damit konsistent (wenn auch gleich da quadratisch)
 	// Puds are always squares. Hence map w==h
@@ -379,9 +444,8 @@ Map::Map(const std::string& filename, ResourceManager_wartools* pResManagerWarto
 	addPlayersToMap(pPud);
 	addUnitsToMap(pPud);
 	createMiniMap();
-
-	Season s = (Season)pPud->era;
-	pResManagerWartools->switchSeason(s);
+	pResManagerWartools->registerSeasonObserver(this);
+	pud_close(pPud);
 
 
 	// Debug ------------------------------------
@@ -451,6 +515,16 @@ Map::~Map() {
 		delete pObject;
 	}
 	m_vecMapObjects.clear();
+
+	// Break cross-player combat references while every target is still alive.
+	// Player destruction order must not decide whether an attacker can safely
+	// unregister from its target.
+	for (auto& [color, player] : m_mapPlayer) {
+		for (Object* object : player->getObjects()) {
+			if (auto* armed = dynamic_cast<IArmed*>(object))
+				armed->clearActiveTarget();
+		}
+	}
 
 	for (auto& e : m_mapPlayer) {
 		Player* pPlayer = e.second;
@@ -1205,12 +1279,12 @@ void Map::addPlayersToMap(Pud* pPud) {
 	}
 
 
-	for (unsigned int i = 0; i < pPud->starting_points; ++i) {
-		PlayerColor color = vecPlayerColors[i];
-		Resources res((int)pPud->sgld.players[i], (int)pPud->slbr.players[i], (int)pPud->soil.players[i]);
+	for (PlayerColor color : vecPlayerColors) {
+		const std::size_t playerSlot = static_cast<std::size_t>(color);
+		Resources res((int)pPud->sgld.players[playerSlot], (int)pPud->slbr.players[playerSlot], (int)pPud->soil.players[playerSlot]);
 
 		// Todo: get real fraction from pud
-		Fraction fraction = (bool)pPud->side.players[i] ? Fraction::Orc : Fraction::Alliance;
+		Fraction fraction = (bool)pPud->side.players[playerSlot] ? Fraction::Orc : Fraction::Alliance;
 
 
 		/*
@@ -1306,12 +1380,14 @@ void Map::addUnitsToMap(Pud* pPud) {
 		case PUD_UNIT_HUMAN_OIL_WELL:
 			std::cerr << "oil well " << std::dec << ui.alter << std::endl;
 			m_oilPatchPositions.push_back({ui.x, ui.y});
-			placeUnit(m_arrTileMap[ui.y][ui.x], new OilRig(pOwner, Fraction::Alliance, this));
+			placeUnit(m_arrTileMap[ui.y][ui.x], new OilRig(pOwner, Fraction::Alliance, this,
+				std::max(1, static_cast<int>(ui.alter)) * 1000));
 			break;
 
 		case PUD_UNIT_ORC_OIL_WELL:
 			m_oilPatchPositions.push_back({ui.x, ui.y});
-			placeUnit(m_arrTileMap[ui.y][ui.x], new OilRig(pOwner, Fraction::Orc, this));
+			placeUnit(m_arrTileMap[ui.y][ui.x], new OilRig(pOwner, Fraction::Orc, this,
+				std::max(1, static_cast<int>(ui.alter)) * 1000));
 			break;
 
 
@@ -1868,6 +1944,13 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 			}
 
 			pRenderer->renderSprite(posLocal_px, pUnit->sprite());
+			if (const Sprite* fire = pBuilding->fireSprite()) {
+				const int buildingSizePx = gMapUnitTilesize[typeid(*pBuilding)] * Tile::TileWidth_px;
+				Point firePos = posLocal_px;
+				firePos.x += (buildingSizePx - fire->getWidth()) / 2;
+				firePos.y += (buildingSizePx - fire->getHeight()) / 2;
+				pRenderer->renderSprite(firePos, *fire);
+			}
 		}
 	}
 

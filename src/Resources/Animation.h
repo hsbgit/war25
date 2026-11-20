@@ -51,8 +51,10 @@ public:
         return &m_pBaseTexture;
     }
 
-    void addSprite(const Sprite& sprite);
-    void process();
+	void addSprite(const Sprite& sprite);
+	void process();
+	Animation singleFrame(std::size_t frame) const;
+	std::size_t frameCount() const { return m_vecSprites.size(); }
 
 
     // If an animation is of type playOnce this method checks whether all frames had been shown

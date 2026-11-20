@@ -30,6 +30,14 @@ namespace gui {
 		update();
 		ImGui::SetNextWindowSize(ImVec2(390.0f, 520.0f), ImGuiCond_Once);
 		ImGui::Begin("Debug Features", &show_another_window);
+		ImGui::TextUnformatted("Simulation speed");
+		ImGui::SetNextItemWidth(-1.0f);
+		ImGui::SliderFloat("##SimulationSpeed", &gDebugManager.m_gameSpeedMultiplier,
+			0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
+		if (ImGui::Button("Reset speed to 1x"))
+			gDebugManager.m_gameSpeedMultiplier = 1.0f;
+		ImGui::TextDisabled("1x uses real seconds for game timings.");
+		ImGui::Separator();
 		ImGui::Checkbox("Draw tile information", &gDebugManager.m_map_drawTileInformation);
 		if (gDebugManager.m_map_drawTileInformation && m_pTile) {
 			std::string strPos = "Tile Position (world): " + std::to_string(m_pTile->getX()) + "," + std::to_string(m_pTile->getY());

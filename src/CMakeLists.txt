@@ -156,6 +156,23 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     $<$<PLATFORM_ID:Windows>:NOMINMAX>
 )
 
+# Full PUD-map lifecycle smoke test. Invoke with:
+#   cmake --build <build-directory> --target smoke_test_maps
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(smoke_test_maps
+        COMMAND ${Python3_EXECUTABLE}
+            "${CMAKE_CURRENT_SOURCE_DIR}/../tests/smoke_test_maps.py"
+            --executable "$<TARGET_FILE:${PROJECT_NAME}>"
+            --maps-root "${CMAKE_CURRENT_BINARY_DIR}/data/maps"
+        DEPENDS ${PROJECT_NAME}
+        USES_TERMINAL
+        VERBATIM
+    )
+else()
+    message(STATUS "Python 3 not found; smoke_test_maps target is unavailable")
+endif()
+
 # Add tests if BUILD_TESTING is enabled
 option(BUILD_TESTING "Build tests" OFF)
 if(BUILD_TESTING)

@@ -83,6 +83,16 @@ void Animation::addSprite(const Sprite& sprite) {
 }
 
 
+Animation Animation::singleFrame(std::size_t frame) const {
+	assert(frame < m_vecSprites.size());
+	Animation result(m_pBaseTexture, m_interval_ms);
+	Sprite sprite = m_vecSprites.at(frame);
+	sprite.updateTexture(result.getBaseTexture());
+	result.addSprite(sprite);
+	return result;
+}
+
+
 void Animation::process() {
     if(m_vecSprites.size() == 1|| (m_playOnce && m_animationFinished)) {
         return;

@@ -19,17 +19,24 @@
 #include "Global/Object.h"
 #include "Player.h"
 #include "Buildings/Building.h"
+#include "Global/GlobalAttributes.h"
 #include "StateEnterBuildingForDelivery.h"
 #include <climits>
 
 
 // Todo: more generalization -> oil tanker?
-StateReturningResource::StateReturningResource(Peasant* pPeasant, State* pIdle) : StateMoving(pPeasant), m_pIdle(pIdle) {
+StateReturningResource::StateReturningResource(Unit* pCollector, State* pIdle) : StateMoving(pCollector), m_pIdle(pIdle) {
 
 }
 
 
 void StateReturningResource::onEnter(const Event* pEvent) {
+	selectNearestAcceptor();
+	m_ticksUntilAcceptorCheck = calculateRequiredTicksForGameAction(2 * 1000);
+}
+
+
+void StateReturningResource::selectNearestAcceptor() {
     m_pTileResourceAcceptor = nullptr;
     m_pApproachTile = nullptr;
     std::vector<Object*> vecObjects = m_pOwner->getOwner()->getObjects();
@@ -67,6 +74,13 @@ void StateReturningResource::onEnter(const Event* pEvent) {
 
 
 State* StateReturningResource::process() {
+	if (--m_ticksUntilAcceptorCheck <= 0) {
+		Tile* previous = m_pTileResourceAcceptor;
+		selectNearestAcceptor();
+		m_ticksUntilAcceptorCheck = calculateRequiredTicksForGameAction(2 * 1000);
+		if (!m_pTileResourceAcceptor)
+			m_pTileResourceAcceptor = previous;
+	}
     auto* pBuilding = m_pTileResourceAcceptor
         ? dynamic_cast<Building*>(m_pTileResourceAcceptor->getSeaOrLandUnit()) : nullptr;
     auto* pAcceptor = dynamic_cast<IResourceAcceptor*>(pBuilding);

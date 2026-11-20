@@ -18,15 +18,14 @@
 
 #include "EventHandling/StateMoving.h"
 
-class Peasant;
+class Unit;
 class StateEnterBuildingForDelivery;
 
 
 class StateReturningResource : public StateMoving {
 
 public:
-    // Todo: more generalization -> oil tanker?
-    StateReturningResource(Peasant* pPeasant, State* pIdle);
+    StateReturningResource(Unit* pCollector, State* pIdle);
 
     void onEnter(const Event* pEvent = nullptr) override ;
 
@@ -40,4 +39,6 @@ private:
     Tile* m_pTileResourceAcceptor = nullptr;
     Tile* m_pApproachTile = nullptr;
     StateEnterBuildingForDelivery* m_pDeliveryState = nullptr;
+	int m_ticksUntilAcceptorCheck = 0;
+	void selectNearestAcceptor();
 };
