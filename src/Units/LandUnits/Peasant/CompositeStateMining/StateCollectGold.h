@@ -35,5 +35,5 @@ private:
 
     // ToDo: Never store a pointer to an object. However, a pointer to a tile is always valid!
     Tile* m_pTileGoldMine = nullptr;
-    bool m_enteringSuccessful;
+    bool m_enteringSuccessful = false;
 };

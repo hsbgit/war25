@@ -19,6 +19,7 @@
 #include "EventHandling/StateMoving.h"
 
 class Peasant;
+class StateEnterBuildingForDelivery;
 
 
 class StateReturningResource : public StateMoving {
@@ -30,12 +31,13 @@ public:
     void onEnter(const Event* pEvent = nullptr) override ;
 
     State* process() override;
+    void setDeliveryState(StateEnterBuildingForDelivery* state) { m_pDeliveryState = state; }
 
 private:
     State* m_pIdle = nullptr;
 
     // Never store a pointer to an object. A pointer to a tile is always valid!
     Tile* m_pTileResourceAcceptor = nullptr;
+    Tile* m_pApproachTile = nullptr;
+    StateEnterBuildingForDelivery* m_pDeliveryState = nullptr;
 };
-
-

@@ -59,13 +59,10 @@ private:
 	AttackerStats m_attackerStats;
 	ResourceManager_wartools::MissileType m_type;
 	Sprite m_sprite;
-	int m_speedX;
-	int m_speedY;
-	int m_dx_px;
-	int m_dy_px;
 	Point m_targetPosition;
 	Point m_originPosition;
-	int m_travelDistanceX;
-	int m_travelDistanceY;
+	Point m_startPosition;
+	int m_totalTravelTicks = 1;
+	int m_elapsedTravelTicks = 0;
 	bool m_expired = false;
 };

@@ -25,7 +25,7 @@ IResourceMine::IResourceMine(Map* pMap, const Resources& availableRes, int minin
 
 
 bool IResourceMine::enter(IResourceCollector* pPeasant) {
-	if (m_mapWorkers.size() > 4)
+	if (!pPeasant || m_mapWorkers.size() >= MaxWorkers || m_mapWorkers.contains(pPeasant))
 		return false;
 
 	// Switch light on / show ship under oil rig, at least one Peasant/ship is working

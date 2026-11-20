@@ -23,11 +23,8 @@ namespace gui {
             ImGui::SetNextWindowPos(ImVec2((float)m_newPos.x, (float)m_newPos.y));
             m_setPos = false;
         }
-
-        ImGui::SetNextWindowSize(ImVec2(0.0f, 0.0f));
     }
 }
-
 
 
 

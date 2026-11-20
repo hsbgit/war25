@@ -17,6 +17,7 @@
 #include "DisplaySettingsWindow.h"
 #include "imgui/imgui.h"
 #include "Global/Constants.h"
+#include "Renderer.h"
 #include <algorithm>
 #include <set>
 #include <string>
@@ -27,7 +28,15 @@ namespace gui {
 		findCurrentResolutionIndex();
 
 		Uint32 flags = SDL_GetWindowFlags(m_window);
-		m_fullscreenEnabled = (flags & SDL_WINDOW_FULLSCREEN) != 0;
+		m_fullscreenEnabled = (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
+
+		SDL_RendererInfo rendererInfo{};
+		if (g_pRenderer && SDL_GetRendererInfo(g_pRenderer->accessSDLRenderer(), &rendererInfo) == 0)
+			m_vsyncEnabled = (rendererInfo.flags & SDL_RENDERER_PRESENTVSYNC) != 0;
+
+		m_appliedResolutionIndex = m_selectedResolutionIndex;
+		m_appliedFullscreen = m_fullscreenEnabled;
+		m_appliedVSync = m_vsyncEnabled;
 
 		m_visible = true;
 	}
@@ -37,23 +46,29 @@ namespace gui {
 			return;
 
 
-		ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-		ImGui::SetNextWindowPos(ImVec2(100, 100), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(420, 270), ImGuiCond_Appearing);
+		ImGui::SetNextWindowPos(ImVec2(
+			std::max(10.0f, ImGui::GetIO().DisplaySize.x - 650.0f), 30.0f), ImGuiCond_Once);
 
-		if (!ImGui::Begin("🖥️ Display Settings", &m_visible,
-						  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse)) {
+		const bool drawContents = ImGui::Begin("Display Settings", &m_visible,
+			ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+		if (!m_visible) {
+			discardPendingChanges();
+			ImGui::End();
+			return;
+		}
+		if (!drawContents) {
 			ImGui::End();
 			return;
 		}
 
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 6));
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 12));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 7));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 10));
 
-		ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "Video Configuration");
+		ImGui::TextColored(ImVec4(0.35f, 0.72f, 1.0f, 1.0f), "Window");
 		ImGui::Separator();
-		ImGui::Spacing();
-
-		ImGui::Text("Resolution:");
+		ImGui::TextUnformatted("Resolution");
+		ImGui::BeginDisabled(m_fullscreenEnabled);
 		ImGui::SetNextItemWidth(-1);
 		if (ImGui::BeginCombo("##ResolutionCombo",
 			(std::to_string(m_availableResolutions[m_selectedResolutionIndex].width) + " x " +
@@ -74,42 +89,58 @@ namespace gui {
 			}
 			ImGui::EndCombo();
 		}
+		ImGui::EndDisabled();
+		if (m_fullscreenEnabled)
+			ImGui::TextDisabled("Desktop fullscreen uses the monitor's native resolution.");
+
+		ImGui::Checkbox("Desktop fullscreen", &m_fullscreenEnabled);
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Borderless fullscreen at the current desktop resolution.");
 
 		ImGui::Spacing();
-		ImGui::Checkbox("🖼️ Fullscreen Mode", &m_fullscreenEnabled);
-
-		ImGui::Spacing();
+		ImGui::TextColored(ImVec4(0.35f, 0.72f, 1.0f, 1.0f), "Rendering");
 		ImGui::Separator();
-		ImGui::Spacing();
+		ImGui::Checkbox("Vertical synchronization (VSync)", &m_vsyncEnabled);
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Synchronizes presentation with the monitor to reduce tearing.");
 
-		ImVec2 buttonSize = ImVec2(120, 32);
-		float windowWidth = ImGui::GetWindowSize().x;
-		float buttonSpacing = 16;
-		float totalButtonWidth = 2 * buttonSize.x + buttonSpacing;
-		float startX = (windowWidth - totalButtonWidth) * 0.5f;
-
-		ImGui::SetCursorPosX(startX);
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.2f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 0.3f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.6f, 0.1f, 1.0f));
-		if (ImGui::Button("✓ Apply", buttonSize)) {
-			m_applySettings = true;
-		}
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.2f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.3f, 0.3f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
-		if (ImGui::Button("✗ Close", buttonSize)) {
+		const ImVec2 buttonSize(112, 32);
+		const float buttonsWidth = buttonSize.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+		ImGui::SetCursorPosY(ImGui::GetWindowHeight() - buttonSize.y - ImGui::GetStyle().WindowPadding.y);
+		ImGui::SetCursorPosX(ImGui::GetWindowWidth() - buttonsWidth - ImGui::GetStyle().WindowPadding.x);
+		if (ImGui::Button("Cancel", buttonSize)) {
+			discardPendingChanges();
 			m_visible = false;
 		}
-		ImGui::PopStyleColor(3);
+		ImGui::SameLine();
+		const bool pending = hasPendingChanges();
+		ImGui::BeginDisabled(!pending);
+		if (ImGui::Button("Apply", buttonSize)) {
+			m_applySettings = true;
+		}
+		ImGui::EndDisabled();
 
 		ImGui::PopStyleVar(2);
 		ImGui::End();
+	}
+
+	bool DisplaySettingsWindow::hasPendingChanges() const {
+		return m_selectedResolutionIndex != m_appliedResolutionIndex ||
+			m_fullscreenEnabled != m_appliedFullscreen || m_vsyncEnabled != m_appliedVSync;
+	}
+
+	void DisplaySettingsWindow::discardPendingChanges() {
+		m_selectedResolutionIndex = m_appliedResolutionIndex;
+		m_fullscreenEnabled = m_appliedFullscreen;
+		m_vsyncEnabled = m_appliedVSync;
+		m_applySettings = false;
+	}
+
+	void DisplaySettingsWindow::resetApplyFlag() {
+		m_applySettings = false;
+		m_appliedResolutionIndex = m_selectedResolutionIndex;
+		m_appliedFullscreen = m_fullscreenEnabled;
+		m_appliedVSync = m_vsyncEnabled;
 	}
 
 	void DisplaySettingsWindow::loadAvailableResolutions() {

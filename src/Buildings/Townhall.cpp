@@ -82,6 +82,10 @@ void Townhall::process() {
 
 
 void Townhall::handleEvent(const Event& event) {
+	if (event == BuildingActions::CancelConstruction) {
+		Building::handleEvent(event);
+		return;
+	}
 	EventID eventID = event.getEventID();
 	ProductionItem::ItemType itemType = (ProductionItem::ItemType)eventID;
 	assert(gMapProductionItems.contains(itemType));
@@ -213,4 +217,3 @@ void Townhall::setCastleProperties() {
 
 	setName((getFraction() == Fraction::Alliance) ? "Castle" : "Fortress");
 }
-

@@ -38,19 +38,21 @@ public:
 	bool isTileVisible(const Tile* pTile) const;
 
 	void setViewPortPosition(const Point& global_tile);
+	void panByTiles(int deltaX, int deltaY);
+	void panByPixels(int deltaX, int deltaY);
 
 
 	Point getTileCoodinatesAtPosition(const Point& mouseCurrPos) {
 		Point coords;
-		coords.x = m_viewPos_UL_tile.x + mouseCurrPos.x / Tile::TileWidth_px;
-		coords.y = m_viewPos_UL_tile.y + mouseCurrPos.y / Tile::TileWidth_px;
+		coords.x = m_viewPos_UL_tile.x + (mouseCurrPos.x + m_viewOffset_px.x) / Tile::TileWidth_px;
+		coords.y = m_viewPos_UL_tile.y + (mouseCurrPos.y + m_viewOffset_px.y) / Tile::TileWidth_px;
 		return coords;
 	}
 
 
 	Point worldToScreen_px(const Point& global_px) const {
-		Point local_px = { (global_px.x - m_viewPos_UL_tile.x * Tile::TileWidth_px),
-							   (global_px.y - m_viewPos_UL_tile.y * Tile::TileWidth_px) };
+		Point local_px = { (global_px.x - m_viewPos_UL_tile.x * Tile::TileWidth_px - m_viewOffset_px.x),
+							   (global_px.y - m_viewPos_UL_tile.y * Tile::TileWidth_px - m_viewOffset_px.y) };
 		return local_px;
 	}
 
@@ -68,21 +70,21 @@ public:
 	}
 
 	// Converts world pixel coordinates to a tile
-	Point pixelToTile(const Point& pos_px) {
-		Point tile = { pos_px.x / Tile::TileWidth_px,
-						   pos_px.y / Tile::TileWidth_px };
+	Point pixelToTile(const Point& pos_px) const {
+		Point tile = { (pos_px.x + m_viewOffset_px.x) / Tile::TileWidth_px,
+						   (pos_px.y + m_viewOffset_px.y) / Tile::TileWidth_px };
 		return tile;
 	}
 
 	// Converts a tile's world position to world pixel
-	Point tileToPixel(const Point& pos_tile) {
-		Point pos_px = { pos_tile.x * Tile::TileWidth_px,
-							 pos_tile.y * Tile::TileWidth_px };
+	Point tileToPixel(const Point& pos_tile) const {
+		Point pos_px = { pos_tile.x * Tile::TileWidth_px - m_viewOffset_px.x,
+							 pos_tile.y * Tile::TileWidth_px - m_viewOffset_px.y };
 		return pos_px;
 	}
 
 
-	inline Point& getCurrentPosition_TL_tile() {
+	inline const Point& getCurrentPosition_TL_tile() const {
 		return m_viewPos_UL_tile;
 	}
 
@@ -101,8 +103,10 @@ private:
 	bool isUnitOnTileVisible(const Point& pos_Tile, int unitTileSize) const;
 
 	Point m_viewPos_UL_tile;
+	Point m_viewOffset_px{0, 0};
 
 	int m_windowHeight_tiles = -1, m_windowWidth_tiles = -1;
+	int m_windowWidth_px = 0, m_windowHeight_px = 0;
 
 	int m_maxViewableMapWidth_tiles = -1, m_maxViewableMapHeight_tiles = -1;
 	int m_maxMapSideLength_tiles = -1;

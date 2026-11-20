@@ -159,7 +159,5 @@ private:
     Resources m_resources, m_additionalResourceProduction;
     TechnologyManager* m_pTechnologyCoordinator = nullptr;
     
-    int m_tickCnt = 0;
-    int m_updateMapTicks = 0;
     MapInfo* m_pMapInfo = nullptr;
 };

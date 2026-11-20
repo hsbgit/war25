@@ -28,6 +28,7 @@ class IArmed {
 public:
 	IArmed();
 	IArmed(int basicDamage, int piercingDamage, int range, int attackCooldownTime_ticks = 0, int attackHeatupTime_ticks = 0);
+	virtual ~IArmed();
 
 	inline AttackerStats getAttackerStats() const {
 		return AttackerStats(getBasicDamage(), getBasicPiercingDamage());
@@ -68,9 +69,9 @@ public:
 	}
 
 	inline void releaseActiveTarget() {
-		assert(m_pActiveTarget);
 		m_pActiveTarget = nullptr;
 	}
+	void clearActiveTarget();
 
 
 protected:
@@ -81,6 +82,7 @@ protected:
 	int m_AttackCooldownTime_ticks = 0;
 
 	bool hasActiveTarget() const;
+	bool isActiveTargetInRange(Object* pAttacker) const;
 	void setActiveTarget(Object* pActiveTarget);
 	Object* m_pActiveTarget = nullptr;
 

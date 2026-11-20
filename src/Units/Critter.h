@@ -32,6 +32,7 @@ public:
 	}
 
 	const Sprite& sprite() const override;
+	void playSoundSelected() override;
 	void doHandleDeath() override;
 	bool isMoving() const { // ToDo: Can be removed if Critter is switched to a real state machine
 		return true;
@@ -55,4 +56,6 @@ private:
 
 	int m_tickCnt = 0;
 	int m_requiredTicksPerMove = 0;
+	int m_selectionClicks = 0;
+	bool m_isSheep = false;
 };

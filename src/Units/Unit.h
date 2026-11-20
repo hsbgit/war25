@@ -75,7 +75,7 @@ public:
 		m_currentAnimation = animation;
 	}
 
-	void setIdleAnimation();
+	void setIdleAnimation(Direction direction = Direction::N);
 
 	void addBuff(const Buff& buff) {
 		auto it = m_activeBuffs.find(buff.getType());
@@ -121,5 +121,4 @@ private:
 	void playRandomSound(const std::vector<std::string>& sounds);
 	int m_speed;
 };
-
 

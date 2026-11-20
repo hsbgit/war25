@@ -28,6 +28,8 @@ CompositeStateChopWood::CompositeStateChopWood(Peasant* pPeasant) : State(pPeasa
     m_collectRessource = new StateLumberWood(pPeasant, pPeasant->m_pIdle);
     m_returningRessource = new StateReturningResource(pPeasant, pPeasant->m_pIdle);
     m_deliverRessource = new StateEnterBuildingForDelivery(pPeasant);
+	static_cast<StateReturningResource*>(m_returningRessource)->setDeliveryState(
+		static_cast<StateEnterBuildingForDelivery*>(m_deliverRessource));
 
     // Set the move to wood state reference so StateLumberWood can return to it
     static_cast<StateLumberWood*>(m_collectRessource)->setMoveToWoodState(m_movingToRessource);

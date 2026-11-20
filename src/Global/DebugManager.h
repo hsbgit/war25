@@ -22,6 +22,7 @@ public:
     bool m_map_drawTileInformation = false; // Water, Land, Destroyable, Occupied
     bool m_map_considerExploration = false;
     bool m_map_drawFogOfWar = false;
+    bool m_minimap_useExplorationAndFogOfWar = false;
 
     bool m_astar_showOpenList = false;
     bool m_astar_showClosedList = false;

@@ -78,6 +78,8 @@ namespace gui {
             m_selectedSpell = -1;
         }
 
+		update();
+		ImGui::SetNextWindowSize(ImVec2(350.0f, 280.0f), ImGuiCond_Once);
         ImGui::Begin("Spells");
         PlayerColor c = PlayerColor::Neutral;
 
@@ -158,4 +160,3 @@ namespace gui {
         ImGui::End();
     }
 }
-

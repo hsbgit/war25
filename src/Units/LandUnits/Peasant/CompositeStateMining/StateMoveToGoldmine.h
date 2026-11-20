@@ -33,5 +33,6 @@ public:
 private:
     State* m_pIdle;
     Event m_initialEvent;
+    Tile* m_pGoldMineTile = nullptr;
     Tile* m_pNextReachableTile = nullptr;
 };

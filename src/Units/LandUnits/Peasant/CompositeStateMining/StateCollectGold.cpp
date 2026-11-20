@@ -26,7 +26,11 @@ StateCollectGold::StateCollectGold(Peasant* pPeasant, State* pIdle) : State(pPea
 
 
 void StateCollectGold::onEnter(const Event* pEvent) {
+    m_pTileGoldMine = nullptr;
+    m_enteringSuccessful = false;
     Tile* posPeasant = m_pOwner->getTile();
+    if (!posPeasant)
+        return;
     GoldMine* pGoldMine = m_pOwner->getMap()->isNextToBuilding<GoldMine>(posPeasant);
 
     if (pGoldMine) {

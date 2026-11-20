@@ -16,6 +16,7 @@
 */
 #pragma once
 
+#include <cstddef>
 #include <map>
 #include "Global/Resources.h"
 
@@ -25,6 +26,8 @@ class IResourceCollector;
 
 class IResourceMine {
 public:
+	static constexpr std::size_t MaxWorkers = 5;
+
 	IResourceMine(Map* pMap, const Resources& availableRes, int m_miningTicks);
 	virtual ~IResourceMine() {}
 
@@ -33,6 +36,8 @@ public:
 	const Resources& availableResources() const {
 		return m_availableRes;
 	}
+
+	std::size_t activeWorkers() const noexcept { return m_mapWorkers.size(); }
 
 protected:
 	virtual void switchImage(bool miningActive) = 0;

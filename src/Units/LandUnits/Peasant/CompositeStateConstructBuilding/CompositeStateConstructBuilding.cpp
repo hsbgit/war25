@@ -32,13 +32,14 @@
 #include "EventHandling/StateMoving.h"
 #include "Resources/SoundManager.h"
 #include "Global/GlobalAttributes.h"
+#include "Global/BuildingPlacement.h"
 #include "Map/Map.h"
 #include <iostream>
 
 
 template<typename BuildingType>
-Building* createBuilding(const Point& targetPos_world, Peasant* pErecter) {
-	if (pErecter->getMap()->isSpaceAvailableForUnit(targetPos_world.y, targetPos_world.x, gMapUnitTilesize[typeid(BuildingType)], Object::Type::Land)) {
+Building* createBuilding(PeasantActions action, const Point& targetPos_world, Peasant* pErecter) {
+	if (pErecter->getMap()->validateBuildingPlacement(action, targetPos_world, pErecter).allowed) {
 		return new BuildingType(pErecter, pErecter->getMap());
 	}
 	return nullptr;
@@ -50,7 +51,7 @@ void CompositeStateConstructBuilding::onWorkDone() {
 
 	Peasant* pErecter = dynamic_cast<Peasant*>(m_pOwner);
 
-	if (pErecter->getTile()->getPos() != m_targetPos_world) {
+	if (!pErecter->getTile() || pErecter->getTile()->getPos() != m_approachPos_world) {
 		std::cout << " \tpeasant has not reached the actual building tile: Not building!" << std::endl;
 		return;
 	}
@@ -62,45 +63,45 @@ void CompositeStateConstructBuilding::onWorkDone() {
 
 	switch (m_buildingToConstruct) {
 	case PeasantActions::BuildTownhall:
-		pBuilding = createBuilding<Townhall>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<Townhall>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildFarm:
-		pBuilding = createBuilding<Farm>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<Farm>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildBarracks:
-		pBuilding = createBuilding<Barracks>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<Barracks>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildLumberMill:
-		pBuilding = createBuilding<LumberMill>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<LumberMill>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildBlacksmith:
-		pBuilding = createBuilding<Blacksmith>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<Blacksmith>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildChurch:
-		pBuilding = createBuilding<Church>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<Church>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildStables:
-		pBuilding = createBuilding<Stables>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<Stables>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildGnomishInventor:
-		pBuilding = createBuilding<GnomishInventor>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<GnomishInventor>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildGryphonAviary:
-		pBuilding = createBuilding<GryphonAviary>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<GryphonAviary>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 
 	case PeasantActions::BuildScoutTower:
-		pBuilding = createBuilding<ScoutTower>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<ScoutTower>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 
 	case PeasantActions::BuildShipyard:
-		pBuilding = createBuilding<Shipyard>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<Shipyard>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildFoundry:
-		pBuilding = createBuilding<Foundry>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<Foundry>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 	case PeasantActions::BuildOilRefinery:
-		pBuilding = createBuilding<OilRefinery>(m_targetPos_world, pErecter);
+		pBuilding = createBuilding<OilRefinery>(m_buildingToConstruct, m_targetPos_world, pErecter);
 		break;
 
 	default:
@@ -114,7 +115,7 @@ void CompositeStateConstructBuilding::onWorkDone() {
 	else {
 		g_pSoundManager->playWAV("ui/placement_error.wav");
 		// Sth. is blocking the construction site. Show Peasant and switch to idle
-		pErecter->getMap()->placeUnit(m_targetPos_world.y, m_targetPos_world.x, pErecter);
+		pErecter->getMap()->placeUnit(m_approachPos_world.y, m_approachPos_world.x, pErecter);
 	}
 }
 
@@ -149,10 +150,21 @@ CompositeStateConstructBuilding::~CompositeStateConstructBuilding() {
 
 void CompositeStateConstructBuilding::onEnter(const Event* pEvent) {
 	assert(pEvent);
+	m_pCurrState = m_movingToConstructionSite;
 	m_buildingToConstruct = static_cast<PeasantActions>(pEvent->getEventID());
 	m_targetPos_world.x = pEvent->tileX();
 	m_targetPos_world.y = pEvent->tileY();
-	m_pCurrState->onEnter(pEvent);
+	Tile* approach = m_pOwner->getMap()->getBuilderApproachTile(
+		m_buildingToConstruct, m_targetPos_world, m_pOwner);
+	if (!approach || !m_pOwner->getMap()->validateBuildingPlacement(
+		m_buildingToConstruct, m_targetPos_world).allowed) {
+		g_pSoundManager->playWAV("ui/placement_error.wav");
+		m_approachPos_world = {-1, -1};
+		static_cast<StateMoving*>(m_movingToConstructionSite)->setTargetTile(m_pOwner->getTile()->getPos());
+		return;
+	}
+	m_approachPos_world = approach->getPos();
+	static_cast<StateMoving*>(m_movingToConstructionSite)->setTargetTile(m_approachPos_world);
 }
 
 

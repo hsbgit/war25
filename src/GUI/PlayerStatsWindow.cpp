@@ -27,6 +27,8 @@ namespace gui {
 		if (!show_another_window)
 			return;
 
+		update();
+		ImGui::SetNextWindowSize(ImVec2(390.0f, 150.0f), ImGuiCond_Once);
 		ImGui::Begin("Player Statistics", &show_another_window);
 
 		std::stringstream ssInfoMap;

@@ -105,6 +105,14 @@ public:
 		return m_isWood;
 	}
 
+	inline bool isRocks() const {
+		return m_isRocks;
+	}
+
+	inline bool isWall() const {
+		return m_isWall;
+	}
+
 	inline bool isCoast() const {
 		return m_isCoast;
 	}

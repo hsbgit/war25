@@ -29,6 +29,8 @@ CompositeStateMining::CompositeStateMining(Peasant* pPeasant) : State(pPeasant) 
     m_collectRessource = new StateCollectGold(pPeasant, pPeasant->m_pIdle);
     m_returningRessource = new StateReturningResource(pPeasant, pPeasant->m_pIdle);
     m_deliverRessource = new StateEnterBuildingForDelivery(pPeasant);
+	static_cast<StateReturningResource*>(m_returningRessource)->setDeliveryState(
+		static_cast<StateEnterBuildingForDelivery*>(m_deliverRessource));
 
 
     // Add all transitions
@@ -84,11 +86,28 @@ CompositeStateMining::~CompositeStateMining() {
 
 void CompositeStateMining::onEnter(const Event* pEvent) {
     assert(pEvent);
+	m_pCurrState = m_movingToRessource;
     m_movingToRessource->onEnter(pEvent);
+}
+
+void CompositeStateMining::onExit() {
+	if (m_pCurrState)
+		m_pCurrState->onExit();
+	State::onExit();
 }
 
 
 State* CompositeStateMining::process() {
+	// Composite states own a second state machine. Its conditions (most
+	// importantly "worker now carries gold") must be evaluated explicitly.
+	m_pCurrState = m_pCurrState->checkForTransition();
     m_pCurrState = m_pCurrState->process();
-    return m_pCurrState; // This?
+
+	// Keep the outer unit state machine on the composite while the mining
+	// cycle advances internally. Only propagate transitions to external states.
+	if (m_pCurrState == m_movingToRessource || m_pCurrState == m_collectRessource ||
+		m_pCurrState == m_returningRessource || m_pCurrState == m_deliverRessource)
+		return this;
+
+    return m_pCurrState;
 }

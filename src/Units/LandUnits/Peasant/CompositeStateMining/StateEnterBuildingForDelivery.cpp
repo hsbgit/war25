@@ -28,31 +28,48 @@ StateEnterBuildingForDelivery::StateEnterBuildingForDelivery(Peasant* pPeasant) 
 
 
 void StateEnterBuildingForDelivery::onEnter(const Event* pEvent) {
+    m_deliveryTicks = -1;
     Tile* pTile = m_pOwner->getTile();
+	if (!pTile)
+		return;
 
-    // Todo: Check whether townhall/saw mill/whatever actually belongs to this player, not to any other player
-    m_pResourceAcceptor = m_pOwner->getMap()->isNextToBuilding<IResourceAcceptor>(pTile);
-
-    if (m_pResourceAcceptor) {
+    // StateReturningResource chose this exact acceptor. Do not scan again: two
+    // adjacent town halls could otherwise make a worker emerge from the wrong one.
+	auto* pAcceptorObject = m_pResourceAcceptorTile
+		? dynamic_cast<Object*>(m_pResourceAcceptorTile->getSeaOrLandUnit()) : nullptr;
+	auto* pResourceAcceptor = dynamic_cast<IResourceAcceptor*>(pAcceptorObject);
+    if (pResourceAcceptor && pAcceptorObject &&
+		pAcceptorObject->getOwner() == m_pOwner->getOwner() && !pAcceptorObject->isDead()) {
         m_pOwner->getMap()->releaseObjectFromTile(m_pOwner);
         m_deliveryTicks = calculateRequiredTicksForGameAction(2 * 1000);
-    }
+	}
+	else {
+		m_pResourceAcceptorTile = nullptr;
+	}
 }
 
 
 State* StateEnterBuildingForDelivery::process() {
-    if (!m_pResourceAcceptor)
+    if (!m_pResourceAcceptorTile)
         return transitionToNextState();
 
-    if (m_deliveryTicks > 0) {
-        m_deliveryTicks--;
-    }
+	auto* pAcceptorBuilding = dynamic_cast<Building*>(m_pResourceAcceptorTile->getSeaOrLandUnit());
+	if (!pAcceptorBuilding || pAcceptorBuilding->isDead() ||
+		pAcceptorBuilding->getOwner() != m_pOwner->getOwner()) {
+		Tile* pFallback = m_pOwner->getMap()->getNextFreeTile(
+			m_pResourceAcceptorTile, m_pOwner->getMap()->sideLength());
+		if (!pFallback)
+			return this;
+		m_pOwner->getMap()->placeUnit(pFallback, m_pOwner);
+		m_pResourceAcceptorTile = nullptr;
+		return transitionToNextState();
+	}
 
-    // Todo: What if townhall gets destroyed?
-    // Todo: m_pResourceAcceptor as tile not as pointer
+    if (m_deliveryTicks > 0)
+        --m_deliveryTicks;
 
-    if (m_deliveryTicks-- == 0) {
-        Tile* pFreeTileNextToResourceAcceptor = m_pOwner->getMap()->getFreeTileAroundBuilding(dynamic_cast<Building*>(m_pResourceAcceptor), m_pOwner);
+    if (m_deliveryTicks == 0) {
+        Tile* pFreeTileNextToResourceAcceptor = m_pOwner->getMap()->getFreeTileAroundBuilding(pAcceptorBuilding, m_pOwner);
 
         if (!pFreeTileNextToResourceAcceptor)
             return this;

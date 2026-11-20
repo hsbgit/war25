@@ -17,6 +17,7 @@
 #pragma once
 
 #include "Window.h"
+#include <functional>
 
 class Map;
 class Viewport;
@@ -24,15 +25,15 @@ class Viewport;
 namespace gui {
 	class MiniMap : public ImGuiWindow {
 	public:
-		MiniMap(Map* pMap, Viewport* pViewPort);
+		using WorldCommandCallback = std::function<void(const Point&)>;
+		MiniMap(Map* pMap, Viewport* pViewPort, WorldCommandCallback worldCommandCallback = {});
 
 		void draw() override;
 
 	private:
-		float m_scale_x, scale_y;
-
 		Map* m_pMap = nullptr;
 		Viewport* m_pViewPort = nullptr;
 		int m_width, m_height;
+		WorldCommandCallback m_worldCommandCallback;
 	};
 }

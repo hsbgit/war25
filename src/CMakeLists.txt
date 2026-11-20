@@ -50,10 +50,38 @@ else()
     find_package(Threads REQUIRED)
     find_package(PkgConfig REQUIRED)
 
-    # Use pkg-config for SDL2 libraries when possible
+    # Use pkg-config for SDL headers; runtime-library fallbacks below only
+    # cover linker discovery and never substitute vendored platform headers.
     pkg_check_modules(SDL2 REQUIRED sdl2)
-    pkg_check_modules(SDL2_IMAGE sdl2_image)
-    pkg_check_modules(SDL2_MIXER sdl2_mixer)
+    pkg_check_modules(SDL2_IMAGE QUIET sdl2_image)
+    pkg_check_modules(SDL2_MIXER QUIET sdl2_mixer)
+
+    find_library(WAR25_SDL2_LIBRARY NAMES SDL2 HINTS ${SDL2_LIBRARY_DIRS})
+    find_library(WAR25_SDL2_IMAGE_LIBRARY NAMES SDL2_image HINTS ${SDL2_IMAGE_LIBRARY_DIRS})
+    find_library(WAR25_SDL2_MIXER_LIBRARY NAMES SDL2_mixer HINTS ${SDL2_MIXER_LIBRARY_DIRS})
+
+    if(NOT WAR25_SDL2_LIBRARY)
+        find_file(WAR25_SDL2_LIBRARY NAMES libSDL2-2.0.so.0
+            PATHS /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /lib/${CMAKE_LIBRARY_ARCHITECTURE})
+    endif()
+    if(NOT WAR25_SDL2_IMAGE_LIBRARY)
+        find_file(WAR25_SDL2_IMAGE_LIBRARY NAMES libSDL2_image-2.0.so.0
+            PATHS /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /lib/${CMAKE_LIBRARY_ARCHITECTURE})
+    endif()
+    if(NOT WAR25_SDL2_MIXER_LIBRARY)
+        find_file(WAR25_SDL2_MIXER_LIBRARY NAMES libSDL2_mixer-2.0.so.0
+            PATHS /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /lib/${CMAKE_LIBRARY_ARCHITECTURE})
+    endif()
+
+    find_library(WAR25_OPENGL_LIBRARY NAMES GL)
+    if(NOT WAR25_OPENGL_LIBRARY)
+        find_file(WAR25_OPENGL_LIBRARY NAMES libGL.so.1
+            PATHS /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /lib/${CMAKE_LIBRARY_ARCHITECTURE})
+    endif()
+
+    if(NOT WAR25_SDL2_LIBRARY OR NOT WAR25_SDL2_IMAGE_LIBRARY OR NOT WAR25_SDL2_MIXER_LIBRARY)
+        message(FATAL_ERROR "SDL2, SDL2_image and SDL2_mixer runtime libraries are required")
+    endif()
 
     target_include_directories(war25_common INTERFACE
         ${SDL2_INCLUDE_DIRS}
@@ -61,28 +89,16 @@ else()
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
 
-    # Fallback for missing system packages - use older style libraries
-    set(SDL2_LIBS ${SDL2_LIBRARIES})
-    if(NOT SDL2_IMAGE_FOUND)
-        list(APPEND SDL2_LIBS "SDL2_image")
-    else()
-        list(APPEND SDL2_LIBS ${SDL2_IMAGE_LIBRARIES})
-    endif()
-
-    if(NOT SDL2_MIXER_FOUND)
-        list(APPEND SDL2_LIBS "SDL2_mixer")
-    else()
-        list(APPEND SDL2_LIBS ${SDL2_MIXER_LIBRARIES})
-    endif()
-
     target_link_libraries(war25_common INTERFACE
-        ${SDL2_LIBS}
+        ${WAR25_SDL2_LIBRARY}
+        ${WAR25_SDL2_IMAGE_LIBRARY}
+        ${WAR25_SDL2_MIXER_LIBRARY}
         "/usr/local/lib/libpud.so"
         "/usr/local/lib/libwar2.so"
         "/usr/local/lib/libglfw3.a"
         Threads::Threads
         dl
-        GL
+        ${WAR25_OPENGL_LIBRARY}
     )
 
     target_compile_options(war25_common INTERFACE ${SDL2_CFLAGS_OTHER})
@@ -139,3 +155,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     $<$<PLATFORM_ID:Windows>:WIN32_LEAN_AND_MEAN>
     $<$<PLATFORM_ID:Windows>:NOMINMAX>
 )
+
+# Add tests if BUILD_TESTING is enabled
+option(BUILD_TESTING "Build tests" OFF)
+if(BUILD_TESTING)
+    add_subdirectory(../tests ${CMAKE_CURRENT_BINARY_DIR}/tests)
+endif()

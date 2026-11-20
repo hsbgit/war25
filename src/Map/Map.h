@@ -30,6 +30,8 @@
 #include <vector>
 #include <typeindex>
 #include <typeinfo>
+#include <cstdint>
+#include <array>
 
 #include "Tile.h"
 #include "Resources/resourcemanager_wartools.h"
@@ -47,6 +49,12 @@ class IRenderer;
 class Viewport;
 class ResourceManager_wartools;
 class GoldMine;
+
+struct BuildingPlacementResult {
+    bool allowed = false;
+    int tileSize = 0;
+    std::vector<bool> validTiles;
+};
 
 
 
@@ -132,6 +140,10 @@ public:
 
 
     bool isSpaceAvailableForUnit(int tile_y, int tile_x, int unitTileSize, Object::Type objType);
+    BuildingPlacementResult validateBuildingPlacement(PeasantActions action, const Point& topLeft,
+                                                      const Object* ignoredObject = nullptr) const;
+    Tile* getBuilderApproachTile(PeasantActions action, const Point& topLeft,
+                                 const Object* builder);
 
 
     Tile* getFreeTileAroundBuilding(Object *pBuilding, const Object *pObject);    
@@ -147,6 +159,7 @@ public:
     void processMapObjects();
     void processPlayers();
     void draw(Renderer *pRenderer, Viewport* pViewPort);
+	void refreshTerrainAround(const Point& center);
 
 
     inline Player* getNeutralPlayer() const {
@@ -167,12 +180,23 @@ private:
     Texture* m_pTextureMiniMap = nullptr, * m_pTextureMiniMapWithOverlay = nullptr;
 
     void identifyNeighbourTiles();
+	void buildTerrainAutotileRules();
+	std::uint8_t woodNeighbourMask(int x, int y) const;
+	std::uint8_t rockNeighbourMask(int x, int y) const;
+	std::uint8_t wallNeighbourMask(int x, int y) const;
+	void retileWood(Tile* tile);
+	void retileRock(Tile* tile);
+	void retileWall(Tile* tile);
     void addPlayersToMap(Pud* pPud);
     void addUnitsToMap(Pud* pPud);
 
     std::vector<std::vector<Tile*> > m_arrTileMap;
+    std::vector<Point> m_oilPatchPositions;
 
-    ResourceManager_wartools* m_pResManagerWartools;
+	ResourceManager_wartools* m_pResManagerWartools;
+	std::map<std::uint8_t, std::uint16_t> m_woodTilesByMask;
+	std::map<std::uint8_t, std::uint16_t> m_rockTilesByMask;
+	std::array<std::map<std::uint8_t, std::uint16_t>, 2> m_wallTilesByMask;
 };
 
 

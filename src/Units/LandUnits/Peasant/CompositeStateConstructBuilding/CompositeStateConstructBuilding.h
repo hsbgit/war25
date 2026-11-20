@@ -39,6 +39,7 @@ private:
 	std::function<bool()> f_isdead;
 
 	Point m_targetPos_world;
+	Point m_approachPos_world{-1, -1};
 	PeasantActions m_buildingToConstruct;
 
 

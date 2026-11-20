@@ -19,6 +19,8 @@
 #include "Global/PseudoRandom.h"
 #include "Global/GlobalAttributes.h"
 #include "Resources/resourcemanager_wartools.h"
+#include "Resources/SoundManager.h"
+#include "Map/Map.h"
 #include <iostream>
 
 
@@ -66,24 +68,28 @@ void Critter::notifySeasonChanged(Season newSeason) {
 
 	switch (newSeason) {
 	case Season::Summer:
+		m_isSheep = true;
 		setName("Sheep");
 		m_vecSoundsSelected.push_back("neutral/units/sheep/selected/1.wav");
 		setDyingSound("neutral/units/sheep/selected/1.wav");
 		break;
 
 	case Season::Winter:
+		m_isSheep = false;
 		setName("Seal");
 		m_vecSoundsSelected.push_back("neutral/units/seal/selected/1.wav");
 		setDyingSound("neutral/units/seal/annoyed/1.wav");
 		break;
 
 	case Season::Wasteland:
+		m_isSheep = false;
 		setName("Pig");
 		m_vecSoundsSelected.push_back("neutral/units/pig/selected/1.wav");
 		setDyingSound("neutral/units/pig/annoyed/1.wav");
 		break;
 
 	case Season::Swamp:
+		m_isSheep = false;
 		setName("Warthog");
 		m_vecSoundsSelected.push_back("neutral/units/warthog/selected/1.wav");
 		setDyingSound("neutral/units/warthog/annoyed/1.wav");
@@ -91,6 +97,27 @@ void Critter::notifySeasonChanged(Season newSeason) {
 
 	default:
 		break;
+	}
+}
+
+void Critter::playSoundSelected() {
+	if (!m_isSheep || isDead()) {
+		Unit::playSoundSelected();
+		return;
+	}
+
+	++m_selectionClicks;
+	if (m_selectionClicks < 5) {
+		Unit::playSoundSelected();
+	} else if (m_selectionClicks < 10) {
+		g_pSoundManager->playSelectionWAV("neutral/units/sheep/annoyed/1.wav");
+	} else {
+		// Warcraft-II-style easter egg: visual/audio explosion only. No
+		// neighbouring tile or unit receives damage.
+		getMap()->addAnimation(getTile(), g_pRessourceManager->getExplosionAnimation());
+		g_pSoundManager->playWAV(getTile(), std::string("misc") + PATH_SEPARATOR + "explosion.wav");
+		die();
+		m_selectionClicks = 0;
 	}
 }
 

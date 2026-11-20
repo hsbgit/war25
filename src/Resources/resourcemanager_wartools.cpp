@@ -263,6 +263,7 @@ void ResourceManager_wartools::loadCursors() {
 #include "Buildings/MageTower.h"
 #include "Buildings/DarkPortal.h"
 #include "Buildings/Goldmine.h"
+#include "Global/BuildingPlacement.h"
 
 void ResourceManager_wartools::createUnitAnimations(std::type_index correspondingType, int iconSquareWidth_px, int spriteCountMoving, int spriteCountAttacking, int spriteCountDying) {
 	TextureMap& textMap = m_mapUnitTexturesHuman; // Does not matter whether orc or human, will be changed individually, e.g., in getUnitIdleAnimation
@@ -305,6 +306,13 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 		}
 
 		mapUnitMovementAnimations[correspondingType][direction] = anim;
+		if (spriteCountMoving > 0) {
+			Animation idle(textMap[correspondingType][color], interval_ms);
+			const Rect standingFrame = {colOffset * iconSquareWidth_px, 0,
+				iconSquareWidth_px, iconSquareWidth_px};
+			idle.addSprite(Sprite(idle.getBaseTexture(), standingFrame, posOffset, flip));
+			mapIdleAnimations[correspondingType][direction] = idle;
+		}
 
 
 
@@ -496,42 +504,19 @@ Sprite ResourceManager_wartools::getCritterSprite(Direction direction, bool dead
 
 
 Animation ResourceManager_wartools::getUnitIdleAnimation(Unit* pUnit, Direction direction) {
-	if (pUnit->isSeaObject()) {
-		if (!mapUnitMovementAnimations.contains(typeid(*pUnit))) {
-			std::cerr << "ERROR: Sea unit type not found in mapUnitMovementAnimations!" << std::endl;
-			// Return empty animation to prevent crash
+	const std::type_index type = typeid(*pUnit);
+	auto* animations = pUnit->isSeaObject() ? &mapUnitMovementAnimations : &mapIdleAnimations;
+	if (!animations->contains(type))
+		return Animation();
+	auto& directional = animations->at(type);
+	if (!directional.contains(direction)) {
+		// Some exceptional sprites (notably skeletons) have only a north idle.
+		// Falling back is harmless and must not flood stderr every few seconds.
+		if (!directional.contains(Direction::N))
 			return Animation();
-		}
-		if (!mapUnitMovementAnimations[typeid(*pUnit)].contains(direction)) {
-			std::cerr << "ERROR: Direction not found for sea unit type!" << std::endl;
-			// Try to use North direction as fallback
-			if (mapUnitMovementAnimations[typeid(*pUnit)].contains(Direction::N)) {
-				direction = Direction::N;
-			} else {
-				return Animation();
-			}
-		}
+		direction = Direction::N;
 	}
-	else {
-		if (!mapIdleAnimations.contains(typeid(*pUnit))) {
-			std::cerr << "ERROR: Unit type not found in mapIdleAnimations!" << std::endl;
-			// Return empty animation to prevent crash
-			return Animation();
-		}
-		if (!mapIdleAnimations[typeid(*pUnit)].contains(direction)) {
-			std::cerr << "ERROR: Direction not found for unit type!" << std::endl;
-			// Try to use North direction as fallback
-			if (mapIdleAnimations[typeid(*pUnit)].contains(Direction::N)) {
-				direction = Direction::N;
-			} else {
-				return Animation();
-			}
-		}
-	}
-
-	// Get appropriate animation
-	// Ships idle animations are equal to the movement animations (just a single image, floating up and down)
-	Animation a(pUnit->isSeaObject() ? mapUnitMovementAnimations[typeid(*pUnit)][direction] : mapIdleAnimations[typeid(*pUnit)][direction]);
+	Animation a(directional.at(direction));
 
 	// Use correct texture map depending on the unit's fraction
 	TextureMap& textMap = (pUnit->getFraction() == Fraction::Orc) ? m_mapUnitTexturesOrc : m_mapUnitTexturesHuman;
@@ -973,6 +958,14 @@ Sprite ResourceManager_wartools::getBuildingSprite(Building* pBuilding, Fraction
 		pTexture = &texMap[type][color]; // ?! todo: activeTextMap anstatt texmap
 	}
 
+	if (!pTexture || !*pTexture) {
+		std::cerr << "Missing building texture for type " << type.name()
+			<< ", faction " << static_cast<int>(fraction)
+			<< ", color " << static_cast<int>(color)
+			<< "; using placeholder sprite" << std::endl;
+		return getUISprite("orc//cursors//red_crosshairs.png");
+	}
+
 
 
 	// Get side length for building (e.g., 64, 96, 128, ...)
@@ -988,6 +981,38 @@ Sprite ResourceManager_wartools::getBuildingSprite(Building* pBuilding, Fraction
 	}
 
 	return Sprite(pTexture, rect);
+}
+
+Sprite ResourceManager_wartools::getBuildingPlacementSprite(PeasantActions action, Fraction fraction,
+	PlayerColor color) {
+	Texture** texture = nullptr;
+	if (action == PeasantActions::BuildScoutTower) {
+		auto& towers = fraction == Fraction::Orc
+			? m_ActiveSeasonScoutTowerTexturesOrc : m_ActiveSeasonScoutTowerTexturesHuman;
+		if (towers.contains(ScoutTower::UpgradeLevel::ScoutTower) &&
+			towers[ScoutTower::UpgradeLevel::ScoutTower].contains(color))
+			texture = &towers[ScoutTower::UpgradeLevel::ScoutTower][color];
+	}
+	else if (action == PeasantActions::BuildTownhall) {
+		auto& halls = fraction == Fraction::Orc
+			? m_ActiveSeasonTownhallOrc : m_ActiveSeasonTownhallHuman;
+		if (halls.contains(Townhall::UpgradeLevel::Townhall) &&
+			halls[Townhall::UpgradeLevel::Townhall].contains(color))
+			texture = &halls[Townhall::UpgradeLevel::Townhall][color];
+	}
+	else {
+		auto& buildings = fraction == Fraction::Orc
+			? m_ActiveSeasonBuildingsOrc : m_ActiveSeasonBuildingsHuman;
+		const std::type_index type = buildingTypeForAction(action);
+		if (buildings.contains(type) && buildings[type].contains(color))
+			texture = &buildings[type][color];
+	}
+	if (!texture || !*texture)
+		return getUISprite("orc//cursors//red_crosshairs.png");
+	int width = 0;
+	int height = 0;
+	SDL_QueryTexture((*texture)->getSDLTexture(), nullptr, nullptr, &width, &height);
+	return Sprite(texture, {0, 0, width, width});
 }
 
 
@@ -1331,11 +1356,24 @@ void ResourceManager_wartools::readMissiles() {
 }
 
 
-Sprite ResourceManager_wartools::getMissile(MissileType t) {
+Sprite ResourceManager_wartools::getMissile(MissileType t, Direction direction) {
 	assert(m_mapMissiles.contains(t));
-
-	Rect dummy = { 0,0,32,32 };
-	return Sprite(&m_mapMissiles.at(t), dummy);
+	Texture* texture = m_mapMissiles.at(t);
+	const int frameWidth = texture->getWidth() / 5;
+	const int frameHeight = std::min(frameWidth, texture->getHeight());
+	int frame = 0;
+	bool flipped = false;
+	switch (direction) {
+	case Direction::N:  frame = 0; break;
+	case Direction::NE: frame = 1; break;
+	case Direction::E:  frame = 2; break;
+	case Direction::SE: frame = 3; break;
+	case Direction::S:  frame = 4; break;
+	case Direction::SW: frame = 3; flipped = true; break;
+	case Direction::W:  frame = 2; flipped = true; break;
+	case Direction::NW: frame = 1; flipped = true; break;
+	}
+	return Sprite(&m_mapMissiles.at(t), {frame * frameWidth, 0, frameWidth, frameHeight}, flipped);
 }
 
 
@@ -1405,30 +1443,43 @@ void ResourceManager_wartools::switchBuildingSprites(Season s) {
 	if (s == Season::Wasteland)
 		switchBuildingSprites(Season::Summer);
 
+	// Sprites keep Texture** pointers to entries in these active maps. Replacing
+	// an entire unordered_map destroys its nodes and leaves every existing
+	// building with dangling pointers. Update values in place so their addresses
+	// remain stable across season changes.
+	auto updateColors = [](auto& target, const auto& source) {
+		for (const auto& [color, texture] : source)
+			target[color] = texture;
+	};
+	auto updateUpgradeLevels = [&updateColors](auto& target, const auto& source) {
+		for (const auto& [level, colors] : source)
+			updateColors(target[level], colors);
+	};
+
 	for (const auto& [buildingType, seasonMap] : m_mapBuildingTexturesHuman) {
 		if (seasonMap.contains(s))
-			m_ActiveSeasonBuildingsHuman[buildingType] = seasonMap.at(s);
+			updateColors(m_ActiveSeasonBuildingsHuman[buildingType], seasonMap.at(s));
 	}
 
 	for (const auto& [buildingType, seasonMap] : m_mapBuildingTexturesOrc) {
 		if (seasonMap.contains(s))
-			m_ActiveSeasonBuildingsOrc[buildingType] = seasonMap.at(s);
+			updateColors(m_ActiveSeasonBuildingsOrc[buildingType], seasonMap.at(s));
 	}
 
 
 	// Townhall and ScoutTower are special, as 3 different *.pngs map to the same typeid -> Townhall and ScoutTower
 	// Thus, they have different structured maps.
 	if (m_mapTownhallTexturesHuman.contains(s))
-		m_ActiveSeasonTownhallHuman = m_mapTownhallTexturesHuman.at(s);
+		updateUpgradeLevels(m_ActiveSeasonTownhallHuman, m_mapTownhallTexturesHuman.at(s));
 
 	if (m_mapTownhallTexturesOrc.contains(s))
-		m_ActiveSeasonTownhallOrc = m_mapTownhallTexturesOrc.at(s);
+		updateUpgradeLevels(m_ActiveSeasonTownhallOrc, m_mapTownhallTexturesOrc.at(s));
 
 	if (m_mapScoutTowerTexturesHuman.contains(s))
-		m_ActiveSeasonScoutTowerTexturesHuman = m_mapScoutTowerTexturesHuman.at(s);
+		updateUpgradeLevels(m_ActiveSeasonScoutTowerTexturesHuman, m_mapScoutTowerTexturesHuman.at(s));
 
 	if (m_mapScoutTowerTexturesOrc.contains(s))
-		m_ActiveSeasonScoutTowerTexturesOrc = m_mapScoutTowerTexturesOrc.at(s);
+		updateUpgradeLevels(m_ActiveSeasonScoutTowerTexturesOrc, m_mapScoutTowerTexturesOrc.at(s));
 }
 
 

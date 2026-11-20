@@ -291,7 +291,8 @@ void SpellExecutor::handleEvent(const Event& event) {
 
 
 void SpellExecutor::setMap(Map* pMap) {
-    m_pMap = pMap;
+	vecRunes.clear();
+	m_pMap = pMap;
 }
 
 SpellExecutor gSpellExecutor;

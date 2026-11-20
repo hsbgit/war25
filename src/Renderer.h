@@ -32,15 +32,14 @@ public:
     void renderTexture(const SDL_Point &pos, const Texture *t) ;
     void drawRect(const SDL_Rect& rect, int r, int g, int b) ;
     void drawFilledRect(const SDL_Rect &rect, int r, int g, int b, int a) ;
+	void drawFogQuad(const SDL_Rect& rect, const Uint8 cornerAlpha[4]);
 
     inline void clear() {
         SDL_SetRenderDrawColor(m_pRenderer, 0,0,0,0);
         SDL_RenderClear(m_pRenderer);
     }
 
-    inline void present() {
-        SDL_RenderPresent(m_pRenderer);
-    }
+	void present();
 
     inline SDL_Renderer* SDLRenderer() {
         return m_pRenderer;
@@ -49,6 +48,9 @@ public:
     inline void renderSprite(const SDL_Point& pos, const Sprite& sprite) {
         renderSprite(pos, &sprite);
     }
+
+    void renderTintedSprite(const SDL_Point& pos, const Sprite& sprite,
+                            Uint8 r, Uint8 g, Uint8 b, Uint8 alpha);
 
     inline void renderSprite(const SDL_Point& pos, const Sprite* pSprite) {
         SDL_Rect src = {pSprite->getOffsetTextureX(), pSprite->getOffsetTextureY(), pSprite->getWidth(), pSprite->getHeight()}; // Rect inside the Sprite's texture (may be the complete Texture)

@@ -87,7 +87,12 @@ std::size_t iSelected = 0;
 // Main code
 int main(int, char**)
 {
-    if(SDL_Init(SDL_INIT_EVERYTHING) != 0)
+    // Joystick, haptic and sensor subsystems are not used and may require
+    // unavailable udev permissions in containers. Initialize only what the
+    // game actually needs.
+    constexpr Uint32 sdlSubsystems = SDL_INIT_VIDEO | SDL_INIT_AUDIO |
+        SDL_INIT_TIMER | SDL_INIT_EVENTS;
+    if(SDL_Init(sdlSubsystems) != 0)
     {
         std::cerr<<"Error: "<< SDL_GetError() << std::endl;
         return -1;
@@ -167,24 +172,32 @@ int main(int, char**)
     while (strPathToPudFile.size()) {
         Game game(window, strPathToPudFile);
 
-        int loops;
-        auto next_game_tick = std::chrono::high_resolution_clock::now();
+        auto previousTime = std::chrono::steady_clock::now();
+        std::chrono::nanoseconds accumulatedTime{0};
+        const auto tickDuration = std::chrono::milliseconds(g_tick_ms);
 
         // Actual main loop
         while (!game.quitRequested()) {
-            loops = 0;
+            // Input and window events are sampled every rendered frame, not only
+            // at 40 Hz. They are queued for the next immutable lockstep frame.
+            game.doEventHandling();
 
-            auto currTime = std::chrono::high_resolution_clock::now();
-            while (currTime > next_game_tick && loops < MAX_FRAMESKIP) {
-                game.doEventHandling();
-                game.doUpdate();
+            const auto now = std::chrono::steady_clock::now();
+            accumulatedTime += now - previousTime;
+            previousTime = now;
 
-                next_game_tick += std::chrono::milliseconds(g_tick_ms);
-                loops++;
+            int processedTicks = 0;
+            while (accumulatedTime >= tickDuration && processedTicks < MAX_FRAMESKIP) {
+                if (!game.doUpdate()) break; // Waiting for a remote command frame.
+                accumulatedTime -= tickDuration;
+                ++processedTicks;
             }
 
-            if (loops >= MAX_FRAMESKIP) {
-                std::cerr << "SKIPPED TOO MANY FRAMES" << std::endl;
+            if (processedTicks == MAX_FRAMESKIP && accumulatedTime >= tickDuration) {
+                // Drop excessive wall-clock debt instead of permanently running
+                // behind. Simulation ticks themselves are never skipped.
+                accumulatedTime = tickDuration;
+                std::cerr << "Simulation could not keep up; timing debt clamped" << std::endl;
             }
 
             game.applyDisplaySettings();
@@ -199,8 +212,14 @@ int main(int, char**)
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
-    SDL_DestroyRenderer(renderer);
+    delete g_pRessourceManager;
+    g_pRessourceManager = nullptr;
+    delete g_pSoundManager;
+    g_pSoundManager = nullptr;
+    delete g_pRenderer;
+    g_pRenderer = nullptr;
     SDL_DestroyWindow(window);
+    IMG_Quit();
     SDL_Quit();
 
     return 0;

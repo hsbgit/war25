@@ -39,16 +39,23 @@ namespace gui {
 		bool needsApplySettings() const { return m_applySettings; }
 		Resolution getSelectedResolution() const { return m_availableResolutions[m_selectedResolutionIndex]; }
 		bool isFullscreenEnabled() const { return m_fullscreenEnabled; }
-		void resetApplyFlag() { m_applySettings = false; }
+		bool isVSyncEnabled() const { return m_vsyncEnabled; }
+		void resetApplyFlag();
 
 	private:
 		void loadAvailableResolutions();
 		void findCurrentResolutionIndex();
+		void discardPendingChanges();
+		bool hasPendingChanges() const;
 
 		SDL_Window* m_window;
 		std::vector<Resolution> m_availableResolutions;
 		int m_selectedResolutionIndex = 0;
 		bool m_fullscreenEnabled = false;
+		bool m_vsyncEnabled = true;
 		bool m_applySettings = false;
+		int m_appliedResolutionIndex = 0;
+		bool m_appliedFullscreen = false;
+		bool m_appliedVSync = true;
 	};
 }

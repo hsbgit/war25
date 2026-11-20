@@ -19,7 +19,7 @@
 #include "EventHandling/State.h"
 
 class Peasant;
-class IResourceAcceptor;
+class Tile;
 
 
 class StateEnterBuildingForDelivery : public State {
@@ -29,8 +29,9 @@ public:
     void onEnter(const Event* pEvent = nullptr) override;
 
     State* process() override;
+    void setResourceAcceptorTile(Tile* tile) { m_pResourceAcceptorTile = tile; }
 
 private:
     int m_deliveryTicks = -1;
-    IResourceAcceptor* m_pResourceAcceptor = nullptr;
+    Tile* m_pResourceAcceptorTile = nullptr;
 };

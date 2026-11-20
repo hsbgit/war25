@@ -17,14 +17,19 @@
 #pragma once
 
 #include "State.h"
+#include "Direction.h"
 
 class StateIdle : public State {
 public:
-    StateIdle(Object* pOwner) : State(pOwner) {
-
-    }
+    explicit StateIdle(Object* pOwner);
 
     void onEnter(const Event* pEvent) override;
     void onExit() override;
     State* process() override;
+	void setFacing(Direction direction) { m_facing = direction; }
+
+private:
+	void scheduleNextTurn();
+	int m_ticksUntilTurn = 0;
+	Direction m_facing = Direction::N;
 };

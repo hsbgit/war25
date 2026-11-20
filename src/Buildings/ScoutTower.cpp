@@ -83,6 +83,12 @@ void ScoutTower::process() {
 
 	// ToDo: Rework following code
 	if (!isBuildingCurrentlyUpgrading() && isArmed()) {
+		// A target is only valid while it remains inside the tower's actual
+		// attack range. Projectiles already in flight may still hit it.
+		if (hasActiveTarget() && !isActiveTargetInRange(this)) {
+			clearActiveTarget();
+			m_tickCnt = 0;
+		}
 		// Redundant Code in ScoutTower and SeaUnit -> Refactoring
 		// alles in armed verschieben?
 		// isAttackInProgress
@@ -113,6 +119,10 @@ void ScoutTower::process() {
 
 
 void ScoutTower::handleEvent(const Event& event) {
+	if (event == BuildingActions::CancelConstruction) {
+		Building::handleEvent(event);
+		return;
+	}
 	EventID eventID = event.getEventID();
 	ProductionItem::ItemType itemType = (ProductionItem::ItemType)eventID;
 	assert(gMapProductionItems.contains(itemType));
@@ -195,5 +205,3 @@ void ScoutTower::setCannonTowerProperties() {
 	setArmedProperties(50, 0, 7, calculateRequiredTicksForGameAction(2000));
 	setName("Cannon Tower");
 }
-
-

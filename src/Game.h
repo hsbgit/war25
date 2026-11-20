@@ -47,7 +47,7 @@ class Game {
 
 public:
     explicit Game(SDL_Window* window, const std::string& strPathToPUDFile);
-    ~Game() = default;
+    ~Game();
 
     // Prevent copying
     Game(const Game&) = delete;
@@ -62,19 +62,23 @@ public:
     }
 
     void doEventHandling();
-    void doUpdate();
+    bool doUpdate();
     void doRendering();
     void applyDisplaySettings();
 
 
 private:
     void debugRenderAStar();
+    void renderBuildingPlacementPreview();
 
     void handleUnitGrouping(const Uint8* keyboardState);
 
     struct InputState {
         bool rectDraggingActive = false;
         SDL_Point leftClickPosition = {0, 0};
+		bool rightDraggingActive = false;
+		bool rightDragMoved = false;
+		SDL_Point rightDragLastPosition = {0, 0};
     } m_inputState;
 
     bool m_quitRequested = false;
@@ -89,18 +93,21 @@ private:
     gui::MenuBarWindow wMenuBar;
     gui::PUDBrowser wPUDBrowser;
     gui::MiniMap* m_pMiniMap = nullptr;
+    Point m_lastMiniMapViewportPosition{-1, -1};
+    bool m_miniMapOverlayDirty = false;
 
     gui::MusicPlayer wMusicPlayer;
     gui::DisplaySettingsWindow wDisplaySettings;
 
-    gui::ObjectInfoWindow m_infoWindow;
     std::set<Object*> m_selectedObjects;
+    gui::ObjectInfoWindow m_infoWindow;
     std::vector<std::set<Object*>> m_savedUserSelections; // m_selectedObjects can be saved with ctrl+1-9 and restored with 1-9
 
 
     struct DebugSettings {
-        bool showDemoWindow = true;
+        bool showDemoWindow = false;
         bool showAnotherWindow = false;
+		bool showMetricsWindow = false;
         ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     } m_debugSettings;
 

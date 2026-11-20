@@ -29,7 +29,8 @@ SoundManager::SoundManager() {
         throw std::logic_error("Error initializing SDL_mixer"); // ToDo: SDL_GetError
     }
 
-    Mix_AllocateChannels(12); // ToDo: 12 Channels might not be available on each PC. Determine this value automatically
+	Mix_AllocateChannels(12); // ToDo: 12 Channels might not be available on each PC. Determine this value automatically
+	Mix_ReserveChannels(1); // Channel 0 is dedicated to non-overlapping selection voices.
 }
 
 
@@ -94,6 +95,41 @@ void SoundManager::playWAV(const std::string& strFileName) {
     catch (std::exception& e) {
         std::cerr << e.what() << std::endl; // Todo: log info that no sufficient channels were available
     }
+}
+
+void SoundManager::playSelectionWAV(const std::string& strFileName) {
+	try {
+		playSelectionWAVInternal(strFileName);
+	}
+	catch (std::exception& e) {
+		std::cerr << e.what() << std::endl;
+	}
+}
+
+void SoundManager::playSelectionWAV(const Object* pObj, const std::string& strFileName) {
+	try {
+		const int channel = playSelectionWAVInternal(strFileName);
+		if (channel >= 0 && !gViewport.isObjectVisible(pObj))
+			reduceVolume(channel);
+	}
+	catch (std::exception& e) {
+		std::cerr << e.what() << std::endl;
+	}
+}
+
+int SoundManager::playSelectionWAVInternal(const std::string& strFileName) {
+	if (Mix_Playing(0))
+		return -1;
+	if (!m_sounds.contains(strFileName)) {
+		const std::string path = strFolderPrefix + strFileName;
+		m_sounds.emplace(strFileName, Sound(path));
+		std::cerr << "LOADING SOUND: " << path << std::endl;
+	}
+	const int channel = Mix_PlayChannel(0, m_sounds.at(strFileName).getSample(), 0);
+	if (channel == -1)
+		throw std::runtime_error("Mix_PlayChannel error");
+	Mix_Volume(channel, MIX_MAX_VOLUME);
+	return channel;
 }
 
 

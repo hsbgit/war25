@@ -19,6 +19,7 @@
 #include "Global/GlobalAttributes.h"
 #include "Units/LandUnits/Peasant/Peasant.h"
 #include "Resources/resourcemanager_wartools.h"
+#include <algorithm>
 #include <cassert>
 
 
@@ -39,19 +40,24 @@ void GoldMine::die() {
 	for (auto it = m_mapWorkers.begin(); it != m_mapWorkers.end(); ) {
 		Peasant* pPeasant = dynamic_cast<Peasant*>(it->first);
 
-		// Todo: what if this fails? same situation as when finishing a construction (buiding complete)
-		bool success = placePeasant(pPeasant, false);
-		assert(success);
-		++it;
+		if (placePeasant(pPeasant, false))
+			it = m_mapWorkers.erase(it);
+		else
+			++it;
 	}
 
-	m_mapWorkers.clear();
+	// Never remove the mine while it still owns workers hidden from the map.
+	if (!m_mapWorkers.empty())
+		return;
+
 	Object::die();
 }
 
 
 bool GoldMine::placePeasant(Peasant* pPeasant, bool withGold) {
 	Tile* pFreeTileNextToGoldMine = Object::m_pMap->getFreeTileAroundBuilding(this, pPeasant);
+	if (!pFreeTileNextToGoldMine)
+		pFreeTileNextToGoldMine = Object::m_pMap->getNextFreeTile(getTile(), Object::m_pMap->sideLength());
 
 	if (!pFreeTileNextToGoldMine)
 		return false;
@@ -59,7 +65,7 @@ bool GoldMine::placePeasant(Peasant* pPeasant, bool withGold) {
 	assert(pFreeTileNextToGoldMine->getSeaOrLandUnit() == nullptr);
 
 	if (withGold) {
-		m_availableRes -= Resources(100);
+		m_availableRes -= Resources(std::min(100, m_availableRes.gold()));
 		dynamic_cast<Peasant*>(pPeasant)->setCarriedResource(ResourceType::Gold);
 	}
 
@@ -71,10 +77,6 @@ bool GoldMine::placePeasant(Peasant* pPeasant, bool withGold) {
 void GoldMine::process() {
 	Building::process();
 
-	if (m_availableRes.gold() == 0)
-		return;
-
-
 	for (auto it = m_mapWorkers.begin(); it != m_mapWorkers.end(); ) {
 		auto& remainingTicks = it->second;
 
@@ -84,15 +86,12 @@ void GoldMine::process() {
 
 		if (remainingTicks == 0) {
 			Peasant* pPeasant = dynamic_cast<Peasant*>(it->first);
-			bool success = placePeasant(pPeasant, true);
+			const bool hasGold = m_availableRes.gold() > 0;
+			bool success = placePeasant(pPeasant, hasGold);
 
 			if (success) {
 				it = m_mapWorkers.erase(it);
 
-				if (m_availableRes.gold() == 0) {
-					die();
-					break;
-				}
 				continue;
 			}
 		}
@@ -102,11 +101,15 @@ void GoldMine::process() {
 
 	if (!m_mapWorkers.size())
 		switchImage(false);
+
+	if (m_availableRes.gold() <= 0)
+		die();
 }
 
 
 bool GoldMine::enter(IResourceCollector* pPeasant) {
-	if (m_mapWorkers.size() > 4)
+	if (!pPeasant || isDead() || m_availableRes.gold() <= 0 ||
+		m_mapWorkers.size() >= MaxWorkers || m_mapWorkers.contains(pPeasant))
 		return false;
 
 	// Switch light on, at least one Peasant is working

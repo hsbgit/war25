@@ -23,18 +23,21 @@ Copyright (C) 2024 P. Last
 class Object;
 // Forward-Decl reicht für den Header:
 enum class Fraction;
+enum class PeasantActions;
 
 namespace gui {
 
 	class ObjectInfoWindow : public ImGuiWindow {
 	public:
-		explicit ObjectInfoWindow(const std::set<Object*>& selectedObjects)
+		explicit ObjectInfoWindow(std::set<Object*>& selectedObjects)
 			: m_selectedObjects(selectedObjects) {}
 
 		void onLeftClicked(const Point& tile_world);
 		void onRightClicked(const Point& tile_world);
+		void close();
 
 		inline bool isActionButtonActive() const { return m_selectedAction != kNoAction; }
+		bool getSelectedBuildingAction(PeasantActions& action) const;
 
 		void draw() override;
 
@@ -49,6 +52,7 @@ namespace gui {
 		void renderBuildingInfo();
 		void renderBuildingProgressIndicatorAndEvents();
 		void renderActions();
+		void resetActionMenu();
 
 		// utils
 		void ensureValidCurrentSelection();
@@ -63,10 +67,13 @@ namespace gui {
 
 	private:
 		static constexpr int kNoAction = -1;
+		enum class ActionMenu { Main, BasicBuildings, AdvancedBuildings };
 
 		int     m_selectedAction = kNoAction;
+		ActionMenu m_actionMenu = ActionMenu::Main;
+		Object* m_pActionMenuObject = nullptr;
 		Object* m_pCurrSelectedObject = nullptr;
-		const std::set<Object*>& m_selectedObjects;
+		std::set<Object*>& m_selectedObjects;
 
 		std::chrono::steady_clock::time_point m_lastAcknowledgeTs{};
 	};

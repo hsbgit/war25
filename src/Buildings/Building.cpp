@@ -40,7 +40,7 @@ Building::Building(Peasant* pErecter, Map* pMap, int constructionTime_s, int hea
 
 	m_sprite = g_pRessourceManager->getBuildingConstructionSprite(1);
 
-	int r = PseudoRandom::rnd(1, 3);
+	int r = PseudoRandom::cosmeticRnd(1, 3);
 	setDyingSound("misc/building_explosion/" + std::to_string(r) + ".wav");
 }
 
@@ -48,7 +48,7 @@ Building::Building(Peasant* pErecter, Map* pMap, int constructionTime_s, int hea
 Building::Building(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, int sight, int armor) : Object(pOwner, pMap, healthPointsMax, armor, sight), BuildingEventProcessor(this, fraction, pMap), m_currState(Building::BuildingState::Constructed), m_sprite(g_pRessourceManager->getUISprite("orc//cursors//red_crosshairs.png")) {
 	m_fraction = fraction;
 
-	int r = PseudoRandom::rnd(1, 3);
+	int r = PseudoRandom::cosmeticRnd(1, 3);
 	setDyingSound("misc/building_explosion/" + std::to_string(r) + ".wav");
 }
 
@@ -177,23 +177,49 @@ void Building::onConstructionFinished() {
 		assert(pFreeTileNextToBuilding->getSeaOrLandUnit() == nullptr);
 
 		Object::m_pMap->placeUnit(pFreeTileNextToBuilding, m_pErecter);
+		m_pErecter = nullptr;
 	}
+}
+
+bool Building::releaseErecter() {
+	if (!m_pErecter)
+		return true;
+	Tile* freeTile = Object::m_pMap->getFreeTileAroundBuilding(this, m_pErecter);
+	if (!freeTile)
+		return false;
+	Object::m_pMap->placeUnit(freeTile, m_pErecter);
+	m_pErecter = nullptr;
+	return true;
+}
+
+void Building::handleEvent(const Event& event) {
+	if (event == BuildingActions::CancelConstruction && isUnderConstruction()) {
+		if (releaseErecter())
+			die();
+		else
+			g_pSoundManager->playErrorWAV();
+		return;
+	}
+	BuildingEventProcessor::handleEvent(event);
 }
 
 
 void Building::playSoundSelected() {
 	if (isUnderConstruction())
-		g_pSoundManager->playWAV(this, "misc/building_construction.wav");
+		g_pSoundManager->playSelectionWAV(this, "misc/building_construction.wav");
 	else if (m_strSoundSelected.size()) {
-		g_pSoundManager->playWAV(m_strSoundSelected);
+		g_pSoundManager->playSelectionWAV(m_strSoundSelected);
 	}
 }
 
 
 
 std::vector<Action> Building::getActions() const {
-	if (isUnderConstruction())
-		return std::vector<Action>();
+	if (isUnderConstruction()) {
+		return {Action(EventProcessor::getID(), static_cast<EventID>(BuildingActions::CancelConstruction),
+			g_pRessourceManager->getIcon(PUD_ICON_CANCEL, getFraction(), getOwner()->getColor()),
+			Action::ActionType::TriggerOnly)};
+	}
 
 	TechnologyManager* pTechManager = getOwner()->getTechnologyCoordinator();
 

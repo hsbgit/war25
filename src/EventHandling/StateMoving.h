@@ -53,7 +53,7 @@ private:
 
     void setDirection(Direction direction);
     bool m_directionChanged = false; // True if the direction changed, e.g., from N to NW. This information is used to load the appropriate Animation
-    Direction m_currentDirection;
+    Direction m_currentDirection = Direction::N;
 
     Path m_path; // Only used if the unit is blocked / the straight way is not working
 

@@ -106,5 +106,9 @@ void Object::notifyAttackersThatImDead() {
 	for (auto& pAttacker : m_vecAttackers) {
 		pAttacker->releaseActiveTarget();
 	}
+	m_vecAttackers.clear();
 }
 
+void Object::unregisterAttacker(IArmed* pAttacker) {
+	std::erase(m_vecAttackers, pAttacker);
+}

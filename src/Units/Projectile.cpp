@@ -17,18 +17,19 @@
 #include "Projectile.h"
 #include "Resources/SoundManager.h"
 #include "Global/Object.h"
-#include "Global/Viewport.h"
 #include "Global/GlobalAttributes.h"
 
+#include <algorithm>
+#include <cmath>
 
-Projectile::Projectile(ResourceManager_wartools::MissileType type, Object* pSource, Map* pMap, Object* pTarget, const Point& spriteOffset_px)
+
+Projectile::Projectile(ResourceManager_wartools::MissileType type, Object* pSource, Map*, Object* pTarget, const Point&)
 	: MapObject(pSource),
 	m_type(type),
 	m_sprite(g_pRessourceManager->getMissile(type)),
 	m_attackerStats(dynamic_cast<IArmed*>(pSource)->getAttackerStats()),
 	m_expired(false) {
 
-	//m_sprite.setOffset(spriteOffset_px);
 	initializeMissile(pSource, pTarget);
 }
 
@@ -48,50 +49,49 @@ void Projectile::initializeMissile(Object* pSource, Object* pTarget) {
 
 	m_attackedID = dynamic_cast<EventProcessor*>(pTarget)->getID();
 
-	auto* pSourceTile = pSource->getTile();
-	auto* pTargetTile = pTarget->getTile();
-
-	if (!pSourceTile || !pTargetTile) {
+	if (!pSource->isPlacedOnMap() || !pTarget->isPlacedOnMap()) {
 		m_expired = true;
 		return;
 	}
 
-	m_originPosition = gViewport.tileToPixel(pSourceTile->getPos());
-	m_targetPosition = gViewport.tileToPixel(pTargetTile->getPos());
+	auto objectCenter = [](Object* object) {
+		const Point& topLeft = object->getTileTopLeft()->getPos();
+		const Point& lowerRight = object->getTileLowerRight()->getPos();
+		return Point{
+			(topLeft.x + lowerRight.x + 1) * Tile::TileWidth_px / 2,
+			(topLeft.y + lowerRight.y + 1) * Tile::TileWidth_px / 2
+		};
+	};
+	const Point sourceCenter = objectCenter(pSource);
+	const Point targetCenter = objectCenter(pTarget);
+	m_sprite = g_pRessourceManager->getMissile(m_type,
+		getTargetCardinalDirection(sourceCenter, targetCenter));
 
+	// Map objects use absolute world pixels. Viewport conversion here made
+	// arrows jump when the camera moved and aimed at the target's top-left.
+	m_originPosition = {sourceCenter.x - m_sprite.getWidth() / 2, sourceCenter.y - m_sprite.getHeight() / 2};
+	m_targetPosition = {targetCenter.x - m_sprite.getWidth() / 2, targetCenter.y - m_sprite.getHeight() / 2};
+	m_startPosition = m_originPosition;
 
-	m_travelDistanceX = std::abs(m_targetPosition.x - m_originPosition.x);
-	m_travelDistanceY = std::abs(m_targetPosition.y - m_originPosition.y);
-
-	m_speedX = 1; // Geschwindigkeit in X-Richtung
-	m_speedY = 1; // Geschwindigkeit in Y-Richtung
-
-	int distance = static_cast<int>(std::sqrt(m_travelDistanceX * m_travelDistanceX + m_travelDistanceY * m_travelDistanceY));
-	if (distance != 0) {
-		m_dx_px = (m_targetPosition.x - m_originPosition.x) * 1000 / distance;
-		m_dy_px = (m_targetPosition.y - m_originPosition.y) * 1000 / distance;
-	}
+	const int deltaX = m_targetPosition.x - m_originPosition.x;
+	const int deltaY = m_targetPosition.y - m_originPosition.y;
+	const int distance = static_cast<int>(std::sqrt(deltaX * deltaX + deltaY * deltaY));
+	const int pixelsPerTick = std::max(1, g_tick_ms);
+	m_totalTravelTicks = std::max(1, (distance + pixelsPerTick - 1) / pixelsPerTick);
 }
 
 
 void Projectile::updatePosition() {
-	int dt_ms = g_tick_ms; // ToDo: Fix? Better?
-	int dt_dist_x_px = (m_speedX * dt_ms * m_dx_px) / 1000;
-	int dt_dist_y_px = (m_speedY * dt_ms * m_dy_px) / 1000;
-
-	m_originPosition.x += dt_dist_x_px;
-	m_originPosition.y += dt_dist_y_px;
-
-	m_travelDistanceX -= std::abs(dt_dist_x_px);
-	m_travelDistanceY -= std::abs(dt_dist_y_px);
-
-	clampToZero(m_travelDistanceX);
-	clampToZero(m_travelDistanceY);
+	m_elapsedTravelTicks = std::min(m_elapsedTravelTicks + 1, m_totalTravelTicks);
+	m_originPosition.x = m_startPosition.x +
+		(m_targetPosition.x - m_startPosition.x) * m_elapsedTravelTicks / m_totalTravelTicks;
+	m_originPosition.y = m_startPosition.y +
+		(m_targetPosition.y - m_startPosition.y) * m_elapsedTravelTicks / m_totalTravelTicks;
 }
 
 
 void Projectile::checkCollision() {
-	if (m_travelDistanceX == 0 && m_travelDistanceY == 0) {
+	if (m_elapsedTravelTicks >= m_totalTravelTicks) {
 		handleCollision();
 		m_expired = true;
 	}

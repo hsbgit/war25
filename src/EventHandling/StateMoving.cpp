@@ -25,6 +25,8 @@
 #include "Map/AStar.h"
 #include "Map/Tile.h"
 #include "Map/Map.h"
+#include "EventHandling/StateIdle.h"
+#include "Global/GlobalAttributes.h"
 
 #include <map>
 #include <iostream>
@@ -32,7 +34,9 @@
 
 
 Tile* StateMoving::isTargetTileANeighbourTile() {
-	auto& neighbourTiles = m_pOwner->getTileTopLeft()->neighbourTiles_SameType;
+	const auto& neighbourTiles = m_pOwner->isAirObject()
+		? m_pOwner->getTileTopLeft()->neighbourTiles
+		: m_pOwner->getTileTopLeft()->neighbourTiles_SameType;
 	auto it = std::find_if(neighbourTiles.begin(), neighbourTiles.end(), [this](const auto& it) {
 		return it.second == m_pTargetTile;
 		});
@@ -58,11 +62,23 @@ Tile* StateMoving::getNextPathTile(bool* pathTemporarilyBlocked) {
 
 	Tile* pNextTile = dynamic_cast<Tile*>(m_path.getFront());
 
-	Object* pBlockingObject = nullptr;
-	if (pNextTile->isBlockedForUnit(m_pOwner, &pBlockingObject)) {
-		if (pBlockingObject && pBlockingObject->isMoving())
-			*pathTemporarilyBlocked = true;
-
+	if (!m_pOwner->getMap()->canBePlacedAtPosition(
+		m_pOwner, pNextTile->getX(), pNextTile->getY())) {
+		// A path can become occupied after A* computed it. Inspect the whole
+		// footprint (air/ships are 2x2), not just its top-left tile.
+		const int tileSize = gMapUnitTilesize.at(typeid(*m_pOwner));
+		for (int y = pNextTile->getY(); y < pNextTile->getY() + tileSize; ++y) {
+			for (int x = pNextTile->getX(); x < pNextTile->getX() + tileSize; ++x) {
+				Tile* tile = m_pOwner->getMap()->getTile({x, y});
+				if (!tile)
+					continue;
+				Object* occupant = m_pOwner->isAirObject()
+					? tile->getAirUnit() : tile->getSeaOrLandUnit();
+				if (occupant && occupant != m_pOwner)
+					*pathTemporarilyBlocked = true;
+			}
+		}
+		m_path.clear();
 		return nullptr;
 	}
 
@@ -83,7 +99,8 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 		if (!m_pOwner->getMap()->canBePlacedAtPosition(m_pOwner, pTargetTile->getX(), pTargetTile->getY()))
 			return nullptr;
 
-		assert(pTargetTile->getSeaOrLandUnit() == nullptr);
+		// canBePlacedAtPosition checks the correct occupancy layer and the full
+		// footprint. Land/sea occupants below an air unit are intentionally valid.
 		setDirection(getTargetCardinalDirection(m_pOwner->getTile(), pTargetTile));
 		return pTargetTile;
 	}
@@ -176,7 +193,9 @@ void StateMoving::setTargetTile(const Point& targetPos_world) {
 void StateMoving::onExit() {
 	// Update animation according to direction
 	Unit* pUnit = dynamic_cast<Unit*>(m_pOwner);
-	pUnit->setIdleAnimation();
+	pUnit->setIdleAnimation(m_currentDirection);
+	if (auto* idle = dynamic_cast<StateIdle*>(pUnit->m_pIdle))
+		idle->setFacing(m_currentDirection);
 	pUnit->clearTilePositionOffset();
 
 	m_pNextTileToMove = nullptr;
@@ -188,7 +207,6 @@ void StateMoving::onExit() {
 }
 
 
-#include "Global/GlobalAttributes.h"
 StateMoving::StateMoving(Object* pOwner) : State(pOwner) {
 	m_ticksPerStep = calculateRequiredTicksForGameAction(250);
 }
@@ -232,7 +250,8 @@ State* StateMoving::process() {
 					std::cerr << "DEBUG: Simple avoidance failed, falling back to AStar pathfinding" << std::endl;
 					// Complex situation with multiple air units - use AStar
 					Tile* targetTile = m_pOwner->getMap()->getTile(m_targetPos_world);
-					AStar astar(m_pOwner->getTileTopLeft(), targetTile);
+					const int unitSize = gMapUnitTilesize.at(typeid(*m_pOwner));
+					AStar astar(m_pOwner->getTileTopLeft(), targetTile, unitSize, true);
 					m_path = astar.findPath();
 
 					if (m_path.isValid()) {
@@ -256,7 +275,9 @@ State* StateMoving::process() {
 				std::cerr << "DEBUG: Land/Sea unit blocked, using pathfinding" << std::endl;
 				// Use AStar for land/sea units that have real obstacles
 				Tile* targetTile = m_pOwner->getMap()->getTile(m_targetPos_world);
-				AStar astar(m_pOwner->getTileTopLeft(), targetTile);
+				const int unitSize = gMapUnitTilesize.at(typeid(*m_pOwner));
+				AStar astar(m_pOwner->getTileTopLeft(), targetTile, unitSize,
+					m_pOwner->isAirObject());
 				m_path = astar.findPath();
 
 				if (m_path.isValid()) {
@@ -490,10 +511,4 @@ bool StateMoving::attemptYieldingManeuver() {
 	std::cerr << "DEBUG: No yielding position found" << std::endl;
 	return false; // No free tile found for yielding
 }
-
-
-
-
-
-
 

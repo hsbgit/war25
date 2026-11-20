@@ -60,6 +60,7 @@ public:
 	}
 
 	std::vector<Action> getActions() const override;
+	void handleEvent(const Event& event) override;
 
 
 	inline void setSprite(const Sprite& sprite) {
@@ -93,6 +94,7 @@ protected:
 	virtual void onConstructionFinished();
 
 private:
+	bool releaseErecter();
 	Peasant* m_pErecter = nullptr; // Only set in the ctor with the constructionTime. In this case m_pErector is the Peasant building. He must be placed on the map when the construction is finished, see 'onConstructionFinished()' 
 	void handleBuildProgress();
 	int m_construction_ticksPerHitpoint = -1; // When built: How many ticks are required to add 1 health to the build progress? Only set if required, in the constructor with the peasant
@@ -100,4 +102,3 @@ private:
 
 	std::string m_strSoundSelected;
 };
-

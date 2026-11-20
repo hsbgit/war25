@@ -32,6 +32,7 @@ public:
     ~CompositeStateMining();
 
     void onEnter(const Event* pEvent = nullptr) override;
+	void onExit() override;
 
     State* process() override;
 

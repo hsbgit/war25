@@ -40,10 +40,13 @@ public:
     void playWAV(const Object* pObj, const std::string& strFileName);
     void playWAV(const MapObject* pObj, const std::string& strFileName);
     void playWAV(const std::string& strFileName);
+    void playSelectionWAV(const std::string& strFileName);
+    void playSelectionWAV(const Object* pObj, const std::string& strFileName);
 
 
 private:
     int playWAVInternal(const std::string& strFileName);
+	int playSelectionWAVInternal(const std::string& strFileName);
     void reduceVolume(int channel);
 
     std::unordered_map<std::string, Sound> m_sounds;

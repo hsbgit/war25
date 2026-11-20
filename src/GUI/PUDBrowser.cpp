@@ -64,8 +64,10 @@ namespace gui {
     }
 
 
-    void PUDBrowser::draw() {
-        ImGui::Begin("PUDBrowser");
+	void PUDBrowser::draw() {
+		update();
+		ImGui::SetNextWindowSize(ImVec2(530.0f, 700.0f), ImGuiCond_Once);
+		ImGui::Begin("PUDBrowser");
 
         ImGui::InputText("Enter Text to Filter Maps", m_searchText, sizeof(m_searchText));
 

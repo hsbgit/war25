@@ -37,6 +37,8 @@ Viewport::Viewport(int maxMapSideLength_tiles, int windowWidth, int windowHeight
 
 
 void Viewport::updateWindowSize(int windowWidth, int windowHeight) {
+	m_windowWidth_px = windowWidth;
+	m_windowHeight_px = windowHeight;
     m_windowWidth_tiles = windowWidth / Tile::TileWidth_px;
     m_windowHeight_tiles = windowHeight / Tile::TileWidth_px;
 
@@ -46,36 +48,46 @@ void Viewport::updateWindowSize(int windowWidth, int windowHeight) {
     if(windowHeight % Tile::TileWidth_px != 0)
         ++m_windowHeight_tiles;
 
+    const int cameraX = std::clamp(m_viewPos_UL_tile.x * Tile::TileWidth_px + m_viewOffset_px.x,
+        0, std::max(0, m_maxMapSideLength_tiles * Tile::TileWidth_px - m_windowWidth_px));
+    const int cameraY = std::clamp(m_viewPos_UL_tile.y * Tile::TileWidth_px + m_viewOffset_px.y,
+        0, std::max(0, m_maxMapSideLength_tiles * Tile::TileWidth_px - m_windowHeight_px));
+    m_viewPos_UL_tile = {cameraX / Tile::TileWidth_px, cameraY / Tile::TileWidth_px};
+    m_viewOffset_px = {cameraX % Tile::TileWidth_px, cameraY % Tile::TileWidth_px};
     updateMaxViewableTiles();
 }
 
 
 void Viewport::setViewPortPosition(const Point& global_tile) {
-    // Do not change the order of the following code!
-    m_viewPos_UL_tile = global_tile;
-    
-    // So far 'global_tile' is the upper left corner of the viewport
-    // The following codes moves 'global_tile' (= m_viewPos_UL_tile) to the center
-    m_viewPos_UL_tile.x = std::max(0, m_viewPos_UL_tile.x - m_windowWidth_tiles / 2);
-    m_viewPos_UL_tile.y = std::max(0, m_viewPos_UL_tile.y - m_windowHeight_tiles / 2);
+	const int cameraX = std::clamp(global_tile.x * Tile::TileWidth_px - m_windowWidth_px / 2,
+		0, std::max(0, m_maxMapSideLength_tiles * Tile::TileWidth_px - m_windowWidth_px));
+	const int cameraY = std::clamp(global_tile.y * Tile::TileWidth_px - m_windowHeight_px / 2,
+		0, std::max(0, m_maxMapSideLength_tiles * Tile::TileWidth_px - m_windowHeight_px));
+	m_viewPos_UL_tile = {cameraX / Tile::TileWidth_px, cameraY / Tile::TileWidth_px};
+	m_viewOffset_px = {cameraX % Tile::TileWidth_px, cameraY % Tile::TileWidth_px};
     updateMaxViewableTiles();
+}
 
-    // Is our viewport exceeding the right OR buttom borders of the map?
-    // If yes, shift it appropriately to the left OR top!
-    if (m_viewPos_UL_tile.x + m_windowWidth_tiles > m_maxMapSideLength_tiles) {
-        m_viewPos_UL_tile.x = m_maxMapSideLength_tiles - m_windowWidth_tiles;
-    }
+void Viewport::panByTiles(int deltaX, int deltaY) {
+	panByPixels(deltaX * Tile::TileWidth_px, deltaY * Tile::TileWidth_px);
+}
 
-    if (m_viewPos_UL_tile.y + m_windowHeight_tiles > m_maxMapSideLength_tiles) {
-        m_viewPos_UL_tile.y = m_maxMapSideLength_tiles - m_windowHeight_tiles;
-    }
-    
+void Viewport::panByPixels(int deltaX, int deltaY) {
+	const int cameraX = std::clamp(m_viewPos_UL_tile.x * Tile::TileWidth_px + m_viewOffset_px.x + deltaX,
+		0, std::max(0, m_maxMapSideLength_tiles * Tile::TileWidth_px - m_windowWidth_px));
+	const int cameraY = std::clamp(m_viewPos_UL_tile.y * Tile::TileWidth_px + m_viewOffset_px.y + deltaY,
+		0, std::max(0, m_maxMapSideLength_tiles * Tile::TileWidth_px - m_windowHeight_px));
+	m_viewPos_UL_tile = {cameraX / Tile::TileWidth_px, cameraY / Tile::TileWidth_px};
+	m_viewOffset_px = {cameraX % Tile::TileWidth_px, cameraY % Tile::TileWidth_px};
+	updateMaxViewableTiles();
 }
 
 
 void Viewport::updateMaxViewableTiles() {
-    m_maxViewableMapWidth_tiles = std::min(m_viewPos_UL_tile.x + m_windowWidth_tiles, m_maxMapSideLength_tiles);
-    m_maxViewableMapHeight_tiles = std::min(m_viewPos_UL_tile.y + m_windowHeight_tiles, m_maxMapSideLength_tiles);
+    const int visibleWidth = (m_viewOffset_px.x + m_windowWidth_px + Tile::TileWidth_px - 1) / Tile::TileWidth_px;
+    const int visibleHeight = (m_viewOffset_px.y + m_windowHeight_px + Tile::TileWidth_px - 1) / Tile::TileWidth_px;
+    m_maxViewableMapWidth_tiles = std::min(m_viewPos_UL_tile.x + visibleWidth, m_maxMapSideLength_tiles);
+    m_maxViewableMapHeight_tiles = std::min(m_viewPos_UL_tile.y + visibleHeight, m_maxMapSideLength_tiles);
 }
 
 
@@ -86,37 +98,25 @@ bool Viewport::consume(SDL_Event& event) {
     switch (event.key.keysym.sym) {
         case SDLK_LEFT:
         {
-            if(m_viewPos_UL_tile.x > 0) {
-                --m_viewPos_UL_tile.x;
-                updateMaxViewableTiles();
-            }
+			panByTiles(-1, 0);
             break;
         }
 
         case SDLK_RIGHT:
         {
-            if((m_viewPos_UL_tile.x+m_windowWidth_tiles+1) <= m_maxMapSideLength_tiles) {
-                ++m_viewPos_UL_tile.x;
-                updateMaxViewableTiles();
-            }
+			panByTiles(1, 0);
             break;
         }
 
         case SDLK_UP:
         {
-            if(m_viewPos_UL_tile.y > 0) {
-                --m_viewPos_UL_tile.y;
-                updateMaxViewableTiles();
-            }
+			panByTiles(0, -1);
             break;
         }
 
         case SDLK_DOWN:
         {
-            if((m_viewPos_UL_tile.y+m_windowHeight_tiles+1) <= m_maxMapSideLength_tiles) {
-                ++m_viewPos_UL_tile.y;
-                updateMaxViewableTiles();
-            }
+			panByTiles(0, 1);
             break;
         }
 

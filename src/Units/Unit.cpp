@@ -128,8 +128,8 @@ void Unit::doHandleDeath() {
 }
 
 
-void Unit::setIdleAnimation() {
-	m_currentAnimation = g_pRessourceManager->getUnitIdleAnimation(this, Direction::N);
+void Unit::setIdleAnimation(Direction direction) {
+	m_currentAnimation = g_pRessourceManager->getUnitIdleAnimation(this, direction);
 }
 
 
@@ -180,11 +180,11 @@ void Unit::playRandomSound(const std::vector<std::string>& sounds) {
 		return;
 
 	if (sounds.size() == 1) {
-		g_pSoundManager->playWAV(sounds.front());
+		g_pSoundManager->playSelectionWAV(sounds.front());
 	}
 	else {
-		int randomIndex = PseudoRandom::rnd(0, (int)sounds.size() - 1);
-		g_pSoundManager->playWAV(sounds[randomIndex]);
+		int randomIndex = PseudoRandom::cosmeticRnd(0, (int)sounds.size() - 1);
+		g_pSoundManager->playSelectionWAV(sounds[randomIndex]);
 	}
 }
 

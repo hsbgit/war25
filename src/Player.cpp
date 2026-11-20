@@ -18,7 +18,6 @@
 #include "Global/DebugManager.h"
 #include "Global/Object.h"
 #include "Global/TechnologyManager.h"
-#include "Global/GlobalAttributes.h"
 #include <algorithm>
 #include <cassert>
 
@@ -26,9 +25,9 @@
 const Resources Player::m_basicResourceProduction(100, 100, 100);
 
 
-Player::Player(const std::string& name, PlayerColor color,  Fraction fraction, MapInfo* pMapInfo, const Resources& res) : m_name(name), m_color(color), m_fraction(fraction), m_resources(res), m_pTechnologyCoordinator(new TechnologyManager(this)), m_pMapInfo(pMapInfo) {
-    m_updateMapTicks = calculateRequiredTicksForGameAction(500);
-}
+Player::Player(const std::string& name, PlayerColor color, Fraction fraction, MapInfo* pMapInfo, const Resources& res)
+    : m_name(name), m_color(color), m_fraction(fraction), m_resources(res),
+      m_pTechnologyCoordinator(new TechnologyManager(this)), m_pMapInfo(pMapInfo) {}
 
 
 Player::~Player() {
@@ -54,12 +53,10 @@ void Player::process() {
 		pObject->process();
     }
     
-    // Updating visibility costs CPU time...
-    // Further restriction: Only for the player playing! -> exploration map, all other additionally visibility map
-    if (++m_tickCnt == m_updateMapTicks) {
-        m_pMapInfo->updateMapVisibility(m_vecObjects);
-        m_tickCnt = 0;
-    }    
+    // Visibility is simulation state and must follow every lockstep tick. A
+    // half-second cache left moving units revealing the wrong tiles and made
+    // fog depend visibly on the update interval.
+    m_pMapInfo->updateMapVisibility(m_vecObjects);
 }
 
 

@@ -17,23 +17,45 @@
 #pragma once
 
 #include "Map.h"
+#include "Sprite.h"
+#include "EventHandling/EventHandlerID.h"
+#include <algorithm>
+#include <map>
 #include <vector>
 
 
 // Owned by each player
 class MapInfo {
 public:
+	struct RememberedBuilding {
+		EventProcessorID id = 0;
+		Point topLeft{0, 0};
+		int tileSize = 1;
+		Sprite sprite;
+	};
+
     MapInfo(const Map& map);
 
     void updateMapVisibility(const std::vector<Object*>& vecObjects);
 
     double exploredAreaInPercent() const {
-        return (double)m_mapExplored.size() / double(m_map.sideLength() * m_map.sideLength()) * 100.0;
+		std::size_t explored = 0;
+		for (const auto& row : m_mapExplored)
+			explored += static_cast<std::size_t>(std::count(row.begin(), row.end(), true));
+		return static_cast<double>(explored) /
+			static_cast<double>(m_map.sideLength() * m_map.sideLength()) * 100.0;
     }
 
     std::vector<std::vector<bool> > m_mapExplored; // Not explored: Black on screen / minimap
     std::vector<std::vector<bool> > m_mapCurrentlyVisible; // Explored but not visible by any units: fog of war!
 
+	const std::map<EventProcessorID, RememberedBuilding>& rememberedBuildings() const {
+		return m_rememberedBuildings;
+	}
+	bool isAreaCurrentlyVisible(const Point& topLeft, int tileSize) const;
+
 private:
-    const Map& m_map;
+	void updateRememberedBuildings();
+	const Map& m_map;
+	std::map<EventProcessorID, RememberedBuilding> m_rememberedBuildings;
 };

@@ -27,6 +27,8 @@ namespace gui {
 		if (!show_another_window)
 			return;
 
+		update();
+		ImGui::SetNextWindowSize(ImVec2(390.0f, 520.0f), ImGuiCond_Once);
 		ImGui::Begin("Debug Features", &show_another_window);
 		ImGui::Checkbox("Draw tile information", &gDebugManager.m_map_drawTileInformation);
 		if (gDebugManager.m_map_drawTileInformation && m_pTile) {
@@ -50,6 +52,8 @@ namespace gui {
 		}
 		ImGui::Checkbox("Consider exploration", &gDebugManager.m_map_considerExploration);
 		ImGui::Checkbox("Use fog of war", &gDebugManager.m_map_drawFogOfWar);
+		ImGui::Checkbox("Minimap: exploration and fog of war",
+			&gDebugManager.m_minimap_useExplorationAndFogOfWar);
 
 		ImGui::Separator();
 		ImGui::Text("Note: The following options are related to the last AStar execution!");

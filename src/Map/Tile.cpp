@@ -168,18 +168,15 @@ Tile::Tile(int x, int y, std::uint16_t tile_id) {
 
 
 Tile::~Tile() {
-	/*
-	 * Note: Since 'm_vecNeighbourTiles_SameType' is a subset of 'm_vecNeighbourTiles' (contains
-	 * same objects) we only have to delete the 'm_vecNeighbourTiles' vector.
-	 */
-	for (auto& pNeighbour : neighbourTiles) {
-		delete pNeighbour.second; /// !!!
-	}
+	// Neighbour entries are non-owning links to tiles owned by Map. Deleting
+	// them here recursively destroys the graph and causes double frees/stack
+	// overflow when a map is unloaded.
 }
 
 
 void Tile::setSprite(int tile_id) {
 	m_tileSprite = g_pRessourceManager->getTileSprite(tile_id);
+	m_tile_id = static_cast<std::uint16_t>(tile_id);
 }
 
 
@@ -198,6 +195,9 @@ void Tile::destroy() {
 		m_isWall = false;
 		setSprite(ResourceManager_wartools::DestroyedWalls);
 	}
+
+	if (m_pMap)
+		m_pMap->refreshTerrainAround(m_pos_tile);
 }
 
 
@@ -288,27 +288,17 @@ bool Tile::isBlockedForUnit(const Object* pObj, Object** pBlockingObject) const 
 		return (m_pAirUnit && (m_pAirUnit != pObj)) ? true : false;
 	}
 
-	if (m_isCoast) {
-		if (pBlockingObject)
-			*pBlockingObject = m_pUnit; // pBlockingObject may be a nullptr if m_pUnit is a nullptr, which is completely fine
-		return true;
-	}
-
 	assert(pObj->isLandObject() || pObj->isSeaObject());
 
-	// Is already another land unit or sea unit associated to this tile?
-	if (pObj->isLandObject() && isLand()) {
-		if (m_isRocks || m_isWood || m_isWall || (m_pUnit && (m_pUnit != pObj))) {
-			if (pBlockingObject)
-				*pBlockingObject = m_pUnit;
-			return true;
-		}
-	}
-	else if (pObj->isSeaObject() && isSea() && m_pUnit && (m_pUnit != pObj)) {
-		if (pBlockingObject)
-			*pBlockingObject = m_pUnit;
-		return true;
-	}
+	if (pBlockingObject)
+		*pBlockingObject = (m_pUnit != pObj) ? m_pUnit : nullptr;
+
+	if (pObj->isLandObject())
+		return !isLand() || m_isCoast || m_isRocks || m_isWood || m_isWall ||
+			(m_pUnit && m_pUnit != pObj);
+
+	if (pObj->isSeaObject())
+		return !isSea() || m_isCoast || (m_pUnit && m_pUnit != pObj);
 
 	return false;
 }

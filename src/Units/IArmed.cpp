@@ -28,6 +28,10 @@ IArmed::IArmed(int basicDamage, int piercingDamage, int range, int attackCooldow
 	setArmedProperties(basicDamage, piercingDamage, range, attackCooldownTime_ticks, attackHeatupTime_ticks);
 }
 
+IArmed::~IArmed() {
+	clearActiveTarget();
+}
+
 
 void IArmed::setArmedProperties(int basicDamage, int piercingDamage, int range, int attackCooldownTime_ticks, int attackHeatupTime_ticks) {
 	m_basicDamage = basicDamage;
@@ -56,14 +60,26 @@ bool IArmed::hasTargetInRange(Object* pAttacker) const {
 
 
 bool IArmed::hasActiveTarget() const {
-	// Todo: further checks (e.g., target still in range?)
-
 	// An Object that is currently not placed on a map cant be a target (not visible, e.g., ship in oilrig)
 	return (m_pActiveTarget != nullptr && m_pActiveTarget->isPlacedOnMap());
 }
 
+bool IArmed::isActiveTargetInRange(Object* pAttacker) const {
+	if (!hasActiveTarget()) return false;
+	const auto targets = findTargetObject(pAttacker);
+	return targets.contains(m_pActiveTarget);
+}
+
+void IArmed::clearActiveTarget() {
+	if (!m_pActiveTarget) return;
+	m_pActiveTarget->unregisterAttacker(this);
+	m_pActiveTarget = nullptr;
+}
+
 
 void IArmed::setActiveTarget(Object* pActiveTarget) {
+	if (m_pActiveTarget == pActiveTarget) return;
+	clearActiveTarget();
 	m_pActiveTarget = pActiveTarget;
 	m_pActiveTarget->registerAttacker(this); // ToDo: Move to IArmed?
 }

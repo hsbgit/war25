@@ -63,6 +63,8 @@ namespace gui {
 
 
 	void MusicPlayer::draw() {
+		update();
+		ImGui::SetNextWindowSize(ImVec2(530.0f, 240.0f), ImGuiCond_Once);
 		ImGui::Begin("Music Player");
 
 		if (ImGui::BeginListBox("Music Player Listbox", ImVec2(-FLT_MIN, 5 * ImGui::GetTextLineHeightWithSpacing()))) {
@@ -121,7 +123,7 @@ namespace gui {
 			m_musicFinished = false;
 
 			if (m_shuffleActive) {
-				m_current_index = PseudoRandom::rnd(0, (int)m_vecMidiFiles.size() - 1);
+				m_current_index = PseudoRandom::cosmeticRnd(0, (int)m_vecMidiFiles.size() - 1);
 			}
 			else if (++m_current_index == m_vecMidiFiles.size()) {
 				m_current_index = 0;

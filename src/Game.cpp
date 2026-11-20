@@ -31,6 +31,8 @@
 #include "Global/DebugManager.h"
 #include "Map/AStar.h" // Just for debug rendering purposes
 #include "Global/GlobalAttributes.h"
+#include "Global/PseudoRandom.h"
+#include "Global/BuildingPlacement.h"
 #include "Units/Critter.h"
 #include "Buildings/Goldmine.h"
 #include "GUI/MiniMap.h"
@@ -68,6 +70,9 @@ gui::DebugSpellWindow gSpellWindow;
 
 
 Game::Game(SDL_Window* window, const std::string& strPathToPUDFile) : m_window(window), wDisplaySettings(window), m_infoWindow(m_selectedObjects) {
+	// A new map is a new deterministic lockstep session.
+	g_pEventBroker.reset();
+	PseudoRandom::seed(0x57415232u);
     SDL_GetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
     g_pRessourceManager->setCursor(CursorTypes::HumanGauntlet);
 
@@ -77,11 +82,25 @@ Game::Game(SDL_Window* window, const std::string& strPathToPUDFile) : m_window(w
     gViewport = Viewport(pMap->sideLength(), m_windowWidth, m_windowHeight);
     gViewport.setViewPortPosition(pMap->getHumanPlayerStartPosition());
     pMap->renderMiniMapOverlay(&gViewport);
-    m_pMiniMap = new gui::MiniMap(pMap, &gViewport);
+    m_lastMiniMapViewportPosition = gViewport.getCurrentPosition_TL_tile();
+    m_pMiniMap = new gui::MiniMap(pMap, &gViewport, [this](const Point& worldTile) {
+		m_infoWindow.onRightClicked(worldTile);
+	});
 
 
     wPlayer = gui::PlayerStatsWindow(pMap->humanControlledPlayer());
     wMenuBar = gui::MenuBarWindow(pMap->humanControlledPlayer());
+
+	// Give every tool window a stable first position. They remain freely
+	// movable afterwards, but no longer all spawn in ImGui's default center.
+	const int rightColumn = std::max(10, m_windowWidth - 360);
+	wDebug.setPosition({10, 300});
+	wPlayer.setPosition({10, std::max(540, m_windowHeight - 180)});
+	wMusicPlayer.setPosition({410, 30});
+	wPUDBrowser.setPosition({410, 300});
+	m_pMiniMap->setPosition({std::max(10, m_windowWidth - 230), 30});
+	m_infoWindow.setPosition({rightColumn, 300});
+	gSpellWindow.setPosition({rightColumn, std::max(620, m_windowHeight - 300)});
     
     m_savedUserSelections.resize(10);
 
@@ -91,6 +110,15 @@ Game::Game(SDL_Window* window, const std::string& strPathToPUDFile) : m_window(w
 
     // Debug
     pMap->humanControlledPlayer()->addToResources(Resources(99999, 99999, 99999));
+}
+
+Game::~Game() {
+	delete m_pMiniMap;
+	m_pMiniMap = nullptr;
+	delete pMap;
+	pMap = nullptr;
+	gSpellExecutor.setMap(nullptr);
+	gSpellWindow.setMap(nullptr);
 }
 
 
@@ -123,8 +151,6 @@ void Game::handleUnitGrouping(const Uint8* keyboardState) {
 
 
 void Game::doEventHandling() {
-    g_pEventBroker.dispatchEvents();
-
     // Poll and handle events (inputs, window resize, etc.)
     // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
     // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
@@ -142,12 +168,12 @@ void Game::doEventHandling() {
             m_quitRequested = true;
 
   
-        if (event.window.event == SDL_WINDOWEVENT_ENTER) {
+        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_ENTER) {
             g_pRessourceManager->refreshLoadedCursor();
         }
 
         // ToDo: Triggered, but setting cursor does not work?
-        if (event.window.event == SDL_WINDOWEVENT_EXPOSED) {
+        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_EXPOSED) {
     //        g_pRessourceManager->setCursor(CursorTypes::HumanGauntlet);
         }
 
@@ -175,6 +201,18 @@ void Game::doEventHandling() {
         }
 
         if (event.type == SDL_MOUSEMOTION) {
+            if (m_inputState.rightDraggingActive) {
+                const int dx = event.motion.x - m_inputState.rightDragLastPosition.x;
+                const int dy = event.motion.y - m_inputState.rightDragLastPosition.y;
+                m_inputState.rightDragLastPosition = {event.motion.x, event.motion.y};
+                if (dx != 0 || dy != 0) {
+                    // Grab-and-drag semantics: the world follows the mouse.
+                    gViewport.panByPixels(-dx, -dy);
+                    m_inputState.rightDragMoved = true;
+                }
+                continue;
+            }
+
             Point posMouse = { event.motion.x, event.motion.y };
 
             Point tile_world = gViewport.screenToWorld_tile(gViewport.pixelToTile(posMouse));
@@ -187,6 +225,13 @@ void Game::doEventHandling() {
 
         }
 
+		// A drag may end above an ImGui window. Always release our camera
+		// capture there as well, otherwise the next motion would keep panning.
+		if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT &&
+			ImGui::GetIO().WantCaptureMouse) {
+			m_inputState.rightDraggingActive = false;
+		}
+
 
         if (gViewport.consume(event))
             continue;
@@ -198,6 +243,11 @@ void Game::doEventHandling() {
         else {
             // Only called once when clicked
             if (event.type == SDL_MOUSEBUTTONDOWN) {
+                if (event.button.button == SDL_BUTTON_RIGHT && m_selectedObjects.empty()) {
+                    m_inputState.rightDraggingActive = true;
+                    m_inputState.rightDragMoved = false;
+                    m_inputState.rightDragLastPosition = {event.button.x, event.button.y};
+                }
                 if (event.button.button == SDL_BUTTON_LEFT) {
                     Point posClicked = { event.button.x, event.button.y };
                     m_inputState.leftClickPosition = posClicked;
@@ -224,10 +274,13 @@ void Game::doEventHandling() {
                 g_pSoundManager->playWAV("ui/click.wav");
 
                 if (event.button.button == SDL_BUTTON_RIGHT) {
+                    const bool wasCameraDrag = m_inputState.rightDraggingActive && m_inputState.rightDragMoved;
+                    m_inputState.rightDraggingActive = false;
                     Point posClicked = { event.button.x, event.button.y };
                     Point tile_world = gViewport.screenToWorld_tile(gViewport.pixelToTile(posClicked));
-       
-                    m_infoWindow.onRightClicked(tile_world);
+
+                    if (!wasCameraDrag)
+                        m_infoWindow.onRightClicked(tile_world);
                     wDebug.setCurrentTile(pMap->getTile(tile_world));
                 }
 
@@ -272,11 +325,12 @@ void Game::doEventHandling() {
 
                         // ToDo: Bug       
                         // Map may be smaller than the Window/Viewport!
-                        int mapWidth_px = gViewport.getMaxViewableMapWidth_tiles() * Tile::TileWidth_px - 1; // Start counting from 0. Otherwise, e.g., a map with width 32 would result in 32*32 = 1024 viewable pixels. Method pixelToTile would map this to tile 32 instead of 31 -> crash
-                        int mapHeight_px = gViewport.getMaxViewableMapHeight_tiles() * Tile::TileWidth_px - 1;
+                        const Point viewportOrigin = gViewport.getCurrentPosition_TL_tile();
+                        int mapWidth_px = (gViewport.getMaxViewableMapWidth_tiles() - viewportOrigin.x) * Tile::TileWidth_px - 1;
+                        int mapHeight_px = (gViewport.getMaxViewableMapHeight_tiles() - viewportOrigin.y) * Tile::TileWidth_px - 1;
 
-                        points[1].x = std::min(mapWidth_px, w); 
-                        points[1].y = std::min(mapHeight_px, h);
+                        points[1].x = std::clamp(w, 0, mapWidth_px);
+                        points[1].y = std::clamp(h, 0, mapHeight_px);
 
 
                         // Get tiles on screen and convert them to world tiles
@@ -292,6 +346,7 @@ void Game::doEventHandling() {
                             });
 
                         if (userSelection.size()) {
+							m_infoWindow.setVisible(true);
                             // Pressing CTRL keys adds unit the current selection, if any
                             if (m_selectedObjects.size() && (keyboardState[SDL_SCANCODE_LCTRL] || keyboardState[SDL_SCANCODE_RCTRL])) {
                                 if (userSelection.size() == 1 && m_selectedObjects.contains(*userSelection.begin())) {
@@ -315,7 +370,13 @@ void Game::doEventHandling() {
 }
 
 
-void Game::doUpdate() {
+bool Game::doUpdate() {
+    // The local command frame (including an empty one) is now immutable.
+    // With multiple participants this returns false until every peer supplied
+    // the same tick, so simulation can never run ahead of command input.
+    g_pEventBroker.completeLocalFrame();
+    if (!g_pEventBroker.advanceTick()) return false;
+
     auto start = std::chrono::high_resolution_clock::now();
 
     // Remove units from the user selection window that can not be selected (anymore) -> dead units
@@ -335,7 +396,6 @@ void Game::doUpdate() {
     // invalidate the loops iterating over the players object vectors
     pMap->processMapObjects();
     pMap->processPlayers();   
-    pMap->renderMiniMapOverlay(&gViewport); // ToDo: Maybe only each n'th tick?
 
     auto end = std::chrono::high_resolution_clock::now();
     float diff = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
@@ -343,6 +403,8 @@ void Game::doUpdate() {
 
     avg += diff;
     ++cnt;
+    m_miniMapOverlayDirty = true;
+    return true;
 }
 
 
@@ -355,6 +417,17 @@ void Game::doRendering() {
 
     g_pRenderer->clear();
 
+    // The minimap overlay is presentation state. Coalesce multiple catch-up
+    // ticks and rebuild it only when simulation or viewport actually changed.
+    const Point viewportPosition = gViewport.getCurrentPosition_TL_tile();
+    const bool viewportMoved = viewportPosition.x != m_lastMiniMapViewportPosition.x ||
+        viewportPosition.y != m_lastMiniMapViewportPosition.y;
+    if (m_miniMapOverlayDirty || viewportMoved) {
+        pMap->renderMiniMapOverlay(&gViewport);
+        m_lastMiniMapViewportPosition = viewportPosition;
+        m_miniMapOverlayDirty = false;
+    }
+
 
     // Start the Dear ImGui frame
     //ImGui_ImplSDL2Renderer_NewFrame();
@@ -366,7 +439,10 @@ void Game::doRendering() {
 
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
     if (m_debugSettings.showDemoWindow)
+	{
+		ImGui::SetNextWindowPos(ImVec2(1010.0f, 30.0f), ImGuiCond_Once);
         ImGui::ShowDemoWindow(&m_debugSettings.showDemoWindow);
+	}
 
 
     // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
@@ -374,11 +450,13 @@ void Game::doRendering() {
         static float f = 0.0f;
         static int counter = 0;
 
+		ImGui::SetNextWindowPos(ImVec2(10.0f, 30.0f), ImGuiCond_Once);
         ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
         ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
         ImGui::Checkbox("Demo Window", &m_debugSettings.showDemoWindow);      // Edit bools storing our window open/close state
         ImGui::Checkbox("Another Window", &m_debugSettings.showAnotherWindow);
+		ImGui::Checkbox("Metrics Window", &m_debugSettings.showMetricsWindow);
 
         ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
         ImGui::ColorEdit3("clear color", (float*)&m_debugSettings.clearColor); // Edit 3 floats representing a color
@@ -423,7 +501,10 @@ void Game::doRendering() {
     gSpellWindow.draw();
     wDisplaySettings.draw();
 
-    ImGui::ShowMetricsWindow();
+	if (m_debugSettings.showMetricsWindow) {
+		ImGui::SetNextWindowPos(ImVec2(1010.0f, 720.0f), ImGuiCond_Once);
+		ImGui::ShowMetricsWindow(&m_debugSettings.showMetricsWindow);
+	}
 
     // Rendering (ImGui data is afterwards ready to be drawn on top)
     ImGui::Render();
@@ -431,6 +512,7 @@ void Game::doRendering() {
 
 
     pMap->draw(g_pRenderer, &gViewport);
+    renderBuildingPlacementPreview();
 
 
     const std::vector<Runes>& vecRunes = gSpellExecutor.getRunes();
@@ -481,10 +563,47 @@ void Game::doRendering() {
     g_pRenderer->present();
 }
 
+void Game::renderBuildingPlacementPreview() {
+    PeasantActions action;
+    if (!m_infoWindow.getSelectedBuildingAction(action) || ImGui::GetIO().WantCaptureMouse)
+        return;
+
+    int mouseX = 0;
+    int mouseY = 0;
+    SDL_GetMouseState(&mouseX, &mouseY);
+    const Point topLeft = gViewport.screenToWorld_tile(
+        gViewport.pixelToTile({mouseX, mouseY}));
+    const BuildingPlacementResult placement = pMap->validateBuildingPlacement(action, topLeft);
+    if (placement.tileSize <= 0)
+        return;
+
+    Object* selected = m_infoWindow.currentObject();
+    if (!selected || !selected->getOwner())
+        return;
+    const Point screenTile = gViewport.worldToScreen_tile(topLeft);
+    const Point screenPixel = gViewport.tileToPixel(screenTile);
+    const Sprite preview = g_pRessourceManager->getBuildingPlacementSprite(
+        action, selected->getFraction(), selected->getOwner()->getColor());
+    g_pRenderer->renderTintedSprite(screenPixel, preview, 70, 255, 70, 155);
+
+    for (int dy = 0; dy < placement.tileSize; ++dy) {
+        for (int dx = 0; dx < placement.tileSize; ++dx) {
+            const int index = dy * placement.tileSize + dx;
+            const Point tilePixel = gViewport.tileToPixel({screenTile.x + dx, screenTile.y + dy});
+            const Rect rect{tilePixel.x, tilePixel.y, Tile::TileWidth_px, Tile::TileWidth_px};
+            if (!placement.validTiles[index])
+                g_pRenderer->drawFilledRect(rect, 255, 20, 20, 120);
+            else
+                g_pRenderer->drawFilledRect(rect, 20, 255, 20, 35);
+        }
+    }
+}
+
 void Game::applyDisplaySettings() {
     if (wDisplaySettings.needsApplySettings()) {
         auto newRes = wDisplaySettings.getSelectedResolution();
         bool fullscreen = wDisplaySettings.isFullscreenEnabled();
+		bool vsync = wDisplaySettings.isVSyncEnabled();
 
         if (fullscreen) {
             SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -496,6 +615,8 @@ void Game::applyDisplaySettings() {
 
         SDL_GetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
         gViewport.updateWindowSize(m_windowWidth, m_windowHeight);
+		if (SDL_RenderSetVSync(g_pRenderer->accessSDLRenderer(), vsync ? 1 : 0) != 0)
+			SDL_Log("Could not change VSync: %s", SDL_GetError());
 
         wDisplaySettings.resetApplyFlag();
     }

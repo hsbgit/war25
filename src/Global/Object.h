@@ -128,8 +128,10 @@ public:
 
 	// Several attackers might attack an Object at the same time.
 	inline void registerAttacker(IArmed* pAttacker) {
-		m_vecAttackers.push_back(pAttacker);
+		if (std::find(m_vecAttackers.begin(), m_vecAttackers.end(), pAttacker) == m_vecAttackers.end())
+			m_vecAttackers.push_back(pAttacker);
 	}
+	void unregisterAttacker(IArmed* pAttacker);
 
 	// If one attacker kills this object we have to notify all remaining attackers
 	// that their active target is already dead.
@@ -169,6 +171,10 @@ public:
 
 	virtual int getSight() const {
 		return m_sight;
+	}
+
+	int getEffectiveSight() const {
+		return getSight() + m_upgradeStats.additionalSight();
 	}
 
 	// used by Troll Beserker or Paladin healing spell
@@ -282,4 +288,3 @@ private:
 	std::string m_name;
 	std::vector<IArmed*> m_vecAttackers;
 };
-

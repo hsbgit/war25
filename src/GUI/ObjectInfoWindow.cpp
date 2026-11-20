@@ -31,8 +31,11 @@ Copyright (C) 2024 P. Last
 // jetzt wo wir die Typen kennen:
 #include "Global/Action.h"        // Action + Action::ActionType
 #include "Global/Fractions.h"      // enum class Fraction
+#include "Global/BuildingPlacement.h"
+#include "Map/Map.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <string>
 #include <vector>
 
@@ -60,6 +63,7 @@ void ObjectInfoWindow::cycleSelection(int delta) {
     idx = (idx + delta) % size;
     if (idx < 0) idx += size;
     m_pCurrSelectedObject = order[idx];
+    resetActionMenu();
 
     if (m_pCurrSelectedObject) {
         m_pCurrSelectedObject->playSoundSelected();
@@ -76,8 +80,25 @@ void ObjectInfoWindow::onLeftClicked(const Point& tile_world) {
         m_selectedAction = kNoAction;
         return;
     }
+    const auto buildingAction = static_cast<PeasantActions>(action.getEventID());
+    if (isBuildingAction(buildingAction) &&
+        !m_pCurrSelectedObject->getMap()->validateBuildingPlacement(
+            buildingAction, tile_world).allowed) {
+        g_pSoundManager->playWAV("ui/placement_error.wav");
+        return;
+    }
     action.trigger(tile_world);
     m_selectedAction = kNoAction;
+}
+
+bool ObjectInfoWindow::getSelectedBuildingAction(PeasantActions& buildingAction) const {
+    if (!m_pCurrSelectedObject || m_selectedAction == kNoAction)
+        return false;
+    const auto actions = m_pCurrSelectedObject->getActions();
+    if (!isValidActionIndex(m_selectedAction, actions))
+        return false;
+    buildingAction = static_cast<PeasantActions>(actions[m_selectedAction].getEventID());
+    return isBuildingAction(buildingAction);
 }
 
 void ObjectInfoWindow::playAcknowledgeDebounced(std::chrono::milliseconds minInterval) {
@@ -89,7 +110,7 @@ void ObjectInfoWindow::playAcknowledgeDebounced(std::chrono::milliseconds minInt
 }
 
 void ObjectInfoWindow::onRightClicked(const Point& tile_world) {
-    m_selectedAction = kNoAction;
+    resetActionMenu();
     if (m_selectedObjects.empty()) return;
 
     for (Object* o : m_selectedObjects) {
@@ -107,10 +128,17 @@ void ObjectInfoWindow::onRightClicked(const Point& tile_world) {
     playAcknowledgeDebounced(War25::Constants::SOUND_DEBOUNCE_INTERVAL);
 }
 
+void ObjectInfoWindow::close() {
+    m_visible = false;
+    resetActionMenu();
+    m_pCurrSelectedObject = nullptr;
+    m_selectedObjects.clear();
+}
+
 void ObjectInfoWindow::draw() {
     if (!m_visible) return;
 
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) m_selectedAction = kNoAction;
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) resetActionMenu();
     if (ImGui::IsKeyPressed(ImGuiKey_Tab)) {
         if (ImGui::GetIO().KeyShift) cycleSelection(-1);
         else                         cycleSelection(+1);
@@ -119,8 +147,27 @@ void ObjectInfoWindow::draw() {
     if (m_selectedObjects.empty()) return;
     ensureValidCurrentSelection();
     if (!m_pCurrSelectedObject) return;
+    if (m_pActionMenuObject != m_pCurrSelectedObject) resetActionMenu();
 
-    if (!ImGui::Begin("Unit Selection Window")) {
+    const std::string title = m_pCurrSelectedObject->getName() + "###UnitSelectionWindow";
+	update();
+	// Keep the command panel at a stable width, but fit its height to the
+	// selected object's actual information and one/two action rows.
+	ImGui::SetNextWindowSizeConstraints(ImVec2(350.0f, 0.0f), ImVec2(350.0f, FLT_MAX));
+    const bool drawContents = ImGui::Begin(title.c_str(), &m_visible,
+		ImGuiWindowFlags_AlwaysAutoResize);
+    if (!m_visible) {
+        ImGui::End();
+        close();
+        return;
+    }
+    if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        ImGui::End();
+        close();
+        return;
+    }
+    if (!drawContents) {
         ImGui::End();
         return;
     }
@@ -138,6 +185,7 @@ void ObjectInfoWindow::draw() {
         const ImU32 border = (pObj == m_pCurrSelectedObject) ? kIconBorderSelected : kIconBorderUnselected;
         if (renderImageButton(pObj->icon(), ImColor(border))) {
             m_pCurrSelectedObject = pObj;
+			resetActionMenu();
             m_pCurrSelectedObject->onClicked();
         }
         renderProgressBar(pObj->getRelativeHealth());
@@ -176,11 +224,6 @@ void ObjectInfoWindow::draw() {
     renderActions();
     renderBuildingProgressIndicatorAndEvents();
 
-    ImGui::NewLine();
-    if (ImGui::Button("Close")) {
-        m_visible = false;
-        m_selectedAction = kNoAction;
-    }
     ImGui::End();
 }
 
@@ -192,8 +235,35 @@ void ObjectInfoWindow::renderActions() {
     ImGui::Separator();
     ImGui::TextUnformatted("Actions:");
 
+    auto isBasicBuilding = [](EventID id) {
+        const auto action = static_cast<PeasantActions>(id);
+        return action == PeasantActions::BuildTownhall ||
+               action == PeasantActions::BuildFarm ||
+               action == PeasantActions::BuildBarracks ||
+               action == PeasantActions::BuildLumberMill ||
+               action == PeasantActions::BuildBlacksmith ||
+               action == PeasantActions::BuildScoutTower;
+    };
+    auto isBuilding = [](EventID id) {
+        const int value = static_cast<int>(id);
+        return value > static_cast<int>(PeasantActions::BuildBegin) &&
+               value < static_cast<int>(PeasantActions::BuildEnd);
+    };
+
+    std::vector<int> visibleActions;
     for (int i = 0; i < static_cast<int>(actions.size()); ++i) {
-        if (i % kActionsPerRow != 0) ImGui::SameLine();
+        const Action& action = actions[i];
+        const bool building = isBuilding(action.getEventID());
+        if ((m_actionMenu == ActionMenu::Main && !building) ||
+            (m_actionMenu == ActionMenu::BasicBuildings && building && isBasicBuilding(action.getEventID())) ||
+            (m_actionMenu == ActionMenu::AdvancedBuildings && building && !isBasicBuilding(action.getEventID()))) {
+            visibleActions.push_back(i);
+        }
+    }
+
+    int buttonIndex = 0;
+    for (int i : visibleActions) {
+        if (buttonIndex % kActionsPerRow != 0) ImGui::SameLine();
 
         auto& action = actions[i];
         if (action.getActionType() == Action::ActionType::EmptyAction) {
@@ -205,8 +275,19 @@ void ObjectInfoWindow::renderActions() {
         const ImVec4 color = (i == m_selectedAction) ? ImVec4(1, 0, 0, 0.4f) : DefaultButtonColor;
 
         if (renderImageButton(action.icon(), color)) {
-            g_pEventBroker.lockEventProcessor(action.getEventProcessorID());
             g_pSoundManager->playWAV("ui/click.wav");
+
+            if (action.getActionType() == Action::ActionType::SubMenu1 ||
+                action.getActionType() == Action::ActionType::SubMenu2) {
+                m_actionMenu = action.getActionType() == Action::ActionType::SubMenu1
+                    ? ActionMenu::BasicBuildings : ActionMenu::AdvancedBuildings;
+                m_selectedAction = kNoAction;
+                m_pActionMenuObject = m_pCurrSelectedObject;
+                ImGui::PopID();
+                return;
+            }
+
+            g_pEventBroker.lockEventProcessor(action.getEventProcessorID());
 
             const auto* pBuilding = dynamic_cast<const Building*>(m_pCurrSelectedObject);
             if (pBuilding) {
@@ -235,7 +316,29 @@ void ObjectInfoWindow::renderActions() {
         }
 
         ImGui::PopID();
+        ++buttonIndex;
     }
+
+    if (m_actionMenu != ActionMenu::Main) {
+        if (buttonIndex % kActionsPerRow != 0) ImGui::SameLine();
+        ImGui::PushID(0x574332);
+        const Sprite cancelIcon = g_pRessourceManager->getIcon(
+            PUD_ICON_CANCEL, m_pCurrSelectedObject->getFraction(),
+            m_pCurrSelectedObject->getOwner()->getColor());
+        if (renderImageButton(cancelIcon, DefaultButtonColor)) {
+            g_pSoundManager->playWAV("ui/click.wav");
+            resetActionMenu();
+        }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+            ImGui::SetTooltip("Back");
+        ImGui::PopID();
+    }
+}
+
+void ObjectInfoWindow::resetActionMenu() {
+    m_selectedAction = kNoAction;
+    m_actionMenu = ActionMenu::Main;
+    m_pActionMenuObject = m_pCurrSelectedObject;
 }
 
 void ObjectInfoWindow::renderArmedInfo() {
@@ -305,6 +408,7 @@ void ObjectInfoWindow::renderBuildingInfo() {
         const auto gold = static_cast<const IResourceMine*>(pGoldMine)->availableResources().gold();
         static const ImVec4 colorGold(1.0f, 0.84f, 0.0f, 1.0f);
         ImGui::TextColored(colorGold, "Gold left: %d", gold);
+		ImGui::Text("Workers: %zu/%zu", pGoldMine->activeWorkers(), GoldMine::MaxWorkers);
     }
 
     if (const auto* pFarm = dynamic_cast<const Farm*>(m_pCurrSelectedObject)) {

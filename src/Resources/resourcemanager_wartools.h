@@ -198,7 +198,7 @@ public:
 
 
 	enum class MissileType { Arrow, Axe, Cannon, BallistaBolt, CatapultRock };
-	Sprite getMissile(MissileType t);
+	Sprite getMissile(MissileType t, Direction direction = Direction::N);
 
 
 	/*
@@ -350,6 +350,7 @@ private:
 	void switchBuildingSprites(Season season);
 public:
 	Sprite getBuildingSprite(Building* pBuilding, Fraction fraction, PlayerColor color, bool underConstruction = false);
+	Sprite getBuildingPlacementSprite(PeasantActions action, Fraction fraction, PlayerColor color);
 	Sprite getNeutralBuildingSprite(Building* pBuilding, int index = 0);
 private:
 
@@ -391,4 +392,3 @@ private:
 
 
 extern ResourceManager_wartools* g_pRessourceManager;
-

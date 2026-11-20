@@ -2,6 +2,8 @@
 set(GLOBAL_SOURCES
     Action.cpp
     Action.h
+    BuildingPlacement.cpp
+    BuildingPlacement.h
     Constants.h
     DebugManager.cpp
     DebugManager.h

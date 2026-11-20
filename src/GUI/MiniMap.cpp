@@ -24,32 +24,33 @@
 
 
 namespace gui {
-	MiniMap::MiniMap(Map* pMap, Viewport* pViewPort) : ImGuiWindow(), m_pMap(pMap), m_pViewPort(pViewPort), m_width(m_pMap->getMiniMapWithOverlay()->getWidth()), m_height(m_pMap->getMiniMapWithOverlay()->getHeight()) {
-		m_scale_x = (float)m_width / (float)(m_pMap->sideLength() * Tile::TileWidth_px);
-		scale_y = (float)m_height / (float)(m_pMap->sideLength() * Tile::TileWidth_px);
-	}
+	MiniMap::MiniMap(Map* pMap, Viewport* pViewPort, WorldCommandCallback worldCommandCallback)
+		: ImGuiWindow(), m_pMap(pMap), m_pViewPort(pViewPort),
+		  m_width(m_pMap->getMiniMapWithOverlay()->getWidth()),
+		  m_height(m_pMap->getMiniMapWithOverlay()->getHeight()),
+		  m_worldCommandCallback(std::move(worldCommandCallback)) {}
 
 
 	void MiniMap::draw() {
+		update();
 		ImGui::Begin("MiniMap");
 
 		gui::renderImage(m_pMap->getMiniMapWithOverlay());
 
 		ImGuiIO& io = ImGui::GetIO();
-		if (ImGui::IsItemHovered() && io.MouseClicked[0]) {
-			ImVec2 clicked_global = ImGui::GetMousePos();
+		if (ImGui::IsItemHovered() && (io.MouseClicked[0] || io.MouseClicked[1])) {
+			const ImVec2 imageMin = ImGui::GetItemRectMin();
+			const ImVec2 imageSize = ImGui::GetItemRectSize();
+			const ImVec2 mouse = ImGui::GetMousePos();
+			Point worldTile{
+				std::clamp(static_cast<int>((mouse.x - imageMin.x) / imageSize.x * m_pMap->sideLength()), 0, m_pMap->sideLength() - 1),
+				std::clamp(static_cast<int>((mouse.y - imageMin.y) / imageSize.y * m_pMap->sideLength()), 0, m_pMap->sideLength() - 1)
+			};
 
-			// It's a bit hacked:
-			// Header (with bar to grap) has approx. 28 pixels
-			// The side to the left is approx. 10 pixels            
-			Point clicked_local = { (int)clicked_global.x - (int)ImGui::GetWindowPos().x - 10, (int)clicked_global.y - (int)ImGui::GetWindowPos().y - 28 };
-
-			// Scale up
-			clicked_local.x = (int)((float)clicked_local.x / m_scale_x);
-			clicked_local.y = (int)((float)clicked_local.y / scale_y);
-
-			// Convert from [px_world] to [tile_world]                      
-			m_pViewPort->setViewPortPosition(m_pViewPort->pixelToTile(clicked_local));
+			if (io.MouseClicked[0])
+				m_pViewPort->setViewPortPosition(worldTile);
+			else if (m_worldCommandCallback)
+				m_worldCommandCallback(worldTile);
 		}
 
 		ImGui::End();

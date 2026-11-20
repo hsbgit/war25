@@ -37,6 +37,7 @@
 #include "Buildings/MageTower.h"
 #include "Buildings/OilRefinery.h"
 #include "Buildings/OilRig.h"
+#include "Global/BuildingPlacement.h"
 
 #include "Buildings/ScoutTower.h"
 #include "Buildings/Shipyard.h"
@@ -210,6 +211,7 @@ void Map::renderMiniMapOverlay(Viewport* pViewPort) {
 	float realMapLength_px = (float)(m_arrTileMap.size() * Tile::TileWidth_px);
 	float miniMapLength_px = (float)m_pTextureMiniMap->getWidth(); // Or height, does not matter -> is squared
 	float scaleFactor = miniMapLength_px / realMapLength_px;
+	MapInfo* humanMapInfo = humanControlledPlayer()->getMapInfo();
 
 	for (auto& e : m_mapPlayer) {
 		Player* pPlayer = e.second;
@@ -218,6 +220,12 @@ void Map::renderMiniMapOverlay(Viewport* pViewPort) {
 		for (auto& pObject : vecObjects) {
 			if (!pObject->isPlacedOnMap())
 				continue;
+			if (gDebugManager.m_minimap_useExplorationAndFogOfWar) {
+				const Point objectTopLeft = pObject->getTileLocation();
+				const int objectSize = gMapUnitTilesize[typeid(*pObject)];
+				if (!humanMapInfo->isAreaCurrentlyVisible(objectTopLeft, objectSize))
+					continue;
+			}
 
 			Point pos = pObject->getTileLocation();
 			pos.x = (int)(pos.x * Tile::TileWidth_px * scaleFactor);
@@ -233,6 +241,37 @@ void Map::renderMiniMapOverlay(Viewport* pViewPort) {
 			}
 			else {
 				g_pRenderer->drawFilledRect(r, 255, 255, 0, 255);
+			}
+		}
+	}
+
+	// Apply visibility after drawing object markers, so unexplored terrain and
+	// units hidden by fog cannot leak information through the minimap.
+	if (gDebugManager.m_minimap_useExplorationAndFogOfWar) {
+		const auto& explored = humanMapInfo->m_mapExplored;
+		const auto& visible = humanMapInfo->m_mapCurrentlyVisible;
+		const int miniSize = m_pTextureMiniMap->getWidth();
+		const int mapSize = sideLength();
+		for (int y = 0; y < mapSize; ++y) {
+			int x = 0;
+			while (x < mapSize) {
+				if (visible[y][x]) {
+					++x;
+					continue;
+				}
+				const bool runExplored = explored[y][x];
+				const int runStart = x;
+				while (x < mapSize && !visible[y][x] && explored[y][x] == runExplored)
+					++x;
+				const int x0 = runStart * miniSize / mapSize;
+				const int y0 = y * miniSize / mapSize;
+				const int x1 = x * miniSize / mapSize;
+				const int y1 = (y + 1) * miniSize / mapSize;
+				const Rect runRect{x0, y0, std::max(1, x1 - x0), std::max(1, y1 - y0)};
+				if (!runExplored)
+					g_pRenderer->drawFilledRect(runRect, 0, 0, 0, 255);
+				else
+					g_pRenderer->drawFilledRect(runRect, 0, 0, 0, 155);
 			}
 		}
 	}
@@ -332,6 +371,10 @@ Map::Map(const std::string& filename, ResourceManager_wartools* pResManagerWarto
 	Tile::m_pMap = this;
 
 	identifyNeighbourTiles();
+	buildTerrainAutotileRules();
+	for (auto& row : m_arrTileMap)
+		for (Tile* tile : row)
+			if (tile->isWall()) retileWall(tile);
 
 	addPlayersToMap(pPud);
 	addUnitsToMap(pPud);
@@ -401,6 +444,13 @@ Map::Map(const std::string& filename, ResourceManager_wartools* pResManagerWarto
 
 Map::~Map() {
 	m_pResManagerWartools->deregisterSeasonObserver(this);
+	delete m_pTextureMiniMapWithOverlay;
+	delete m_pTextureMiniMap;
+
+	for (MapObject* pObject : m_vecMapObjects) {
+		delete pObject;
+	}
+	m_vecMapObjects.clear();
 
 	for (auto& e : m_mapPlayer) {
 		Player* pPlayer = e.second;
@@ -488,12 +538,9 @@ Object* Map::getObjectOnTile(const Point& tile_world) {
 }
 
 
-// ToDo: Implement for circle
 // ToDo: Cache result? Maybe called several times per frame, by an object, by the minimap, ...
 void Map::getVisibleTiles(Object* pObj, int sightRange, std::vector<Tile*>& vecVisibleTiles) const {
 	assert(pObj->isPlacedOnMap());
-
-	// ToDo: Improve, currently Rectangle shape
 
 	// We have to consider that Object can be a building occupying, e.g., 2x2 Tiles.
 	const Tile* pTileTopLeft = pObj->getTileTopLeft();
@@ -508,11 +555,14 @@ void Map::getVisibleTiles(Object* pObj, int sightRange, std::vector<Tile*>& vecV
 	int posX_lowerRight_tile = std::min(pTileLowerRight->getPos().x + sightRange, sideLength() - 1);
 	int posY_lowerRight_tile = std::min(pTileLowerRight->getPos().y + sightRange, sideLength() - 1);
 
-	// Extract all tiles within the rectangle
-	for (int y = posY_upperLeft_tile; y < posY_lowerRight_tile; ++y) {
-		for (int x = posX_upperLeft_tile; x < posX_lowerRight_tile; ++x) {
-			Tile* pTile = m_arrTileMap[y][x];
-			vecVisibleTiles.push_back(pTile);
+	// Distance to the occupied rectangle gives units a circular sight area and
+	// buildings the same rounded radius around their whole footprint.
+	for (int y = posY_upperLeft_tile; y <= posY_lowerRight_tile; ++y) {
+		for (int x = posX_upperLeft_tile; x <= posX_lowerRight_tile; ++x) {
+			const int dx = std::max({pTileTopLeft->getX() - x, 0, x - pTileLowerRight->getX()});
+			const int dy = std::max({pTileTopLeft->getY() - y, 0, y - pTileLowerRight->getY()});
+			if (dx * dx + dy * dy <= sightRange * sightRange)
+				vecVisibleTiles.push_back(m_arrTileMap[y][x]);
 		}
 	}
 }
@@ -586,6 +636,96 @@ bool Map::isSpaceAvailableForUnit(int tile_y, int tile_x, int unitTileSize, Obje
 	return true;
 }
 
+BuildingPlacementResult Map::validateBuildingPlacement(PeasantActions action, const Point& topLeft,
+                                                        const Object* ignoredObject) const {
+    BuildingPlacementResult result;
+    if (!isBuildingAction(action))
+        return result;
+
+    result.tileSize = buildingTileSizeForAction(action);
+    result.validTiles.assign(result.tileSize * result.tileSize, false);
+    if (topLeft.x < 0 || topLeft.y < 0 ||
+        topLeft.x + result.tileSize > sideLength() ||
+        topLeft.y + result.tileSize > sideLength())
+        return result;
+
+	const bool coastal = isCoastalBuildingAction(action);
+	int coastTiles = 0;
+    bool allTilesValid = true;
+    for (int dy = 0; dy < result.tileSize; ++dy) {
+        for (int dx = 0; dx < result.tileSize; ++dx) {
+            Tile* tile = m_arrTileMap[topLeft.y + dy][topLeft.x + dx];
+            Object* occupant = tile->getSeaOrLandUnit();
+            const bool free = !occupant || occupant == ignoredObject;
+			const bool terrain = coastal
+				? (tile->isSea() || tile->isCoast()) && !tile->isDestroyable()
+				: tile->isLand() && !tile->isDestroyable();
+            const bool valid = free && terrain;
+            result.validTiles[dy * result.tileSize + dx] = valid;
+            allTilesValid = allTilesValid && valid;
+			coastTiles += tile->isCoast() ? 1 : 0;
+        }
+    }
+
+	// Shore buildings consist exclusively of coast/water tiles. Three coast
+	// tiles form the required connection to land; they need not be collinear,
+	// so coastlines turning around a corner remain valid.
+	bool globalRuleValid = !coastal || coastTiles >= 3;
+
+    // The original game reserves water around an oil patch for an oil rig.
+    // The original editor specifies at least four tiles from an oil patch or
+    // platform for shipyards/refineries.
+    if (globalRuleValid && requiresOilPatchDistance(action)) {
+		constexpr int minimumClearTiles = 4;
+        const int buildingRight = topLeft.x + result.tileSize - 1;
+        const int buildingBottom = topLeft.y + result.tileSize - 1;
+        for (const Point& oil : m_oilPatchPositions) {
+            constexpr int oilPatchSize = 3;
+            const int oilRight = oil.x + oilPatchSize - 1;
+            const int oilBottom = oil.y + oilPatchSize - 1;
+            const int dx = std::max({oil.x - buildingRight - 1, topLeft.x - oilRight - 1, 0});
+            const int dy = std::max({oil.y - buildingBottom - 1, topLeft.y - oilBottom - 1, 0});
+            if (std::max(dx, dy) < minimumClearTiles) {
+                globalRuleValid = false;
+                break;
+            }
+        }
+    }
+
+    if (!globalRuleValid)
+        std::fill(result.validTiles.begin(), result.validTiles.end(), false);
+    result.allowed = allTilesValid && globalRuleValid;
+    return result;
+}
+
+Tile* Map::getBuilderApproachTile(PeasantActions action, const Point& topLeft,
+                                  const Object* builder) {
+    const int size = buildingTileSizeForAction(action);
+    Tile* best = nullptr;
+    int bestDistance = sideLength() * 2;
+    const Point builderPos = builder && builder->getTile() ? builder->getTile()->getPos() : topLeft;
+
+    for (int y = topLeft.y - 1; y <= topLeft.y + size; ++y) {
+        for (int x = topLeft.x - 1; x <= topLeft.x + size; ++x) {
+            if (x >= topLeft.x && x < topLeft.x + size &&
+                y >= topLeft.y && y < topLeft.y + size)
+                continue;
+            if (x < 0 || y < 0 || x >= sideLength() || y >= sideLength())
+                continue;
+            Tile* tile = m_arrTileMap[y][x];
+            if (!tile->isLand() || tile->isDestroyable() ||
+                (tile->getSeaOrLandUnit() && tile->getSeaOrLandUnit() != builder))
+                continue;
+            const int distance = std::abs(builderPos.x - x) + std::abs(builderPos.y - y);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = tile;
+            }
+        }
+    }
+    return best;
+}
+
 
 /*
  * Can a specified unit type be placed directly beside our building?
@@ -649,11 +789,6 @@ void Map::placeUnit(int tile_y, int tile_x, Object* pObject) {
 	 */
 	for (auto& pTile : pObject->getOccupiedTiles()) {
 		if (pTile) {  // Safety check for null pointers
-			// Debug output for air units
-			if (pObject->isAirObject()) {
-				std::cerr << "DEBUG: Releasing air unit from tile (" << pTile->getX() << "," << pTile->getY() << ")" << std::endl;
-				std::cerr << "DEBUG: Tile's current air unit: " << pTile->getAirUnit() << ", our object: " << pObject << std::endl;
-			}
 			pTile->release(pObject);
 		}
 	}
@@ -676,12 +811,6 @@ void Map::placeUnit(int tile_y, int tile_x, Object* pObject) {
 		for (int x = tile_x; x < tile_x + tilesize; ++x) {
 			Tile* pTile = m_arrTileMap[y][x];
 			assert(pTile);  // Tile should never be null if bounds checking passed
-
-			// Debug output for air units
-			if (pObject->isAirObject()) {
-				std::cerr << "DEBUG: Assigning air unit to tile (" << x << "," << y << ")" << std::endl;
-				std::cerr << "DEBUG: Tile's current air unit before assign: " << pTile->getAirUnit() << std::endl;
-			}
 
 			pTile->assign(pObject);
 			pObject->getOccupiedTiles().push_back(pTile);
@@ -866,6 +995,191 @@ void Map::identifyNeighbourTiles() {
 	}
 }
 
+std::uint8_t Map::woodNeighbourMask(int x, int y) const {
+	static constexpr int offsets[4][2] = {
+		{0, -1}, {1, 0}, {0, 1}, {-1, 0}
+	};
+	std::uint8_t mask = 0;
+	for (int i = 0; i < 4; ++i) {
+		const int nx = x + offsets[i][0];
+		const int ny = y + offsets[i][1];
+		if (nx >= 0 && ny >= 0 && nx < sideLength() && ny < sideLength() && m_arrTileMap[ny][nx]->isWood())
+			mask |= static_cast<std::uint8_t>(1u << i);
+	}
+	return mask;
+}
+
+std::uint8_t Map::rockNeighbourMask(int x, int y) const {
+	static constexpr int offsets[4][2] = {
+		{0, -1}, {1, 0}, {0, 1}, {-1, 0}
+	};
+	std::uint8_t mask = 0;
+	for (int i = 0; i < 4; ++i) {
+		const int nx = x + offsets[i][0];
+		const int ny = y + offsets[i][1];
+		if (nx >= 0 && ny >= 0 && nx < sideLength() && ny < sideLength() && m_arrTileMap[ny][nx]->isRocks())
+			mask |= static_cast<std::uint8_t>(1u << i);
+	}
+	return mask;
+}
+
+std::uint8_t Map::wallNeighbourMask(int x, int y) const {
+	static constexpr int offsets[4][2] = {
+		{0, -1}, {1, 0}, {0, 1}, {-1, 0}
+	};
+	std::uint8_t mask = 0;
+	for (int i = 0; i < 4; ++i) {
+		const int nx = x + offsets[i][0];
+		const int ny = y + offsets[i][1];
+		if (nx >= 0 && ny >= 0 && nx < sideLength() && ny < sideLength() && m_arrTileMap[ny][nx]->isWall())
+			mask |= static_cast<std::uint8_t>(1u << i);
+	}
+	return mask;
+}
+
+void Map::buildTerrainAutotileRules() {
+	std::map<std::uint8_t, std::map<std::uint16_t, int>> woodVotes;
+	std::map<std::uint8_t, std::map<std::uint16_t, int>> rockVotes;
+	std::array<std::map<std::uint8_t, std::map<std::uint16_t, int>>, 2> wallVotes;
+	for (int y = 0; y < sideLength(); ++y)
+		for (int x = 0; x < sideLength(); ++x) {
+			if (m_arrTileMap[y][x]->isWood())
+				++woodVotes[woodNeighbourMask(x, y)][m_arrTileMap[y][x]->getTileID()];
+			if (m_arrTileMap[y][x]->isRocks())
+				++rockVotes[rockNeighbourMask(x, y)][m_arrTileMap[y][x]->getTileID()];
+			if (m_arrTileMap[y][x]->isWall()) {
+				const std::uint16_t id = m_arrTileMap[y][x]->getTileID();
+				const bool mixedWall = id >= 0x0800 && id <= 0x09d4;
+				if (mixedWall) {
+					const int faction = id >= 0x0900 ? 1 : 0;
+					++wallVotes[faction][wallNeighbourMask(x, y)][id];
+				}
+			}
+		}
+
+	auto selectMostFrequentTile = [](const auto& votes, auto& tilesByMask) {
+		for (const auto& [mask, ids] : votes) {
+			int bestCount = -1;
+			std::uint16_t bestId = 0;
+			for (const auto& [id, count] : ids) {
+				if (count > bestCount) {
+					bestCount = count;
+					bestId = id;
+				}
+			}
+			tilesByMask[mask] = bestId;
+		}
+	};
+	selectMostFrequentTile(woodVotes, m_woodTilesByMask);
+	selectMostFrequentTile(rockVotes, m_rockTilesByMask);
+
+	for (int faction = 0; faction < 2; ++faction) {
+		for (const auto& [mask, ids] : wallVotes[faction]) {
+			int bestCount = -1;
+			for (const auto& [id, count] : ids) {
+				if (count > bestCount) {
+					bestCount = count;
+					m_wallTilesByMask[faction][mask] = id;
+				}
+			}
+		}
+	}
+}
+
+void Map::retileWood(Tile* tile) {
+	if (!tile || !tile->isWood() || m_woodTilesByMask.empty()) return;
+	const std::uint8_t wanted = woodNeighbourMask(tile->getX(), tile->getY());
+	auto exact = m_woodTilesByMask.find(wanted);
+	if (exact != m_woodTilesByMask.end()) {
+		tile->setSprite(exact->second);
+		return;
+	}
+
+	// A freshly cut hole can create a combination not present in the source
+	// map. Use the transition with the smallest neighbour difference.
+	int bestDistance = 5;
+	std::uint16_t bestId = tile->getTileID();
+	for (const auto& [mask, id] : m_woodTilesByMask) {
+		unsigned difference = static_cast<unsigned>(mask ^ wanted);
+		int distance = 0;
+		while (difference) {
+			distance += static_cast<int>(difference & 1u);
+			difference >>= 1u;
+		}
+		if (distance < bestDistance) {
+			bestDistance = distance;
+			bestId = id;
+		}
+	}
+	tile->setSprite(bestId);
+}
+
+void Map::retileRock(Tile* tile) {
+	if (!tile || !tile->isRocks() || m_rockTilesByMask.empty()) return;
+	const std::uint8_t wanted = rockNeighbourMask(tile->getX(), tile->getY());
+	auto exact = m_rockTilesByMask.find(wanted);
+	if (exact != m_rockTilesByMask.end()) {
+		tile->setSprite(exact->second);
+		return;
+	}
+
+	int bestDistance = 5;
+	std::uint16_t bestId = tile->getTileID();
+	for (const auto& [mask, id] : m_rockTilesByMask) {
+		unsigned difference = static_cast<unsigned>(mask ^ wanted);
+		int distance = 0;
+		while (difference) {
+			distance += static_cast<int>(difference & 1u);
+			difference >>= 1u;
+		}
+		if (distance < bestDistance) {
+			bestDistance = distance;
+			bestId = id;
+		}
+	}
+	tile->setSprite(bestId);
+}
+
+void Map::retileWall(Tile* tile) {
+	if (!tile || !tile->isWall()) return;
+	const int x = tile->getX();
+	const int y = tile->getY();
+	auto wallAt = [&](int px, int py) {
+		return px >= 0 && py >= 0 && px < sideLength() && py < sideLength() && m_arrTileMap[py][px]->isWall();
+	};
+	const bool north = wallAt(x, y - 1);
+	const bool east = wallAt(x + 1, y);
+	const bool south = wallAt(x, y + 1);
+	const bool west = wallAt(x - 1, y);
+
+	const std::uint16_t id = tile->getTileID();
+	const std::uint16_t group = id & 0x00f0;
+	const bool orc = (id >= 0x0900 && id <= 0x09d4) || group == 0x00a0 || group == 0x00c0;
+	const std::uint8_t mask = wallNeighbourMask(x, y);
+	if (const auto it = m_wallTilesByMask[orc ? 1 : 0].find(mask);
+		it != m_wallTilesByMask[orc ? 1 : 0].end()) {
+		tile->setSprite(it->second);
+		return;
+	}
+	if ((north || south) && !east && !west)
+		tile->setSprite(orc ? 0x0900 : 0x0800); // vertical run
+	else if ((east || west) && !north && !south)
+		tile->setSprite(orc ? 0x0960 : 0x0860); // horizontal run
+	else if (!north && !east && !south && !west)
+		tile->setSprite(orc ? 0x00a0 : 0x0090); // isolated wall
+}
+
+void Map::refreshTerrainAround(const Point& center) {
+	for (int y = std::max(0, center.y - 1); y <= std::min(sideLength() - 1, center.y + 1); ++y) {
+		for (int x = std::max(0, center.x - 1); x <= std::min(sideLength() - 1, center.x + 1); ++x) {
+			Tile* tile = m_arrTileMap[y][x];
+			if (tile->isWood()) retileWood(tile);
+			if (tile->isRocks()) retileRock(tile);
+			if (tile->isWall()) retileWall(tile);
+		}
+	}
+}
+
 
 void Map::addPlayersToMap(Pud* pPud) {
 	// Neutral player is always existent (Critter, Goldmines, ...)
@@ -973,6 +1287,7 @@ void Map::addUnitsToMap(Pud* pPud) {
 
 
 		case PUD_UNIT_OIL_PATCH:
+			m_oilPatchPositions.push_back({ui.x, ui.y});
 			break;
 
 			// Neutral
@@ -990,10 +1305,12 @@ void Map::addUnitsToMap(Pud* pPud) {
 
 		case PUD_UNIT_HUMAN_OIL_WELL:
 			std::cerr << "oil well " << std::dec << ui.alter << std::endl;
+			m_oilPatchPositions.push_back({ui.x, ui.y});
 			placeUnit(m_arrTileMap[ui.y][ui.x], new OilRig(pOwner, Fraction::Alliance, this));
 			break;
 
 		case PUD_UNIT_ORC_OIL_WELL:
+			m_oilPatchPositions.push_back({ui.x, ui.y});
 			placeUnit(m_arrTileMap[ui.y][ui.x], new OilRig(pOwner, Fraction::Orc, this));
 			break;
 
@@ -1345,39 +1662,10 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 		for (std::size_t x = pViewPort->getCurrentPosition_TL_tile().x; x < pViewPort->getMaxViewableMapWidth_tiles(); ++x) {
 			Tile* pTile = m_arrTileMap[y][x];
 
-			if (gDebugManager.m_map_considerExploration && !mapExplored[y][x]) {
-				Rect r;
-
-				// funktionen zusammenfassen??
-				r.x = pViewPort->tileToPixel(pViewPort->worldToScreen_tile(pTile->getPos())).x;
-				r.y = pViewPort->tileToPixel(pViewPort->worldToScreen_tile(pTile->getPos())).y;
-				r.w = Tile::TileWidth_px;
-				r.h = Tile::TileWidth_px;
-
-				// Black non-transparent filled rectangle
-				pRenderer->drawFilledRect(r, 0, 0, 0, 0);
-				continue;
-			}
-
-
 			Point posLocal_tile = pViewPort->worldToScreen_tile(pTile->getPos());
 
 			if (pTile->getSprite().isValid())
 				pRenderer->renderSprite(pViewPort->tileToPixel(posLocal_tile), pTile->getSprite());
-
-
-			if (gDebugManager.m_map_drawFogOfWar && !mapCurrentlyVisible[y][x]) {
-				Rect r;
-
-				// funktionen zusammenfassen??
-				r.x = pViewPort->tileToPixel(pViewPort->worldToScreen_tile(pTile->getPos())).x;
-				r.y = pViewPort->tileToPixel(pViewPort->worldToScreen_tile(pTile->getPos())).y;
-				r.w = Tile::TileWidth_px;
-				r.h = Tile::TileWidth_px;
-
-				// Gray non-filled rectangle
-				pRenderer->drawRect(r, 127, 127, 127);
-			}
 		}
 	}
 
@@ -1487,8 +1775,17 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 
 		for (auto& unit : pPlayer->getObjects()) {
 			if (pViewPort->isObjectVisible(unit)) {
-				// ToDo: Fuer Gebaeude korrekt implementieren (fuer vector<Pos> abfragem
-				if (!gDebugManager.m_map_considerExploration || mapExplored[unit->getTileLocation().y][unit->getTileLocation().x]) {
+				const Point& location = unit->getTileLocation();
+				bool explored = mapExplored[location.y][location.x];
+				bool visible = mapCurrentlyVisible[location.y][location.x];
+				if (dynamic_cast<Building*>(unit)) {
+					for (Tile* occupied : unit->getOccupiedTiles()) {
+						explored = explored || mapExplored[occupied->getY()][occupied->getX()];
+						visible = visible || mapCurrentlyVisible[occupied->getY()][occupied->getX()];
+					}
+				}
+				if ((!gDebugManager.m_map_considerExploration || explored) &&
+					(!gDebugManager.m_map_drawFogOfWar || visible)) {
 					vecVisibleObjects.push_back(unit);
 
 					//   Point posLocal_tile = pViewPort->worldToScreen_tile(unit->getPos());
@@ -1498,7 +1795,7 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 
 			if (gDebugManager.m_object_drawVisibilityRanges && (pPlayer == pHumanPlayer)) {
 				std::vector<Tile*> vecVisibleTiles;
-				getVisibleTiles(unit, unit->getSight(), vecVisibleTiles);
+				getVisibleTiles(unit, unit->getEffectiveSight(), vecVisibleTiles);
 
 				for (auto& pTile : vecVisibleTiles) {
 					Rect r;
@@ -1639,5 +1936,53 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 		Point posScreen_px = pViewPort->worldToScreen_px(pObject->getPositionWorld_px());
 		pRenderer->renderSprite(posScreen_px, pObject->getSprite());
 	}
-}
 
+	// Buildings remain as their last known image under fog. If they were
+	// destroyed out of sight, MapInfo keeps the snapshot until this area is
+	// actually scouted again.
+	if (gDebugManager.m_map_drawFogOfWar) {
+		for (const auto& [id, remembered] : pHumanPlayer->getMapInfo()->rememberedBuildings()) {
+			if (pHumanPlayer->getMapInfo()->isAreaCurrentlyVisible(remembered.topLeft, remembered.tileSize))
+				continue;
+			const Point screen = pViewPort->tileToPixel(pViewPort->worldToScreen_tile(remembered.topLeft));
+			pRenderer->renderSprite(screen, remembered.sprite);
+		}
+	}
+
+	// Fog is the final map layer so unseen units, animations and map objects
+	// cannot leak through. Corner alpha interpolation produces a feathered,
+	// rounded boundary instead of hard 32-pixel stair steps.
+	if (gDebugManager.m_map_considerExploration || gDebugManager.m_map_drawFogOfWar) {
+		auto cornerAlpha = [&](int vertexX, int vertexY) -> Uint8 {
+			int samples = 0;
+			int alphaSum = 0;
+			for (int y = vertexY - 1; y <= vertexY; ++y) {
+				for (int x = vertexX - 1; x <= vertexX; ++x) {
+					if (x < 0 || y < 0 || x >= sideLength() || y >= sideLength())
+						continue;
+					int alpha = 0;
+					if (gDebugManager.m_map_considerExploration && !mapExplored[y][x])
+						alpha = 255;
+					else if (gDebugManager.m_map_drawFogOfWar && !mapCurrentlyVisible[y][x])
+						alpha = 112;
+					alphaSum += alpha;
+					++samples;
+				}
+			}
+			return samples ? static_cast<Uint8>(alphaSum / samples) : 255;
+		};
+
+		for (int y = pViewPort->getCurrentPosition_TL_tile().y; y < pViewPort->getMaxViewableMapHeight_tiles(); ++y) {
+			for (int x = pViewPort->getCurrentPosition_TL_tile().x; x < pViewPort->getMaxViewableMapWidth_tiles(); ++x) {
+				const Point screen = pViewPort->tileToPixel(pViewPort->worldToScreen_tile({x, y}));
+				const Rect rect{screen.x, screen.y, Tile::TileWidth_px, Tile::TileWidth_px};
+				const Uint8 alpha[4] = {
+					cornerAlpha(x, y), cornerAlpha(x + 1, y),
+					cornerAlpha(x + 1, y + 1), cornerAlpha(x, y + 1)
+				};
+				if (alpha[0] || alpha[1] || alpha[2] || alpha[3])
+					pRenderer->drawFogQuad(rect, alpha);
+			}
+		}
+	}
+}

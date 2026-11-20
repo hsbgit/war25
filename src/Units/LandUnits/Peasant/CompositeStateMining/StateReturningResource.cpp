@@ -18,6 +18,8 @@
 #include "Units/LandUnits/Peasant/Peasant.h"
 #include "Global/Object.h"
 #include "Player.h"
+#include "Buildings/Building.h"
+#include "StateEnterBuildingForDelivery.h"
 #include <climits>
 
 
@@ -28,6 +30,8 @@ StateReturningResource::StateReturningResource(Peasant* pPeasant, State* pIdle) 
 
 
 void StateReturningResource::onEnter(const Event* pEvent) {
+    m_pTileResourceAcceptor = nullptr;
+    m_pApproachTile = nullptr;
     std::vector<Object*> vecObjects = m_pOwner->getOwner()->getObjects();
 
     Tile* pTileNearestResourceAcceptor = nullptr;
@@ -38,7 +42,8 @@ void StateReturningResource::onEnter(const Event* pEvent) {
 
 
         // Todo: there was a bug when pObj was not connected to a tile, meaning pObj->getTile()->getX() caused a crash
-        if (pRA && pRA->acceptsResource(dynamic_cast<IResourceCollector*>(m_pOwner)->currentlyCarrying())) {
+        if (pRA && !pObj->isDead() && pObj->getTile() && m_pOwner->getTile() &&
+            pRA->acceptsResource(dynamic_cast<IResourceCollector*>(m_pOwner)->currentlyCarrying())) {
             int distance = std::abs(m_pOwner->getTile()->getX() - pObj->getTile()->getX()) + std::abs(m_pOwner->getTile()->getY() - pObj->getTile()->getY());
 
             if (distance < minDistance) {
@@ -49,22 +54,49 @@ void StateReturningResource::onEnter(const Event* pEvent) {
     }
 
     if (pTileNearestResourceAcceptor) {
-        m_pTileResourceAcceptor = m_pOwner->getMap()->getNextFreeTile(pTileNearestResourceAcceptor);
+        m_pTileResourceAcceptor = pTileNearestResourceAcceptor;
+        auto* pBuilding = dynamic_cast<Building*>(pTileNearestResourceAcceptor->getSeaOrLandUnit());
+        m_pApproachTile = pBuilding
+            ? m_pOwner->getMap()->getFreeTileAroundBuilding(pBuilding, m_pOwner) : nullptr;
 
-        if (m_pTileResourceAcceptor) {
-            setTargetTile(m_pTileResourceAcceptor->getPos());
+        if (m_pApproachTile) {
+            setTargetTile(m_pApproachTile->getPos());
         }
     }
 }
 
 
 State* StateReturningResource::process() {
-    if (!m_pTileResourceAcceptor)
+    auto* pBuilding = m_pTileResourceAcceptor
+        ? dynamic_cast<Building*>(m_pTileResourceAcceptor->getSeaOrLandUnit()) : nullptr;
+    auto* pAcceptor = dynamic_cast<IResourceAcceptor*>(pBuilding);
+    if (!pBuilding || !pAcceptor || pBuilding->isDead() || pBuilding->getOwner() != m_pOwner->getOwner())
         return m_pIdle;
 
+    bool nextToChosenAcceptor = false;
+    if (m_pOwner->getTile()) {
+        const Point worker = m_pOwner->getTile()->getPos();
+        for (Tile* occupied : pBuilding->getOccupiedTiles()) {
+            if (std::abs(worker.x - occupied->getX()) <= 1 &&
+                std::abs(worker.y - occupied->getY()) <= 1) {
+                nextToChosenAcceptor = true;
+                break;
+            }
+        }
+    }
+    if (nextToChosenAcceptor) {
+        if (m_pDeliveryState)
+            m_pDeliveryState->setResourceAcceptorTile(m_pTileResourceAcceptor);
+        return transitionToNextState();
+    }
 
-    // Todo: check if townhall still exists or if there is any closer townhall which has been built
+    if (!m_pApproachTile ||
+        (m_pApproachTile->getSeaOrLandUnit() && m_pApproachTile->getSeaOrLandUnit() != m_pOwner)) {
+        m_pApproachTile = m_pOwner->getMap()->getFreeTileAroundBuilding(pBuilding, m_pOwner);
+        if (!m_pApproachTile)
+            return this;
+        setTargetTile(m_pApproachTile->getPos());
+    }
 
     return StateMoving::process();
 }
-

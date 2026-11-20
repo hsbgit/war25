@@ -43,9 +43,11 @@ void StateMoveToGoldmine::onEnter(const Event* pEvent) {
     Point goldmine_tile_world = Point{ (int)m_initialEvent.tileX(), (int)m_initialEvent.tileY() };
     Tile* pTile = m_pOwner->getMap()->getTile(goldmine_tile_world);
 
+    m_pGoldMineTile = nullptr;
     m_pNextReachableTile = nullptr;
-    if (pTile->getSeaOrLandUnit() && dynamic_cast<GoldMine*>(pTile->getSeaOrLandUnit())) {
-        m_pNextReachableTile = m_pOwner->getMap()->getNextFreeTile(pTile);
+    if (auto* pGoldMine = dynamic_cast<GoldMine*>(pTile->getSeaOrLandUnit())) {
+        m_pGoldMineTile = pTile;
+        m_pNextReachableTile = m_pOwner->getMap()->getFreeTileAroundBuilding(pGoldMine, m_pOwner);
     }
 
     // We can't start AStar with a destiny tile that is blocked
@@ -56,9 +58,23 @@ void StateMoveToGoldmine::onEnter(const Event* pEvent) {
 
 
 State* StateMoveToGoldmine::process() {
-    // Todo: check if townhall still exists or if there is any closer townhall which has been built
-    if (!m_pNextReachableTile)
+    auto* pGoldMine = m_pGoldMineTile
+        ? dynamic_cast<GoldMine*>(m_pGoldMineTile->getSeaOrLandUnit()) : nullptr;
+    if (!pGoldMine || pGoldMine->availableResources().gold() <= 0 || !m_pOwner->getTile())
         return m_pIdle;
+
+    if (m_pOwner->getMap()->isNextToBuilding<GoldMine>(m_pOwner->getTile()) == pGoldMine)
+        return transitionToNextState();
+
+    // Several workers may initially pick the same perimeter tile. Re-select
+    // one whenever another unit claimed it instead of finishing too early.
+    if (!m_pNextReachableTile ||
+        (m_pNextReachableTile->getSeaOrLandUnit() && m_pNextReachableTile->getSeaOrLandUnit() != m_pOwner)) {
+        m_pNextReachableTile = m_pOwner->getMap()->getFreeTileAroundBuilding(pGoldMine, m_pOwner);
+        if (!m_pNextReachableTile)
+            return this;
+        setTargetTile(m_pNextReachableTile->getPos());
+    }
 
     return StateMoving::process();
 }

@@ -16,7 +16,13 @@
 */
 #pragma once
 
+#include <cstdint>
+
 class PseudoRandom {
 public:
+	// Deterministic stream for all state-changing simulation decisions.
 	static int rnd(int min, int max);
+	// Non-deterministic stream for sounds and other presentation-only choices.
+	static int cosmeticRnd(int min, int max);
+	static void seed(std::uint32_t seed);
 };
