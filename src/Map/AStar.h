@@ -16,13 +16,13 @@
 */
 #pragma once
 
-#include <map>
 #include <vector>
 #include <unordered_set>
 
 #include "Path.h"
 
 class INode;
+class Object;
 
 #ifdef _DEBUG
 extern std::unordered_set<INode*> g_debugSetOpenList;
@@ -34,7 +34,8 @@ extern Path g_debugPath;
 
 class AStar {
 public:
-	AStar(INode* pStartNode, INode* pEndNode, int unitSize = 1, bool airPath = false);
+	AStar(INode* pStartNode, INode* pEndNode, int unitSize = 1,
+		bool airPath = false, Object* movingObject = nullptr);
 
 	// ToDo: What about air? Only air units might block a path
 	Path findPath(); // ToDo: Maybe parameter "bool closest" such that if a tile cannot be reached the next close point is taken
@@ -48,17 +49,16 @@ public:
 	}
 
 private:
-	std::vector<INode*> buildFinalPath(INode* pNode);
-	INode* getNodeWith_fMin();
-	int heuristic(const INode* pNode);
+	int heuristic(const INode* pNode) const;
+	bool canVisit(const INode* from, const INode* to) const;
+	bool isDynamicallyBlocked(const INode* node) const;
 
+	INode* m_pStartNode;
 	INode* m_pEndNode;
 	int m_unitSize;
 	bool m_airPath;
+	Object* m_pMovingObject;
 
-	// Maps f values [key] to appropriate INodes. 
-	// Important that an ordered map is used as the lowest f value is required in 'getNodeWith_fMin', obtained by 'm_mapOpenList_f_values.begin()'
-	std::map<int, std::unordered_set<INode*>> m_mapOpenList_f_values;
 	std::unordered_set<INode*> m_setOpenList;
 	std::unordered_set<INode*> m_setClosedList;
 };

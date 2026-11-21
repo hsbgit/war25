@@ -15,6 +15,7 @@ set(GUI_SOURCES
     MiniMap.h
     MusicPlayer.cpp
     MusicPlayer.h
+    CommandTargeting.h
     ObjectInfoWindow.cpp
     ObjectInfoWindow.h
     PlayerStatsWindow.cpp

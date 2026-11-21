@@ -27,21 +27,25 @@ public:
 
 	INode* getFront() const {
 		assert(isValid());
-		return m_vecPathNodes.front();
+		return m_vecPathNodes[m_nextNode];
 	}
 
 	void popFront() {
 		assert(isValid());
-		m_vecPathNodes.erase(m_vecPathNodes.begin());
+		++m_nextNode;
 	}
 
 	inline bool isValid() const {
-		return m_vecPathNodes.size();
+		return m_nextNode < m_vecPathNodes.size();
 	}
 
 	void clear() {
 		m_vecPathNodes.clear();
+		m_nextNode = 0;
 	}
 
 	bool m_isValid = false;
+
+private:
+	std::size_t m_nextNode = 0;
 };

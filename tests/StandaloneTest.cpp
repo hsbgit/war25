@@ -8,6 +8,8 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
+#include "GUI/CommandTargeting.h"
 
 // Simple Point struct to avoid SDL dependency
 struct SimplePoint {
@@ -291,4 +293,46 @@ TEST_F(War25StandaloneTest, ResourceManagement) {
 
     // Can't afford expensive unit
     EXPECT_FALSE(playerResources.canAfford(100, 0, 0));
+}
+
+TEST_F(War25StandaloneTest, ResourceCommandsPreserveBlockedMineOrTreeTarget) {
+    const SimplePoint requested{10, 12};
+    const std::vector<SimplePoint> formation{{9, 12}, {10, 11}, {11, 12}};
+    std::unordered_set<int> reserved;
+    const SimplePoint destination = gui::chooseCommandDestination(
+        requested, formation, true, 1, 64, reserved,
+        [](const SimplePoint&) { return false; });
+
+    EXPECT_EQ(destination, requested);
+    EXPECT_TRUE(reserved.empty());
+}
+
+TEST_F(War25StandaloneTest, GroupCommandsReserveSeparateFootprints) {
+    const SimplePoint requested{10, 10};
+    const std::vector<SimplePoint> formation{{10, 10}, {11, 10}, {12, 10}};
+    std::unordered_set<int> reserved;
+    const auto canPlace = [](const SimplePoint&) { return true; };
+
+    const SimplePoint first = gui::chooseCommandDestination(
+        requested, formation, false, 1, 64, reserved, canPlace);
+    const SimplePoint second = gui::chooseCommandDestination(
+        requested, formation, false, 1, 64, reserved, canPlace);
+
+    EXPECT_EQ(first, (SimplePoint{10, 10}));
+    EXPECT_EQ(second, (SimplePoint{11, 10}));
+}
+
+TEST_F(War25StandaloneTest, GroupCommandsReserveFullShipFootprints) {
+    const SimplePoint requested{10, 10};
+    const std::vector<SimplePoint> formation{{10, 10}, {11, 10}, {12, 10}};
+    std::unordered_set<int> reserved;
+    const auto canPlace = [](const SimplePoint&) { return true; };
+
+    const SimplePoint first = gui::chooseCommandDestination(
+        requested, formation, false, 2, 64, reserved, canPlace);
+    const SimplePoint second = gui::chooseCommandDestination(
+        requested, formation, false, 2, 64, reserved, canPlace);
+
+    EXPECT_EQ(first, (SimplePoint{10, 10}));
+    EXPECT_EQ(second, (SimplePoint{12, 10}));
 }

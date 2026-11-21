@@ -29,11 +29,6 @@
 #include "Global/GlobalAttributes.h"
 #include "Units/Resource/IResourceCollector.h"
 
-#include <map>
-#include <iostream>
-
-
-
 Tile* StateMoving::isTargetTileANeighbourTile() {
 	const auto& neighbourTiles = m_pOwner->isAirObject()
 		? m_pOwner->getTileTopLeft()->neighbourTiles
@@ -63,42 +58,85 @@ Tile* StateMoving::getNextPathTile(bool* pathTemporarilyBlocked) {
 
 	Tile* pNextTile = dynamic_cast<Tile*>(m_path.getFront());
 
-	if (!m_pOwner->getMap()->canBePlacedAtPosition(
-		m_pOwner, pNextTile->getX(), pNextTile->getY())) {
-		// A path can become occupied after A* computed it. Inspect the whole
-		// footprint (air/ships are 2x2), not just its top-left tile.
-		const int tileSize = gMapUnitTilesize.at(typeid(*m_pOwner));
-		for (int y = pNextTile->getY(); y < pNextTile->getY() + tileSize; ++y) {
-			for (int x = pNextTile->getX(); x < pNextTile->getX() + tileSize; ++x) {
-				Tile* tile = m_pOwner->getMap()->getTile({x, y});
-				if (!tile)
-					continue;
-				Object* occupant = m_pOwner->isAirObject()
-					? tile->getAirUnit() : tile->getSeaOrLandUnit();
-				if (occupant && occupant != m_pOwner)
-					*pathTemporarilyBlocked = true;
+	if (!canMoveTo(pNextTile)) {
+		*pathTemporarilyBlocked = isOccupiedByAnotherUnit(pNextTile);
+		if (*pathTemporarilyBlocked) {
+			// Usually keep the route through a chokepoint. Periodically discard it
+			// so head-on traffic can select a free detour instead of waiting forever.
+			if (++m_blockedPathRetries >= 5) {
+				m_path.clear();
+				m_blockedPathRetries = 0;
 			}
+			m_pathRetryTicks = calculateRequiredTicksForGameAction(100);
+		} else {
+			// Terrain may have changed since the route was calculated.
+			m_path.clear();
 		}
-		m_path.clear();
 		return nullptr;
 	}
 
+	m_blockedPathRetries = 0;
 	setDirection(getTargetCardinalDirection(m_pOwner->getTile(), pNextTile));
 	m_path.popFront();
 	return pNextTile;
+}
+
+bool StateMoving::canMoveTo(const Tile* tile) const {
+	Map* map = m_pOwner->getMap();
+	if (!map->canBePlacedAtPosition(m_pOwner, tile->getX(), tile->getY()))
+		return false;
+	const Tile* current = m_pOwner->getTileTopLeft();
+	if (current->getX() == tile->getX() || current->getY() == tile->getY())
+		return true;
+	// A diagonal move needs clearance at both orthogonal intermediate
+	// positions. This keeps 2x2 ships out of coast corners.
+	return map->canBePlacedAtPosition(m_pOwner, tile->getX(), current->getY()) &&
+		map->canBePlacedAtPosition(m_pOwner, current->getX(), tile->getY());
+}
+
+bool StateMoving::isOccupiedByAnotherUnit(const Tile* topLeft) const {
+	const int footprint = gMapUnitTilesize.at(typeid(*m_pOwner));
+	auto positionIsOccupied = [this, footprint](int topLeftX, int topLeftY) {
+		for (int y = topLeftY; y < topLeftY + footprint; ++y) {
+			for (int x = topLeftX; x < topLeftX + footprint; ++x) {
+			Tile* tile = m_pOwner->getMap()->getTile({x, y});
+			if (!tile) continue;
+			Object* occupant = m_pOwner->isAirObject()
+				? tile->getAirUnit() : tile->getSeaOrLandUnit();
+			if (occupant && occupant != m_pOwner)
+				return true;
+			}
+		}
+		return false;
+	};
+	if (positionIsOccupied(topLeft->getX(), topLeft->getY()))
+		return true;
+	const Tile* current = m_pOwner->getTileTopLeft();
+	if (current->getX() == topLeft->getX() || current->getY() == topLeft->getY())
+		return false;
+	return positionIsOccupied(topLeft->getX(), current->getY()) ||
+		positionIsOccupied(current->getX(), topLeft->getY());
 }
 
 
 Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	assert(pathTemporarilyBlocked);
 	*pathTemporarilyBlocked = false;
+	if (m_pathRetryTicks > 0) {
+		--m_pathRetryTicks;
+		*pathTemporarilyBlocked = true;
+		return nullptr;
+	}
 
 	// Is the next tile the final target tile?
 	Tile* pTargetTile = isTargetTileANeighbourTile();
 	if (pTargetTile) {
-		// Check whether target tile is blocked -> if yes, we stop as we are as closest as possible
-		if (!m_pOwner->getMap()->canBePlacedAtPosition(m_pOwner, pTargetTile->getX(), pTargetTile->getY()))
+		if (!canMoveTo(pTargetTile)) {
+			*pathTemporarilyBlocked = isOccupiedByAnotherUnit(pTargetTile);
+			if (*pathTemporarilyBlocked)
+				m_pathRetryTicks = calculateRequiredTicksForGameAction(100);
 			return nullptr;
+		}
 
 		// canBePlacedAtPosition checks the correct occupancy layer and the full
 		// footprint. Land/sea occupants below an air unit are intentionally valid.
@@ -116,10 +154,11 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	Direction targetDir = getTargetCardinalDirection(currPos_tile, m_targetPos_world);
 
 
-	int unitSize_tile = (m_pOwner->isAirObject() || m_pOwner->isSeaObject()) ? 2 : 1;
+	const int unitSize_tile = gMapUnitTilesize.at(typeid(*m_pOwner));
 
 	auto mapFreeTiles = m_pOwner->getTileTopLeft()->getFreeNeighbourNodes(unitSize_tile, m_pOwner->isAirObject());
-	if (mapFreeTiles.contains(targetDir)) {
+	if (mapFreeTiles.contains(targetDir) &&
+		canMoveTo(dynamic_cast<Tile*>(mapFreeTiles[targetDir]))) {
 		setDirection(targetDir);
 		return dynamic_cast<Tile*>(mapFreeTiles[targetDir]);
 	}
@@ -132,7 +171,7 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	}
 
 	Direction left = static_cast<Direction>(dir);
-	if (mapFreeTiles.contains(left)) {
+	if (mapFreeTiles.contains(left) && canMoveTo(dynamic_cast<Tile*>(mapFreeTiles[left]))) {
 		setDirection(left);
 		return dynamic_cast<Tile*>(mapFreeTiles[left]);
 	}
@@ -144,7 +183,7 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	}
 
 	Direction right = static_cast<Direction>(dir);
-	if (mapFreeTiles.contains(right)) {
+	if (mapFreeTiles.contains(right) && canMoveTo(dynamic_cast<Tile*>(mapFreeTiles[right]))) {
 		setDirection(right);
 		return dynamic_cast<Tile*>(mapFreeTiles[right]);
 	}
@@ -154,14 +193,16 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	assert(!m_path.isValid());  // error if target could not be reached
 	assert(m_pTargetTile);
 
-	AStar a(dynamic_cast<INode*>(m_pOwner->getTileTopLeft()), dynamic_cast<INode*>(m_pTargetTile), unitSize_tile, m_pOwner->isAirObject());
+	AStar a(dynamic_cast<INode*>(m_pOwner->getTileTopLeft()), dynamic_cast<INode*>(m_pTargetTile),
+		unitSize_tile, m_pOwner->isAirObject(), m_pOwner);
 	m_path = a.findPath();
 
 	if (m_path.isValid()) {
 		return getNextPathTile(pathTemporarilyBlocked);
 	}
 
-	// Well, no way/path found
+	// A* treats units as temporary congestion, so failure here means there is
+	// no terrain-valid route to the requested destination.
 	return nullptr;
 }
 
@@ -188,6 +229,9 @@ void StateMoving::onEnter(const Event* pEvent) {
 void StateMoving::setTargetTile(const Point& targetPos_world) {
 	m_targetPos_world = targetPos_world;
 	m_pTargetTile = m_pOwner->getMap()->getTile(m_targetPos_world);
+	m_path.clear();
+	m_pathRetryTicks = 0;
+	m_blockedPathRetries = 0;
 }
 
 
@@ -204,6 +248,7 @@ void StateMoving::onExit() {
 	m_animationNeedsUpdate = true;
 
 	m_path.clear();
+	m_blockedPathRetries = 0;
 
 	State::onExit();
 }
@@ -250,87 +295,8 @@ State* StateMoving::process() {
 				return transitionToNextState();
 		}
 
-		// Double-check: can we actually place the unit at this position?
-		if (!m_pOwner->getMap()->canBePlacedAtPosition(m_pOwner, m_pNextTileToMove->getX(), m_pNextTileToMove->getY())) {
-			if (m_pOwner->isAirObject()) {
-				std::cerr << "DEBUG: Air unit blocked, trying simple avoidance" << std::endl;
-				// Try simple avoidance first
-				Tile* alternativeTile = findAlternativeDirection();
-				if (alternativeTile) {
-					m_pNextTileToMove = alternativeTile;
-					std::cerr << "DEBUG: Found alternative direction to (" << alternativeTile->getX() << "," << alternativeTile->getY() << ")" << std::endl;
-				} else {
-					std::cerr << "DEBUG: Simple avoidance failed, falling back to AStar pathfinding" << std::endl;
-					// Complex situation with multiple air units - use AStar
-					Tile* targetTile = m_pOwner->getMap()->getTile(m_targetPos_world);
-					const int unitSize = gMapUnitTilesize.at(typeid(*m_pOwner));
-					AStar astar(m_pOwner->getTileTopLeft(), targetTile, unitSize, true);
-					m_path = astar.findPath();
-
-					if (m_path.isValid()) {
-						bool pathTemporarilyBlocked;
-						m_pNextTileToMove = getNextPathTile(&pathTemporarilyBlocked);
-						if (!m_pNextTileToMove) {
-							std::cerr << "DEBUG: AStar path temporarily blocked, waiting" << std::endl;
-							return this; // Path blocked, wait
-						}
-					} else {
-						std::cerr << "DEBUG: AStar found no path, stopping all movement" << std::endl;
-						// Clear movement state to stop visual glitch
-						m_pNextTileToMove = nullptr;
-						m_tilePositionOffset_px.x = 0;
-						m_tilePositionOffset_px.y = 0;
-						m_pOwner->setTilePositionOffset(m_tilePositionOffset_px);
-						return this; // No path found, wait
-					}
-				}
-			} else {
-				std::cerr << "DEBUG: Land/Sea unit blocked, using pathfinding" << std::endl;
-				// Use AStar for land/sea units that have real obstacles
-				Tile* targetTile = m_pOwner->getMap()->getTile(m_targetPos_world);
-				const int unitSize = gMapUnitTilesize.at(typeid(*m_pOwner));
-				AStar astar(m_pOwner->getTileTopLeft(), targetTile, unitSize,
-					m_pOwner->isAirObject());
-				m_path = astar.findPath();
-
-				if (m_path.isValid()) {
-					bool pathTemporarilyBlocked;
-					m_pNextTileToMove = getNextPathTile(&pathTemporarilyBlocked);
-					if (!m_pNextTileToMove) {
-						return this; // Path blocked, wait
-					}
-					// Reset failure counter on successful pathfinding
-					m_pathfindingFailureCount = 0;
-				} else {
-					m_pathfindingFailureCount++;
-					std::cerr << "DEBUG: Land/Sea pathfinding failed (" << m_pathfindingFailureCount << "/" << MAX_PATHFINDING_FAILURES << ")" << std::endl;
-
-					if (m_pathfindingFailureCount >= MAX_PATHFINDING_FAILURES) {
-						std::cerr << "DEBUG: Multiple pathfinding failures, attempting yielding maneuver" << std::endl;
-						// Try yielding - temporarily move to a nearby free position to unblock others
-						if (attemptYieldingManeuver()) {
-							m_pathfindingFailureCount = 0; // Reset counter on successful yield
-							return this; // Continue yielding movement
-						}
-					}
-
-					// Clear movement state to stop visual glitch
-					m_pNextTileToMove = nullptr;
-					m_tilePositionOffset_px.x = 0;
-					m_tilePositionOffset_px.y = 0;
-					m_pOwner->setTilePositionOffset(m_tilePositionOffset_px);
-					return this; // No path found, wait
-				}
-			}
-		}
-
 		// Place/block tile in advance
 		m_pOwner->getMap()->placeUnit(m_pNextTileToMove, m_pOwner);
-
-		// Remember this position to prevent ping-pong oscillation
-		if (m_pOwner->isAirObject()) {
-			rememberPosition(m_pNextTileToMove->getPos());
-		}
 
 		m_tilePositionOffset_px.x = -(m_pNextTileToMove->getX() - currPos_tile.x) * Tile::TileWidth_px;
 		m_tilePositionOffset_px.y = -(m_pNextTileToMove->getY() - currPos_tile.y) * Tile::TileWidth_px;
@@ -406,122 +372,4 @@ State* StateMoving::process() {
 	}
 
 	return this;
-}
-
-
-Tile* StateMoving::findAlternativeDirection() {
-	if (!m_pOwner->isAirObject()) {
-		return nullptr; // Only for air units
-	}
-
-	Point currPos = m_pOwner->getTileLocation();
-	Direction targetDir = getTargetCardinalDirection(currPos, m_targetPos_world);
-
-	// Try alternative directions around the blocked direction
-	std::vector<Direction> alternativeDirections;
-
-	// Add adjacent directions to the target direction
-	switch (targetDir) {
-	case Direction::N:
-		alternativeDirections = {Direction::NW, Direction::NE, Direction::W, Direction::E};
-		break;
-	case Direction::S:
-		alternativeDirections = {Direction::SW, Direction::SE, Direction::W, Direction::E};
-		break;
-	case Direction::W:
-		alternativeDirections = {Direction::NW, Direction::SW, Direction::N, Direction::S};
-		break;
-	case Direction::E:
-		alternativeDirections = {Direction::NE, Direction::SE, Direction::N, Direction::S};
-		break;
-	case Direction::NW:
-		alternativeDirections = {Direction::N, Direction::W, Direction::NE, Direction::SW};
-		break;
-	case Direction::NE:
-		alternativeDirections = {Direction::N, Direction::E, Direction::NW, Direction::SE};
-		break;
-	case Direction::SW:
-		alternativeDirections = {Direction::S, Direction::W, Direction::SE, Direction::NW};
-		break;
-	case Direction::SE:
-		alternativeDirections = {Direction::S, Direction::E, Direction::SW, Direction::NE};
-		break;
-	}
-
-	// Try each alternative direction
-	auto mapFreeTiles = m_pOwner->getTileTopLeft()->getFreeNeighbourNodes(2, true); // 2x2 air unit
-	for (Direction dir : alternativeDirections) {
-		if (mapFreeTiles.contains(dir)) {
-			Tile* alternativeTile = static_cast<Tile*>(mapFreeTiles[dir]);
-			Point alternativePos = alternativeTile->getPos();
-
-			// Skip if this position was recently visited (prevent ping-pong)
-			if (isRecentPosition(alternativePos)) {
-				std::cerr << "DEBUG: Skipping recent position (" << alternativePos.x << "," << alternativePos.y << ")" << std::endl;
-				continue;
-			}
-
-			// Double check that we can actually place the unit there
-			if (m_pOwner->getMap()->canBePlacedAtPosition(m_pOwner, alternativeTile->getX(), alternativeTile->getY())) {
-				setDirection(dir);
-				return alternativeTile;
-			}
-		}
-	}
-
-	return nullptr; // No alternative found
-}
-
-
-void StateMoving::rememberPosition(const Point& pos) {
-	// Add position to the front of the list
-	m_recentPositions.insert(m_recentPositions.begin(), pos);
-
-	// Keep only the last MAX_REMEMBERED_POSITIONS
-	if (m_recentPositions.size() > MAX_REMEMBERED_POSITIONS) {
-		m_recentPositions.resize(MAX_REMEMBERED_POSITIONS);
-	}
-}
-
-
-bool StateMoving::isRecentPosition(const Point& pos) {
-	for (const Point& recentPos : m_recentPositions) {
-		if (recentPos.x == pos.x && recentPos.y == pos.y) {
-			return true;
-		}
-	}
-	return false;
-}
-
-
-bool StateMoving::attemptYieldingManeuver() {
-	if (m_pOwner->isAirObject()) {
-		return false; // Only for land units
-	}
-
-	std::cerr << "DEBUG: Attempting yielding maneuver" << std::endl;
-
-	// Find a free neighboring tile to temporarily move to
-	auto mapFreeTiles = m_pOwner->getTileTopLeft()->getFreeNeighbourNodes(1, false); // 1x1 land unit
-
-	for (const auto& [direction, tile] : mapFreeTiles) {
-		Tile* yieldTile = static_cast<Tile*>(tile);
-		Point yieldPos = yieldTile->getPos();
-
-		// Check if we can place the unit there
-		if (m_pOwner->getMap()->canBePlacedAtPosition(m_pOwner, yieldPos.x, yieldPos.y)) {
-			std::cerr << "DEBUG: Yielding to position (" << yieldPos.x << "," << yieldPos.y << ")" << std::endl;
-
-			// Move to yield position
-			m_pNextTileToMove = yieldTile;
-			setDirection(direction);
-
-			// Set a temporary target to return to original goal after yielding
-			// We'll use the yielding as a "stepping stone" towards the original target
-			return true;
-		}
-	}
-
-	std::cerr << "DEBUG: No yielding position found" << std::endl;
-	return false; // No free tile found for yielding
 }

@@ -16,11 +16,14 @@
 */
 #include "AStar.h"
 #include "INode.h"
-#include <cmath>
-#include <cassert>
+#include "Map/Map.h"
+#include "Map/Tile.h"
+#include "Global/Object.h"
+
 #include <algorithm>
-#include <chrono>
-#include <iostream>
+#include <cmath>
+#include <queue>
+#include <unordered_map>
 
 #ifdef _DEBUG
 std::unordered_set<INode*> g_debugSetOpenList;
@@ -28,183 +31,158 @@ std::unordered_set<INode*> g_debugSetClosedList;
 Path g_debugPath;
 #endif
 
+namespace {
+struct QueueEntry {
+	int f;
+	int h;
+	INode* node;
+};
 
-AStar::AStar(INode* pStartNode, INode* pEndNode, int unitSize, bool airPath) : m_pEndNode(pEndNode), m_unitSize(unitSize), m_airPath(airPath) {
-	// ToDo: call/implement for air / land units
-	NeighbourNodes vecNeighourNodes = pStartNode->getFreeNeighbourNodes(m_unitSize, m_airPath);
-
-	for (auto& [direction, pNode] : vecNeighourNodes) {
-		pNode->m_pParentNode = pStartNode;
-		pNode->m_g = (direction == Direction::NW || direction == Direction::NE || direction == Direction::SW || direction == Direction::SE) ? 14 : 10; // rename?   
-		pNode->m_h = heuristic(pNode);
-
-		m_setOpenList.insert(pNode);
-		m_mapOpenList_f_values[pNode->getF()].insert(pNode);
+struct LowestScoreFirst {
+	bool operator()(const QueueEntry& lhs, const QueueEntry& rhs) const {
+		if (lhs.f != rhs.f) return lhs.f > rhs.f;
+		if (lhs.h != rhs.h) return lhs.h > rhs.h;
+		if (lhs.node->getY() != rhs.node->getY())
+			return lhs.node->getY() > rhs.node->getY();
+		return lhs.node->getX() > rhs.node->getX();
 	}
+};
 
-	pStartNode->m_pParentNode = nullptr;
-	m_setClosedList.insert(pStartNode);
+bool isDiagonal(Direction direction) {
+	return direction == Direction::NW || direction == Direction::NE ||
+		direction == Direction::SW || direction == Direction::SE;
+}
 }
 
+AStar::AStar(INode* start, INode* end, int unitSize, bool airPath,
+	Object* movingObject)
+	: m_pStartNode(start), m_pEndNode(end), m_unitSize(unitSize),
+	  m_airPath(airPath), m_pMovingObject(movingObject) {}
 
-int AStar::heuristic(const INode* pNode) {
-	return 10 * (std::abs(pNode->getX() - m_pEndNode->getX()) + std::abs(pNode->getY() - m_pEndNode->getY()));
+int AStar::heuristic(const INode* node) const {
+	// Octile distance is admissible for the 10/14 movement costs and explores
+	// substantially fewer tiles than the old Manhattan estimate with diagonals.
+	const int dx = std::abs(node->getX() - m_pEndNode->getX());
+	const int dy = std::abs(node->getY() - m_pEndNode->getY());
+	return 10 * std::max(dx, dy) + 4 * std::min(dx, dy);
 }
 
+bool AStar::canVisit(const INode* from, const INode* to) const {
+	if (!m_pMovingObject)
+		return true;
+	Map* map = m_pMovingObject->getMap();
+	auto footprintFitsTerrain = [this, map](int topLeftX, int topLeftY) {
+		if (topLeftX < 0 || topLeftY < 0 ||
+			topLeftX + m_unitSize > map->sideLength() ||
+			topLeftY + m_unitSize > map->sideLength())
+			return false;
+		if (m_airPath)
+			return true;
+		for (int y = topLeftY; y < topLeftY + m_unitSize; ++y) {
+			for (int x = topLeftX; x < topLeftX + m_unitSize; ++x) {
+				const Tile* tile = map->getTile({x, y});
+				if (m_pMovingObject->isLandObject()) {
+					if (!tile->isLand() || tile->isCoast() || tile->isRocks() ||
+						tile->isWood() || tile->isWall())
+						return false;
+				} else if (m_pMovingObject->isSeaObject() &&
+					(!tile->isSea() || tile->isCoast())) {
+					return false;
+				}
+			}
+		}
+		return true;
+	};
+	if (!footprintFitsTerrain(to->getX(), to->getY()))
+		return false;
+
+	// Check both orthogonal positions for diagonal movement. This is essential
+	// for 2x2 hulls and also prevents 1x1 land units cutting solid corners.
+	if (from->getX() != to->getX() && from->getY() != to->getY()) {
+		if (!footprintFitsTerrain(to->getX(), from->getY()) ||
+			!footprintFitsTerrain(from->getX(), to->getY()))
+			return false;
+	}
+	return true;
+}
+
+bool AStar::isDynamicallyBlocked(const INode* node) const {
+	if (!m_pMovingObject)
+		return false;
+	Map* map = m_pMovingObject->getMap();
+	for (int y = node->getY(); y < node->getY() + m_unitSize; ++y) {
+		for (int x = node->getX(); x < node->getX() + m_unitSize; ++x) {
+			Tile* tile = map->getTile({x, y});
+			Object* occupant = m_airPath ? tile->getAirUnit() : tile->getSeaOrLandUnit();
+			if (occupant && occupant != m_pMovingObject)
+				return true;
+		}
+	}
+	return false;
+}
 
 Path AStar::findPath() {
-#ifdef _DEBUG
-	auto start = std::chrono::high_resolution_clock::now();
-#endif
+	Path result;
+	if (!m_pStartNode || !m_pEndNode || m_pStartNode == m_pEndNode)
+		return result;
 
-	Path path;
+	std::priority_queue<QueueEntry, std::vector<QueueEntry>, LowestScoreFirst> open;
+	std::unordered_map<INode*, int> scores;
+	std::unordered_map<INode*, INode*> parents;
+	scores[m_pStartNode] = 0;
+	open.push({heuristic(m_pStartNode), heuristic(m_pStartNode), m_pStartNode});
+	m_setOpenList.insert(m_pStartNode);
 
-	while (m_setOpenList.size()) {
-		INode* pNode_fMin = getNodeWith_fMin();
-		NeighbourNodes neighourNodes = pNode_fMin->getFreeNeighbourNodes(m_unitSize, m_airPath);
+	while (!open.empty()) {
+		const QueueEntry entry = open.top();
+		open.pop();
+		INode* current = entry.node;
+		if (m_setClosedList.contains(current))
+			continue; // stale priority-queue entry
+		m_setOpenList.erase(current);
+		m_setClosedList.insert(current);
 
-		// For each of the squares adjacent to this current square:
-		for (auto& [direction, pNode] : neighourNodes) {
-			if (m_setClosedList.contains(pNode)) {
-				// If it is on the closed list, ignore it.
+		if (current == m_pEndNode) {
+			std::vector<INode*> nodes;
+			for (INode* node = current; node != m_pStartNode; node = parents.at(node))
+				nodes.push_back(node);
+			std::reverse(nodes.begin(), nodes.end());
+			result.m_vecPathNodes = std::move(nodes);
+			break;
+		}
+
+		NeighbourNodes availableNeighbours;
+		const NeighbourNodes* neighbours;
+		if (m_pMovingObject) {
+			Tile* tile = static_cast<Tile*>(current);
+			neighbours = m_airPath ? &tile->neighbourTiles : &tile->neighbourTiles_SameType;
+		} else {
+			availableNeighbours = current->getFreeNeighbourNodes(m_unitSize, m_airPath);
+			neighbours = &availableNeighbours;
+		}
+		for (const auto& [direction, neighbour] : *neighbours) {
+			if (m_setClosedList.contains(neighbour) || !canVisit(current, neighbour))
 				continue;
-			}
-
-			int costs = (direction == Direction::NW || direction == Direction::NE || direction == Direction::SW || direction == Direction::SE) ? 14 : 10; // rename?            
-
-			if (m_setOpenList.contains(pNode)) {
-				// If an adjacent square is already on the open list, check to see if this path to
-				// that square is a better one. In other words, check to see if the G score for that
-				// square is lower if we use the current square to get there. If not, don’t do anything.
-				int possibleNewG = pNode_fMin->m_g + costs;
-
-				if (possibleNewG < pNode->m_g) {
-					// Since we change g the sum f will most likely also be changed
-					int old_f = pNode->getF();
-
-					pNode->m_g = possibleNewG;
-					pNode->m_pParentNode = pNode_fMin;
-
-#ifdef _DEBUG
-					if (pNode == pNode_fMin->m_pParentNode && pNode_fMin == pNode->m_pParentNode) {
-						std::cerr << "Got a problem" << std::endl;
-					}
-#endif
-
-					if (old_f != pNode->getF()) {
-						// f changed indeed. Hence we remove this node from its old position within our f map
-						std::unordered_set<INode*>& setNodes = m_mapOpenList_f_values[old_f];
-
-						assert(setNodes.contains(pNode));
-						setNodes.erase(pNode);
-
-						if (!setNodes.size()) {
-							m_mapOpenList_f_values.erase(old_f);
-						}
-
-						// And add it back to its new position
-						m_mapOpenList_f_values[pNode->getF()].insert(pNode);
-					}
-				}
-			}
-			else {
-				pNode->m_pParentNode = pNode_fMin;
-				pNode->m_g = pNode_fMin->m_g + costs;
-				pNode->m_h = heuristic(pNode);
-
-#ifdef _DEBUG
-				if (pNode == pNode_fMin->m_pParentNode && pNode_fMin == pNode->m_pParentNode) {
-					std::cerr << "Got a problem" << std::endl;
-				}
-#endif
-
-				m_setOpenList.insert(pNode);
-				m_mapOpenList_f_values[pNode->getF()].insert(pNode);
-			}
-		}
-
-		// Stop when you: Add the target square to the closed list, in which case the path has been found (see note below), or
-		if (m_setClosedList.contains(m_pEndNode)) {
-			path.m_vecPathNodes = buildFinalPath(m_pEndNode);
-			break;
-		}
-
-		if (!m_setOpenList.size()) {
-			std::cerr << "[Pathfinding] No path found!" << std::endl;
-			// ToDo: return closest tile?
-			// sth. like path.m_vecPathNodes = buildFinalPath(pNode_fMin);  
-			break;
+			// Units are temporary obstacles. A finite penalty prefers a free detour,
+			// while still producing a route through a moving crowd or a chokepoint.
+			const int congestionPenalty = isDynamicallyBlocked(neighbour) ? 40 : 0;
+			const int tentative = scores[current] +
+				(isDiagonal(direction) ? 14 : 10) + congestionPenalty;
+			auto old = scores.find(neighbour);
+			if (old != scores.end() && tentative >= old->second)
+				continue;
+			scores[neighbour] = tentative;
+			parents[neighbour] = current;
+			const int h = heuristic(neighbour);
+			open.push({tentative + h, h, neighbour});
+			m_setOpenList.insert(neighbour);
 		}
 	}
 
 #ifdef _DEBUG
-	auto end = std::chrono::high_resolution_clock::now();
-	float diff = (float)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
 	g_debugSetClosedList = m_setClosedList;
 	g_debugSetOpenList = m_setOpenList;
-	g_debugPath = path;
-
-	std::cerr << "[Pathfinding] Required time to find path: " << diff << "[ms]" << std::endl;
+	g_debugPath = result;
 #endif
-
-	return path;
-}
-
-
-std::vector<INode*> AStar::buildFinalPath(INode* pNode) {
-	std::vector<INode*> vecPath = { pNode };  // Could be a set as a path should contain each tile just once. But as a set is not ordered sequentially the path would get destroyed. In Addition the following std::reverse is not possible on a set
-
-	// Go back from end node to start node
-	INode* pParent = pNode->m_pParentNode;
-
-	// Bug: Endless loop? Appeared when moving a lot of units
-	while (pParent) {
-		if (std::find(vecPath.begin(), vecPath.end(), pParent) != vecPath.end()) {
-			std::cerr << "Got a problem" << std::endl;
-			break;
-		}
-
-		vecPath.push_back(pParent);
-		pParent = pParent->m_pParentNode;
-	}
-
-	// Remove start point ( where the unit is currently standing)
-	vecPath.pop_back();
-
-	// Reverse, to get the right movement ordering from start to end node
-	std::reverse(vecPath.begin(), vecPath.end());
-
-	// Clear parent nodes for next AStar runs
-	for (auto& pNode : m_setOpenList) {
-		pNode->m_pParentNode = nullptr;
-	}
-
-	for (auto& pNode : m_setClosedList) {
-		pNode->m_pParentNode = nullptr;
-	}
-
-	return vecPath;
-}
-
-
-INode* AStar::getNodeWith_fMin() {
-	// while loop which is calling 'getNodeWith_fMin' should have been left if openlist is empty!
-	assert(m_mapOpenList_f_values.size());
-
-	std::unordered_set<INode*>& setNodes = m_mapOpenList_f_values.begin()->second;
-
-	// Map keys are always sorted unless std::unordered_map is used
-	INode* pNode = *setNodes.begin();
-
-	// Remove from open list and from f list
-	setNodes.erase(setNodes.begin());
-
-	if (!setNodes.size()) {
-		m_mapOpenList_f_values.erase(m_mapOpenList_f_values.begin());
-	}
-
-	m_setOpenList.erase(pNode);
-	m_setClosedList.insert(pNode);
-	return pNode;
+	return result;
 }
