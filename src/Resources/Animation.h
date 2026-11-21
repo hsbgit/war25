@@ -54,6 +54,7 @@ public:
 	void addSprite(const Sprite& sprite);
 	void process();
 	Animation singleFrame(std::size_t frame) const;
+	Animation playOnce() const;
 	std::size_t frameCount() const { return m_vecSprites.size(); }
 
 

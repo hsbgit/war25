@@ -198,8 +198,12 @@ public:
 	}
 
 
-	enum class MissileType { Arrow, Axe, Cannon, BallistaBolt, CatapultRock };
+	enum class MissileType { Arrow, Axe, Cannon, BallistaBolt, CatapultRock,
+		Fireball, DragonBreath, GryphonHammer, SubmarineMissile, TurtleMissile };
 	Sprite getMissile(MissileType t, Direction direction = Direction::N);
+	enum class SpellVisual { FlameShield, Blizzard, Whirlwind, DeathAndDecay };
+	Animation getSpellAnimation(SpellVisual visual) const;
+	const Sprite& getAirUnitShadow() const { return m_airUnitShadow; }
 
 
 	/*
@@ -236,6 +240,7 @@ public:
 	Animation getUnitIdleAnimation(Unit* pUnit, Direction direction);
 	Animation getDyingAnimation(Unit* pUnit);
 	Animation getBuildingFireAnimation(bool large) const;
+	Animation getCorpseAnimation(const Unit* unit, Direction direction) const;
 
 
 	// Working nur peasant. Walking east, west, north....
@@ -262,6 +267,10 @@ public:
 
 
 	TextureMap m_mapUnitTexturesHuman, m_mapUnitTexturesOrc, m_mapUnitTexturesNeutral;
+	Texture* m_pCorpseTexture = nullptr;
+	std::map<SpellVisual, Animation> m_spellAnimations;
+	Texture* m_pAirUnitShadowTexture = nullptr;
+	Sprite m_airUnitShadow;
 	std::unordered_map<ResourceType, TextureMap> m_mapWorkerResourceTexturesHuman;
 	std::unordered_map<ResourceType, TextureMap> m_mapWorkerResourceTexturesOrc;
 

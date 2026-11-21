@@ -15,13 +15,20 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 #include "SpellExecutor.h"
+#include "Player.h"
 #include "Map/Map.h"
 #include "Magic/Runes.h"
+#include "Magic/SpellEffect.h"
 #include "Resources/SoundManager.h"
 #include "Units/Critter.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
 #include "Units/LandUnits/Mage.h"
+#include "Units/LandUnits/Skeleton.h"
 #include <iostream>
+#include <set>
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 
 SpellExecutor::SpellExecutor() : EventProcessor() {
@@ -64,13 +71,21 @@ void SpellExecutor::process() {
 
 
 void SpellExecutor::handleEvent(const Event& event) {
-    assert(m_pMap);
-    std::cerr << "SpellExecutor called with event id " << std::dec << (int)event.getEventID() << std::endl;
+	castSpell(nullptr, event.getEventID(), {event.tileX(), event.tileY()});
+}
 
-    Point m_targetPos_world;
-    m_targetPos_world.x = event.tileX();
-    m_targetPos_world.y = event.tileY();
+void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPos_world) {
+    assert(m_pMap);
+    std::cerr << "SpellExecutor called with event id " << std::dec << (int)spell << std::endl;
+
+    Point m_targetPos_world = targetPos_world;
     Tile* pTargetTile = m_pMap->getTile(m_targetPos_world);
+	if (!pTargetTile) return;
+	auto unitOnTarget = [pTargetTile]() -> Unit* {
+		Object* object = pTargetTile->getAirUnit()
+			? pTargetTile->getAirUnit() : pTargetTile->getSeaOrLandUnit();
+		return dynamic_cast<Unit*>(object);
+	};
 
     // Very good literature: http://classic.battle.net/war2/advanced/statistics.shtml 
 
@@ -113,12 +128,12 @@ void SpellExecutor::handleEvent(const Event& event) {
 
 
 
-    switch ((int)event.getEventID()) {
+    switch ((int)spell) {
     case (int)BuffType::Bloodlust:
     {
-        Unit* pUnit = dynamic_cast<Unit*>(pTargetTile->getSeaOrLandUnit()); // ToDo: Return Unit because it is always a unit?
+        Unit* pUnit = unitOnTarget();
 
-        if (pUnit && pUnit->isOrganic()) {
+        if (pUnit) {
             pUnit->addBuff(Buff(BuffType::Bloodlust));
             g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "bloodlust.wav");
         }
@@ -131,9 +146,9 @@ void SpellExecutor::handleEvent(const Event& event) {
         // The effect is movement speed and attack speed are cut in half.
         // Slow slows down any unit attack by half.
         // http://classic.battle.net/war2/units/mage.shtml
-        Unit* pUnit = dynamic_cast<Unit*>(pTargetTile->getSeaOrLandUnit()); // ToDo: Return Unit because it is always a unit?
+        Unit* pUnit = unitOnTarget();
 
-        if (pUnit && pUnit->isOrganic()) {
+        if (pUnit) {
             pUnit->addBuff(Buff(BuffType::Slow));
             g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "slow.wav");
         }
@@ -142,7 +157,7 @@ void SpellExecutor::handleEvent(const Event& event) {
 
     case (int)BuffType::Haste:
     {
-        Unit* pUnit = dynamic_cast<Unit*>(pTargetTile->getSeaOrLandUnit()); // ToDo: Return Unit because it is always a unit?
+        Unit* pUnit = unitOnTarget();
 
         /*
          * ToDo:
@@ -153,7 +168,7 @@ void SpellExecutor::handleEvent(const Event& event) {
          *
          * Source: http://classic.battle.net/war2/units/deathknight.shtml
          */
-        if (pUnit && pUnit->isOrganic()) {
+        if (pUnit) {
             // ToDo: Handle haste effect
            /*
             Land
@@ -192,9 +207,9 @@ void SpellExecutor::handleEvent(const Event& event) {
         // The unit remains invisible until the duration runs out or the unit attacks or casts any spells which will instantly reveal it.
         // Invisible Peasant can build a building and remain Invisible after the buildings competition.
         // http://classic.battle.net/war2/units/mage.shtml
-        Unit* pUnit = dynamic_cast<Unit*>(pTargetTile->getSeaOrLandUnit()); // ToDo: Return Unit because it is always a unit?
+        Unit* pUnit = unitOnTarget();
 
-        if (pUnit && pUnit->isOrganic()) {
+        if (pUnit) {
 
             if (typeid(*pUnit) == typeid(Dwarfes)) {
                 pUnit->die();
@@ -212,7 +227,7 @@ void SpellExecutor::handleEvent(const Event& event) {
 
     case (int)PaladinActions::Excorcism:
     {
-        Unit* pUnit = dynamic_cast<Unit*>(pTargetTile->getSeaOrLandUnit()); // ToDo: Return Unit because it is always a unit?
+        Unit* pUnit = unitOnTarget();
 
         if (pUnit && pUnit->isOrganic()) {
 
@@ -227,7 +242,7 @@ void SpellExecutor::handleEvent(const Event& event) {
 
     case (int)BuffType::UnholyArmor:
     {
-        Unit* pUnit = dynamic_cast<Unit*>(pTargetTile->getSeaOrLandUnit()); // ToDo: Return Unit because it is always a unit?
+        Unit* pUnit = unitOnTarget();
 
         if (pUnit && pUnit->isOrganic()) {
             if (typeid(*pUnit) == typeid(Dwarfes)) {
@@ -263,10 +278,101 @@ void SpellExecutor::handleEvent(const Event& event) {
     }
     break;
 
+	case (int)MageActions::Fireball:
+	{
+		if (!caster || !caster->isPlacedOnMap()) break;
+		const Point origin = caster->getTileLocation();
+		const int dx = (m_targetPos_world.x > origin.x) - (m_targetPos_world.x < origin.x);
+		const int dy = (m_targetPos_world.y > origin.y) - (m_targetPos_world.y < origin.y);
+		if (dx == 0 && dy == 0) break;
+		std::set<Object*> hit;
+		for (int distance = 1; distance <= 8; ++distance) {
+			Tile* tile = m_pMap->getTile({origin.x + dx * distance, origin.y + dy * distance});
+			if (!tile) break;
+			if (tile->getSeaOrLandUnit()) hit.insert(tile->getSeaOrLandUnit());
+			if (tile->getAirUnit()) hit.insert(tile->getAirUnit());
+		}
+		for (Object* object : hit)
+			if (object != caster) object->takeDamage(AttackerStats(0, 34), true);
+		g_pSoundManager->playWAV("missiles/fireball_throw.wav");
+	}
+	break;
+
+	case (int)MageActions::FlameShield:
+	{
+		Unit* target = unitOnTarget();
+		if (target && !target->isAirObject()) {
+			m_pMap->addMapObject(new SpellEffect(caster, m_pMap, target->getTileLocation(),
+				g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::FlameShield),
+				12000, 8, 1, SpellEffect::Motion::FollowTarget, target));
+			g_pSoundManager->playWAV("spells/flame_shield.wav");
+		}
+	}
+	break;
+
+	case (int)MageActions::Blizzard:
+		m_pMap->addMapObject(new SpellEffect(caster, m_pMap, m_targetPos_world,
+			g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::Blizzard),
+			10000, 7, 2));
+		g_pSoundManager->playWAV("spells/blizzard.wav");
+		break;
+
+	case (int)DeathKnightActions::DeathCoil:
+	{
+		std::vector<Unit*> victims;
+		for (const auto& [color, player] : m_pMap->m_mapPlayer) {
+			(void)color;
+			for (Object* object : player->getObjects()) {
+				auto* unit = dynamic_cast<Unit*>(object);
+				if (!unit || unit->isDead() || !unit->isPlacedOnMap() || !unit->isOrganic()) continue;
+				if (caster && !unit->isEnemy(caster)) continue;
+				const Point position = unit->getTileLocation();
+				if (std::max(std::abs(position.x - m_targetPos_world.x),
+					std::abs(position.y - m_targetPos_world.y)) <= 1)
+					victims.push_back(unit);
+			}
+		}
+		const int damage = victims.empty() ? 0 : 50 / static_cast<int>(victims.size());
+		int drained = 0;
+		for (Unit* victim : victims) {
+			victim->takeDamage(AttackerStats(0, damage), true);
+			drained += damage;
+		}
+		if (caster && drained > 0 && !caster->isDead()) caster->increaseHealth(drained);
+		g_pSoundManager->playWAV("spells/death_coil.wav");
+	}
+	break;
+
+	case (int)DeathKnightActions::Whirlwind:
+		m_pMap->addMapObject(new SpellEffect(caster, m_pMap, m_targetPos_world,
+			g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::Whirlwind),
+			20000, 5, 0, SpellEffect::Motion::Whirlwind));
+		g_pSoundManager->playWAV("spells/whirlwind.wav");
+		break;
+
+	case (int)DeathKnightActions::RaiseTheDead:
+	{
+		Object* corpse = pTargetTile->getSeaOrLandUnit();
+		if (caster && corpse && corpse->isDead() && corpse->isLandObject()) {
+			m_pMap->releaseObjectFromTile(corpse);
+			auto* skeleton = new Skeleton(caster->getOwner(), m_pMap);
+			m_pMap->placeUnit(pTargetTile, skeleton);
+			g_pSoundManager->playWAV("spells/touch_of_darkness.wav");
+		}
+	}
+	break;
+
+	case (int)DeathKnightActions::DeathAndDecay:
+		m_pMap->addMapObject(new SpellEffect(caster, m_pMap, m_targetPos_world,
+			g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::DeathAndDecay),
+			10000, 7, 2));
+		g_pSoundManager->playWAV("spells/death_and_decay.wav");
+		break;
+
     case (int)MageActions::Polymorph:
     {
-        Unit* pUnit = dynamic_cast<Unit*>(pTargetTile->getSeaOrLandUnit()); // ToDo: Return Unit because it is always a unit?
-        if (pUnit && pUnit->isLandObject()) {
+        Unit* pUnit = unitOnTarget();
+        if (pUnit && pUnit->isLandObject() && pTargetTile->isLand()) {
             // ToDo: Dragons yes, but what if dragons are on water?
             // This turns any living creature into the critter for that map type such as Pig for Wasteland, Seal for Snow, Sheep for Forest, Boar for Swamp. 
             // There is no warning to enemy players that their units have been Polymorphs.

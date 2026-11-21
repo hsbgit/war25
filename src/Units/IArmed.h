@@ -72,6 +72,10 @@ public:
 		m_pActiveTarget = nullptr;
 	}
 	void clearActiveTarget();
+	void assignTarget(Object* target) { setActiveTarget(target); }
+	Object* activeTarget() const { return hasActiveTarget() ? m_pActiveTarget : nullptr; }
+	bool activeTargetInRange(Object* attacker) const { return isActiveTargetInRange(attacker); }
+	int attackCooldownTicks() const { return m_AttackCooldownTime_ticks; }
 
 
 protected:

@@ -49,29 +49,30 @@ void Mage::process() {
 
 
 void Mage::handleEvent(const Event& event) {
-	switch ((int)event.getEventID()) {
-	case (EventID)BuffType::Slow:
-	{
-		Point m_targetPos_world;
-		m_targetPos_world.x = event.tileX();
-		m_targetPos_world.y = event.tileY();
-		Tile* pTargetTile = m_pMap->getTile(m_targetPos_world);
-
-
-		Unit* pUnit = dynamic_cast<Unit*>(pTargetTile->getSeaOrLandUnit()); // ToDo: Return Unit because it is always a unit?
-
-		if (pUnit && pUnit->isOrganic()) {
-			if (reduceMana(50)) {
-				pUnit->addBuff(Buff(BuffType::Slow));
-				g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "slow.wav");
-			}
+	const EventID spell = event.getEventID();
+	int manaCost = -1;
+	switch (static_cast<int>(spell)) {
+	case static_cast<int>(MageActions::Fireball): manaCost = 100; break;
+	case static_cast<int>(BuffType::Slow): manaCost = 50; break;
+	case static_cast<int>(MageActions::FlameShield): manaCost = 80; break;
+	case static_cast<int>(BuffType::Invisibility): manaCost = 200; break;
+	case static_cast<int>(MageActions::Polymorph): manaCost = 200; break;
+	case static_cast<int>(MageActions::Blizzard): manaCost = 25; break;
+	case static_cast<int>(DeathKnightActions::DeathCoil): manaCost = 100; break;
+	case static_cast<int>(BuffType::Haste): manaCost = 50; break;
+	case static_cast<int>(DeathKnightActions::RaiseTheDead): manaCost = 50; break;
+	case static_cast<int>(DeathKnightActions::Whirlwind): manaCost = 100; break;
+	case static_cast<int>(BuffType::UnholyArmor): manaCost = 200; break;
+	case static_cast<int>(DeathKnightActions::DeathAndDecay): manaCost = 25; break;
+	default: break;
+	}
+	if (manaCost >= 0) {
+		if (reduceMana(manaCost)) {
+			removeBuff(BuffType::Invisibility);
+			gSpellExecutor.castSpell(this, spell, {event.tileX(), event.tileY()});
 		}
+		return;
 	}
-
-	break;
-
-	}
-
 	Unit::handleEvent(event);
 }
 
@@ -81,7 +82,7 @@ std::vector<Action> Mage::getActions() const {
 	std::vector<Action> vecActions = Unit::getActions();
 
 	PlayerColor color = getOwner()->getColor();
-	EventProcessorID id = gSpellExecutor.getID();
+	EventProcessorID id = getID();
 
 	TechnologyManager* pTC = getOwner()->getTechnologyCoordinator();
 
@@ -90,7 +91,7 @@ std::vector<Action> Mage::getActions() const {
 		vecActions.push_back(Action(id, (EventID)MageActions::Fireball, g_pRessourceManager->getIcon(PUD_ICON_FIREBALL, color), Action::ActionType::WithWorldTile));
 
 		if (pTC->isResearched(Upgrade::ItemType::Mage_Slow))
-			vecActions.push_back(Action(getID(), (EventID)BuffType::Slow, g_pRessourceManager->getIcon(PUD_ICON_SLOW, color), Action::ActionType::WithWorldTile));
+			vecActions.push_back(Action(id, (EventID)BuffType::Slow, g_pRessourceManager->getIcon(PUD_ICON_SLOW, color), Action::ActionType::WithWorldTile));
 
 		if (pTC->isResearched(Upgrade::ItemType::Mage_FlameShield))
 			vecActions.push_back(Action(id, (EventID)MageActions::FlameShield, g_pRessourceManager->getIcon(PUD_ICON_FLAME_SHIELD, color), Action::ActionType::WithWorldTile));

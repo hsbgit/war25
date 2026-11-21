@@ -42,6 +42,10 @@ bool StateMachine::isCurrentStateMovingState() const {
 	return dynamic_cast<StateMoving*>(m_pCurrState) ? true : false;
 }
 
+bool StateMachine::isCurrentState(const State* state) const {
+	return m_pCurrState == state;
+}
+
 
 State* State::checkForTransition(const Event& event) {
 	// No priority, if there are several possible transitions simply pick the first one

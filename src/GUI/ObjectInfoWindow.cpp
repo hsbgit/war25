@@ -118,60 +118,84 @@ void ObjectInfoWindow::playAcknowledgeDebounced(std::chrono::milliseconds minInt
 void ObjectInfoWindow::onRightClicked(const Point& tile_world) {
     resetActionMenu();
     if (m_selectedObjects.empty()) return;
-    Map* map = (*m_selectedObjects.begin())->getMap();
-    Object* clickedObject = map->getObjectOnTile(tile_world);
-    std::vector<Unit*> units;
-    for (Object* object : m_selectedObjects) {
-        if (object->getOwner() == map->humanControlledPlayer())
-            if (auto* unit = dynamic_cast<Unit*>(object)) units.push_back(unit);
-    }
-    std::sort(units.begin(), units.end(), [&tile_world](Unit* lhs, Unit* rhs) {
-        auto distance = [&tile_world](Unit* unit) {
-            const Point p = unit->getTileLocation();
-            const int dx = p.x - tile_world.x;
-            const int dy = p.y - tile_world.y;
-            return dx * dx + dy * dy;
-        };
-        const int dl = distance(lhs), dr = distance(rhs);
-        if (dl != dr) return dl < dr;
-        return lhs->getID() < rhs->getID();
-    });
+	Map* map = (*m_selectedObjects.begin())->getMap();
+	Object* clickedObject = map->getObjectOnTile(tile_world);
+	const bool attackOrder = clickedObject &&
+		clickedObject->getOwner() != map->humanControlledPlayer() &&
+		!clickedObject->getOwner()->isNeutral();
 
-    std::vector<Point> candidates;
-    const int maxRadius = std::max(4,
-        static_cast<int>(std::ceil(std::sqrt(static_cast<double>(units.size())))) + 3);
-    for (int radius = 0; radius <= maxRadius; ++radius) {
-        for (int y = -radius; y <= radius; ++y) {
-            for (int x = -radius; x <= radius; ++x) {
-                if (radius && std::max(std::abs(x), std::abs(y)) != radius) continue;
-                const Point candidate{tile_world.x + x, tile_world.y + y};
-                if (candidate.x >= 0 && candidate.y >= 0 &&
-                    candidate.x < map->sideLength() && candidate.y < map->sideLength())
-                    candidates.push_back(candidate);
-            }
-        }
-    }
-    std::unordered_set<int> reserved;
+	std::vector<Unit*> units;
+	for (Object* object : m_selectedObjects) {
+		if (object->getOwner() == map->humanControlledPlayer())
+			if (auto* unit = dynamic_cast<Unit*>(object)) units.push_back(unit);
+	}
+	std::sort(units.begin(), units.end(), [&tile_world](Unit* lhs, Unit* rhs) {
+		auto distance = [&tile_world](Unit* unit) {
+			const Point p = unit->getTileLocation();
+			const int dx = p.x - tile_world.x;
+			const int dy = p.y - tile_world.y;
+			return dx * dx + dy * dy;
+		};
+		const int dl = distance(lhs), dr = distance(rhs);
+		if (dl != dr) return dl < dr;
+		return lhs->getID() < rhs->getID();
+	});
 
-    for (Unit* pUnit : units) {
-        const bool resourceOrder = dynamic_cast<IResourceCollector*>(pUnit) &&
-            ((clickedObject && dynamic_cast<IResourceMine*>(clickedObject)) ||
-             map->getTile(tile_world)->isWood());
-        const int footprint = gMapUnitTilesize.at(typeid(*pUnit));
-        const Point destination = chooseCommandDestination(
-            tile_world, candidates, resourceOrder, footprint, map->sideLength(),
-            reserved, [map, pUnit](const Point& candidate) {
-                return map->canBePlacedAtPosition(pUnit, candidate.x, candidate.y);
-            });
-        auto actions = pUnit->getActions();
-        const auto it = std::find_if(actions.begin(), actions.end(),
-            [](const Action& action) {
-                return action.getEventID() == static_cast<EventID>(GeneralActions::Move);
-            });
-        if (it != actions.end()) {
-            g_pEventBroker.lockEventProcessor(it->getEventProcessorID());
-            it->trigger(destination);
-        }
+	if (attackOrder) {
+		for (Unit* unit : units) {
+			IArmed* armed = dynamic_cast<IArmed*>(unit);
+			if (!armed || !armed->isArmed()) continue;
+			auto actions = unit->getActions();
+			const auto it = std::find_if(actions.begin(), actions.end(), [](const Action& action) {
+				return action.getEventID() == static_cast<EventID>(GeneralActions::Attack);
+			});
+			if (it != actions.end()) {
+				g_pEventBroker.lockEventProcessor(it->getEventProcessorID());
+				it->trigger(tile_world);
+			}
+		}
+		playAcknowledgeDebounced(War25::Constants::SOUND_DEBOUNCE_INTERVAL);
+		return;
+	}
+
+	// Give each member a distinct destination. Sending a large group to one
+	// tile caused every unit to run A* independently into the same bottleneck,
+	// after which rear units could wait forever behind the pile.
+	std::vector<Point> candidates;
+	const int maxRadius = std::max(4,
+		static_cast<int>(std::ceil(std::sqrt(static_cast<double>(units.size())))) + 3);
+	for (int radius = 0; radius <= maxRadius; ++radius) {
+		for (int y = -radius; y <= radius; ++y) {
+			for (int x = -radius; x <= radius; ++x) {
+				if (radius && std::max(std::abs(x), std::abs(y)) != radius) continue;
+				const Point candidate{tile_world.x + x, tile_world.y + y};
+				if (candidate.x >= 0 && candidate.y >= 0 &&
+					candidate.x < map->sideLength() && candidate.y < map->sideLength())
+					candidates.push_back(candidate);
+			}
+		}
+	}
+	std::unordered_set<int> reserved;
+
+	for (Unit* pUnit : units) {
+		const bool resourceOrder = dynamic_cast<IResourceCollector*>(pUnit) &&
+			((clickedObject && dynamic_cast<IResourceMine*>(clickedObject)) ||
+			 map->getTile(tile_world)->isWood());
+		const int footprint = gMapUnitTilesize.at(typeid(*pUnit));
+		const Point destination = chooseCommandDestination(
+			tile_world, candidates, resourceOrder, footprint, map->sideLength(),
+			reserved, [map, pUnit](const Point& candidate) {
+				return map->canBePlacedAtPosition(pUnit, candidate.x, candidate.y);
+			});
+		auto actions = pUnit->getActions();
+		const auto it = std::find_if(actions.begin(), actions.end(),
+			[](const Action& action) {
+				return action.getEventID() == static_cast<EventID>(GeneralActions::Move);
+			});
+		if (it != actions.end()) {
+			g_pEventBroker.lockEventProcessor(it->getEventProcessorID());
+			it->trigger(destination);
+		}
     }
     // kein Krach bei Multi-Select
     playAcknowledgeDebounced(War25::Constants::SOUND_DEBOUNCE_INTERVAL);

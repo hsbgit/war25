@@ -53,6 +53,7 @@
 #include "Units/LandUnits/Knight.h"
 #include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
+#include "Units/LandUnits/Skeleton.h"
 
 
 
@@ -263,6 +264,7 @@ std::unordered_map<std::type_index, int> gMapUnitTilesize = {
 	{typeid(Ballista), 1},
 	{typeid(Mage), 1},
 	{typeid(Dwarfes), 1},
+	{typeid(Skeleton), 1},
 	{typeid(GnomishFlyingMaschine), 2},
 	{typeid(GryphonRider), 2},
 	{typeid(Tanker), 2},
@@ -323,4 +325,3 @@ std::unordered_map<std::type_index, ObjectType> gMapUnitType = {
 	{typeid(Shipyard), ObjectType::Land},
 	{typeid(Townhall), ObjectType::Land}
 };
-

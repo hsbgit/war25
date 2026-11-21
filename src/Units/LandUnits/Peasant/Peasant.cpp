@@ -159,6 +159,33 @@ void Peasant::process() {
 	}
 }
 
+void Peasant::onAttackedBy(Object* attacker) {
+	if (!attacker || !isIdle() || !isPlacedOnMap() || !attacker->isPlacedOnMap())
+		return;
+	const Point own = getTileLocation();
+	const Point threat = attacker->getTileLocation();
+	const int dx = (own.x > threat.x) - (own.x < threat.x);
+	const int dy = (own.y > threat.y) - (own.y < threat.y);
+	if (dx == 0 && dy == 0) return;
+	const int edge = getMap()->sideLength() - 1;
+	Point destination{std::clamp(own.x + dx * 5, 0, edge),
+		std::clamp(own.y + dy * 5, 0, edge)};
+	// Search close to the point opposite the attacker if the ideal tile is
+	// terrain-blocked. This keeps fleeing deterministic and avoids standing
+	// still at map edges.
+	for (int radius = 0; radius <= 4; ++radius) {
+		for (int y = destination.y - radius; y <= destination.y + radius; ++y) {
+			for (int x = destination.x - radius; x <= destination.x + radius; ++x) {
+				if (x < 0 || y < 0 || x > edge || y > edge ||
+					!getMap()->canBePlacedAtPosition(this, x, y))
+					continue;
+				handleEvent(Event(getID(), GeneralActions::Move, x, y));
+				return;
+			}
+		}
+	}
+}
+
 
 std::vector<Action> Peasant::getActions() const {
 	std::vector<Action> vecActions = Unit::getActions();

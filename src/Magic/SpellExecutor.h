@@ -20,6 +20,7 @@
 #include "EventHandling/EventProcessor.h"
 #include "Types.h"
 
+class Mage;
 
 class SpellExecutor : public EventProcessor {
 public:
@@ -29,6 +30,7 @@ public:
 	void process();
 
 	void handleEvent(const Event& event);
+	void castSpell(Mage* caster, EventID spell, const Point& targetPos_world);
 	void setMap(Map* pMap);
 
 	inline const std::vector<Runes>& getRunes() const {

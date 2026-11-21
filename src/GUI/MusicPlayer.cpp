@@ -17,6 +17,8 @@
 #include "MusicPlayer.h"
 #include "imgui/imgui.h"
 #include "Global/PseudoRandom.h"
+#include <algorithm>
+#include <cfloat>
 #include <filesystem>
 
 
@@ -67,7 +69,14 @@ namespace gui {
 		ImGui::SetNextWindowSize(ImVec2(530.0f, 240.0f), ImGuiCond_Once);
 		ImGui::Begin("Music Player");
 
-		if (ImGui::BeginListBox("Music Player Listbox", ImVec2(-FLT_MIN, 5 * ImGui::GetTextLineHeightWithSpacing()))) {
+		// Reserve only one compact control row at the bottom and give all
+		// remaining vertical space to the track list.
+		const float controlsHeight = ImGui::GetFrameHeightWithSpacing() +
+			ImGui::GetStyle().ItemSpacing.y;
+		const float listHeight = std::max(
+			8.0f * ImGui::GetTextLineHeightWithSpacing(),
+			ImGui::GetContentRegionAvail().y - controlsHeight);
+		if (ImGui::BeginListBox("##MusicPlayerTrackList", ImVec2(-FLT_MIN, listHeight))) {
 			for (std::size_t i = 0; i < m_vecMidiFiles.size(); ++i) {
 				const bool is_selected = (m_current_index == i);
 				if (ImGui::Selectable(m_vecMidiFiles[i].c_str(), is_selected, ImGuiSelectableFlags_AllowDoubleClick)) {

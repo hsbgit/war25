@@ -345,6 +345,22 @@ void Game::doEventHandling() {
                             return !pObject->isSelectable();
                             });
 
+						// SDL supplies a stable click count for mouse double-clicks. If
+						// the clicked object is ours, expand the selection to every
+						// currently visible object of the exact same runtime type.
+						if (event.button.clicks >= 2 && userSelection.size() == 1) {
+							Object* clicked = *userSelection.begin();
+							if (clicked->getOwner() == pMap->humanControlledPlayer()) {
+								userSelection.clear();
+								for (Object* object : clicked->getOwner()->getObjects()) {
+									if (object->isSelectable() && object->isPlacedOnMap() &&
+										typeid(*object) == typeid(*clicked) &&
+										gViewport.isObjectVisible(object))
+										userSelection.insert(object);
+								}
+							}
+						}
+
                         if (userSelection.size()) {
 							m_infoWindow.setVisible(true);
                             // Pressing CTRL keys adds unit the current selection, if any

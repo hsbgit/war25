@@ -92,6 +92,16 @@ Animation Animation::singleFrame(std::size_t frame) const {
 	return result;
 }
 
+Animation Animation::playOnce() const {
+	Animation result(*this);
+	result.m_playOnce = true;
+	result.m_animationFinished = false;
+	result.m_currentSpriteID = 0;
+	result.m_passedTime_ms = 0;
+	result.m_ticksPerSprite = calculateRequiredTicksForGameAction(result.m_interval_ms);
+	return result;
+}
+
 
 void Animation::process() {
     if(m_vecSprites.size() == 1|| (m_playOnce && m_animationFinished)) {
@@ -109,9 +119,11 @@ void Animation::process() {
 
 void Animation::nextSprite() {
     if(++m_currentSpriteID >= m_vecSprites.size()) {
-        if(m_playOnce)
+		if(m_playOnce) {
+			m_currentSpriteID = m_vecSprites.size() - 1;
             m_animationFinished = true;
-        else 
+		}
+		else
             m_currentSpriteID = 0;        
     }
 }

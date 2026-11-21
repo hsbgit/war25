@@ -28,8 +28,8 @@ public:
     void process();
     void handleEvent(const Event& event);    
     bool isCurrentStateMovingState() const;
+	bool isCurrentState(const State* state) const;
 
 private:
     State* m_pCurrState;
 };
-

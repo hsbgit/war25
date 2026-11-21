@@ -1862,6 +1862,10 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 				}
 				if ((!gDebugManager.m_map_considerExploration || explored) &&
 					(!gDebugManager.m_map_drawFogOfWar || visible)) {
+					if (auto* spellUnit = dynamic_cast<Unit*>(unit);
+						spellUnit && spellUnit->hasBuff(BuffType::Invisibility) &&
+						pPlayer != pHumanPlayer)
+						continue;
 					vecVisibleObjects.push_back(unit);
 
 					//   Point posLocal_tile = pViewPort->worldToScreen_tile(unit->getPos());
@@ -1955,6 +1959,18 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 	}
 
 
+	auto drawBuffIcons = [pRenderer](Unit* unit, Point position) {
+		if (!unit) return;
+		for (const auto& [buffType, buff] : unit->getActiveBuffs()) {
+			(void)buff;
+			auto icon = g_pRessourceManager->m_mapBuffSprites.find(buffType);
+			if (icon == g_pRessourceManager->m_mapBuffSprites.end() || !icon->second)
+				continue;
+			pRenderer->renderSprite(position, icon->second);
+			position.x += 16;
+		}
+	};
+
 	// Third land units (catapults, death knights etc. may cover building parts a bit)
 	for (auto& pUnit : vecVisibleObjects) {
 		if (dynamic_cast<Building*>(pUnit) != nullptr)
@@ -1971,18 +1987,7 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 
 			pRenderer->renderSprite(posLocal_px, pUnit->sprite());
 
-			// Draw buffs
-			Unit* pUnit1 = dynamic_cast<Unit*>(pUnit);
-			if (pUnit1->hasActiveBuffs()) {
-				auto& activeBuffs = pUnit1->getActiveBuffs();
-
-
-				for (const auto& [buffType, buff] : activeBuffs) {
-					Sprite* pIcon = g_pRessourceManager->m_mapBuffSprites[buffType];
-					pRenderer->renderSprite(posLocal_px, pIcon);
-					posLocal_px.x += 16;
-				}
-			}
+			drawBuffIcons(dynamic_cast<Unit*>(pUnit), posLocal_px);
 		}
 	}
 
@@ -1992,7 +1997,17 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 	for (auto& pUnit : vecVisibleObjects) {
 		if (pUnit->getType() == Object::Type::Air) {
 			Point posLocal_tile = pViewPort->worldToScreen_tile(pUnit->getTileLocation());
-			pRenderer->renderSprite(pViewPort->tileToPixel(posLocal_tile), pUnit->sprite());
+			Point posLocal_px = pViewPort->tileToPixel(posLocal_tile);
+			posLocal_px.x += pUnit->getTilePositionOffset().x;
+			posLocal_px.y += pUnit->getTilePositionOffset().y;
+			const Sprite& shadow = g_pRessourceManager->getAirUnitShadow();
+			Point shadowPos = posLocal_px;
+			const int footprint = gMapUnitTilesize.at(typeid(*pUnit)) * Tile::TileWidth_px;
+			shadowPos.x += (footprint - shadow.getWidth()) / 2;
+			shadowPos.y += (footprint - shadow.getHeight()) / 2 + 12;
+			pRenderer->renderSprite(shadowPos, shadow);
+			pRenderer->renderSprite(posLocal_px, pUnit->sprite());
+			drawBuffIcons(dynamic_cast<Unit*>(pUnit), posLocal_px);
 		}
 	}
 

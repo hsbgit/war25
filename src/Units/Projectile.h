@@ -58,6 +58,7 @@ private:
 
 private:
 	EventProcessorID m_attackedID;
+	EventProcessorID m_attackerID;
 	AttackerStats m_attackerStats;
 	ResourceManager_wartools::MissileType m_type;
 	Sprite m_sprite;

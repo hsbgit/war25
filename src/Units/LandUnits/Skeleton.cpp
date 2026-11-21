@@ -17,6 +17,7 @@
 #include "Skeleton.h"
 #include "Player.h"
 #include "Resources/resourcemanager_wartools.h"
+#include "Global/GlobalAttributes.h"
 
 
 // Hm... has no fraction, neither human nor orc
@@ -38,11 +39,10 @@ Skeleton::Skeleton(Player* pOwner, Map* pMap) : Unit(pOwner, Fraction::Orc, pMap
 
 
 void Skeleton::process() {
-	/*
-	m_lifespan_ms -= passedTime_ms;
-	if (!isDead() && m_lifespan_ms < 0) {
+	Unit::process();
+	if (!isDead())
+		m_lifespan_ms -= g_tick_ms;
+	if (!isDead() && m_lifespan_ms <= 0) {
 		die();
-		return;
 	}
-	*/
 }

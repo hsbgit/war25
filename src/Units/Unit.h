@@ -41,6 +41,10 @@ public:
 	virtual ~Unit();
 
 	inline int getSpeed() const {
+		if (m_activeBuffs.contains(BuffType::Slow))
+			return std::max(1, m_speed / 2);
+		if (m_activeBuffs.contains(BuffType::Haste))
+			return m_speed + std::max(1, m_speed / 2);
 		return m_speed;
 	}
 
@@ -56,6 +60,7 @@ public:
 	// Object
 	void process() override;
 	bool isMoving() const override;
+	bool isIdle() const { return m_stateMachine.isCurrentState(m_pIdle); }
 	std::vector<Action> getActions() const override;
 
 
@@ -76,6 +81,7 @@ public:
 	}
 
 	void setIdleAnimation(Direction direction = Direction::N);
+	void setFacingDirection(Direction direction) { m_facingDirection = direction; }
 
 	void addBuff(const Buff& buff) {
 		auto it = m_activeBuffs.find(buff.getType());
@@ -86,6 +92,8 @@ public:
 			m_activeBuffs[buff.getType()] = buff;
 		}
 	}
+	void removeBuff(BuffType type) { m_activeBuffs.erase(type); }
+	bool hasBuff(BuffType type) const { return m_activeBuffs.contains(type); }
 
 	inline bool hasActiveBuffs() const {
 		return m_activeBuffs.size();
@@ -119,6 +127,10 @@ protected:
 
 private:
 	void playRandomSound(const std::vector<std::string>& sounds);
+	void updateCombat();
+	Object* selectAutomaticTarget(IArmed* armed) const;
 	int m_speed;
+	int m_attackCooldownRemaining = 0;
+	Direction m_attackDirection = Direction::N;
+	Direction m_facingDirection = Direction::N;
 };
-

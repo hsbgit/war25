@@ -121,6 +121,7 @@ public:
 
 
 	virtual void takeDamage(const AttackerStats& stats, bool noRandomComponent = false);
+	virtual void onAttackedBy(Object*) {}
 
 	virtual void doHandleDeath() = 0;
 	virtual bool isMoving() const = 0;

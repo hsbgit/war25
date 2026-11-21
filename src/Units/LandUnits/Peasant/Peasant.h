@@ -49,6 +49,7 @@ public:
 	// EventProcessor
 	void handleEvent(const Event& event) override;
 	void process() override;
+	void onAttackedBy(Object* attacker) override;
 
 	// IResourceCollector
 	bool canCollectResource(ResourceType t) const override {

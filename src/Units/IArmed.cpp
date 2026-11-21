@@ -17,6 +17,7 @@
 #include "IArmed.h"
 #include "Global/Object.h"
 #include "Map/Map.h"
+#include "Player.h"
 
 
 IArmed::IArmed() : m_basicDamage(0), m_piercingDamage(0), m_range(0) {
@@ -47,7 +48,9 @@ std::set<Object*> IArmed::findTargetObject(Object* pAttacker) const {
 
 	std::erase_if(setObjectsInRange,
 		[pAttacker](Object* pTarget) {
-			return !pTarget->isEnemy(pAttacker) || pTarget->getFraction() == Fraction::Neutral;
+			return !pTarget->isEnemy(pAttacker) ||
+				pTarget->getFraction() == Fraction::Neutral ||
+				pTarget->getOwner()->isNeutral();
 		});
 
 	return setObjectsInRange;

@@ -475,8 +475,18 @@ Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction dire
 		return a;
 	}
 
-	if (animType == AnimationType::Attacking ||
-		animType == AnimationType::Working_Gold ||
+	if (animType == AnimationType::Attacking) {
+		// Several vessel sheets contain directional idle/movement frames but no
+		// dedicated attack rows. Combat must still work for those units.
+		if (!mapUnitAttackAnimations.contains(typeid(*pUnit)) ||
+			!mapUnitAttackAnimations[typeid(*pUnit)].contains(direction))
+			return getUnitIdleAnimation(pUnit, direction);
+		Animation a(mapUnitAttackAnimations[typeid(*pUnit)][direction]);
+		a.setBaseTexture(pCorrectColorTexture);
+		return a;
+	}
+
+	if (animType == AnimationType::Working_Gold ||
 		animType == AnimationType::Working_Lumber) {
 		assert(mapUnitAttackAnimations.contains(typeid(*pUnit)));
 		assert(mapUnitAttackAnimations[typeid(*pUnit)].contains(direction));
@@ -490,6 +500,9 @@ Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction dire
 
 
 Texture* ResourceManager_wartools::getUnitTexture(Unit* pUnit, ResourceType carriedResource) {
+	if (typeid(*pUnit) == typeid(Skeleton))
+		return m_mapUnitTexturesNeutral[typeid(Skeleton)][PlayerColor::Red];
+
 	TextureMap& baseTextures = (pUnit->getFraction() == Fraction::Orc)
 		? m_mapUnitTexturesOrc : m_mapUnitTexturesHuman;
 	const std::type_index type = typeid(*pUnit);
@@ -829,6 +842,38 @@ void ResourceManager_wartools::createidleAnimations() {
 	createUnitAnimations(typeid(Knight), 360 / 5, 5, 4, 5);
 	createUnitAnimations(typeid(Mage), 360 / 5, 5, 4, 7);
 	createUnitAnimations(typeid(Peasant), 360 / 5, 5, 5, 3);
+
+	// Skeletons use five frames horizontally and a living/death row pair per
+	// direction, unlike the regular unit sheets.
+	Texture* skeletonTexture = m_mapUnitTexturesNeutral[typeid(Skeleton)][PlayerColor::Red];
+	assert(skeletonTexture);
+	for (int directionValue = 0; directionValue < 8; ++directionValue) {
+		Direction direction = static_cast<Direction>(directionValue);
+		int sourceDirection = directionValue;
+		bool flipped = false;
+		if (sourceDirection > 4) {
+			sourceDirection -= (sourceDirection - 4) * 2;
+			flipped = true;
+		}
+		constexpr int frameSize = 56;
+		const Point offset{-12, -12};
+		Animation movement(skeletonTexture, 120);
+		Animation attack(skeletonTexture, 120);
+		Animation dying(skeletonTexture, 160, true);
+		for (int frame = 0; frame < 5; ++frame) {
+			const Rect living{frame * frameSize, sourceDirection * 2 * frameSize,
+				frameSize, frameSize};
+			movement.addSprite(Sprite(movement.getBaseTexture(), living, offset, flipped));
+			attack.addSprite(Sprite(attack.getBaseTexture(), living, offset, flipped));
+			const Rect dead{frame * frameSize, (sourceDirection * 2 + 1) * frameSize,
+				frameSize, frameSize};
+			dying.addSprite(Sprite(dying.getBaseTexture(), dead, offset, flipped));
+		}
+		mapUnitMovementAnimations[typeid(Skeleton)][direction] = movement;
+		mapUnitAttackAnimations[typeid(Skeleton)][direction] = attack;
+		mapUnitDyingAnimations[typeid(Skeleton)][direction] = dying;
+		mapIdleAnimations[typeid(Skeleton)][direction] = movement.singleFrame(0);
+	}
 
 
 	// CannonBall wird größer in 2 stufen
@@ -1395,19 +1440,45 @@ ResourceManager_wartools::ResourceManager_wartools(const std::string& pathToGrap
 
 void ResourceManager_wartools::readMissiles() {
 	std::string strToFolder("data/graphics/missiles/");
+	m_pCorpseTexture = new Texture(
+		"data/graphics/neutral/units/corpses.png", m_pRenderer);
 
 	m_mapMissiles[MissileType::Arrow] = new Texture(strToFolder + "arrow.png", m_pRenderer);
 	m_mapMissiles[MissileType::Axe] = new Texture(strToFolder + "axe.png", m_pRenderer);
 	m_mapMissiles[MissileType::BallistaBolt] = new Texture(strToFolder + "ballista_bolt.png", m_pRenderer);
 	m_mapMissiles[MissileType::Cannon] = new Texture(strToFolder + "cannon.png", m_pRenderer);
 	m_mapMissiles[MissileType::CatapultRock] = new Texture(strToFolder + "catapult_rock.png", m_pRenderer);
+	m_mapMissiles[MissileType::Fireball] = new Texture(strToFolder + "fireball.png", m_pRenderer);
+	m_mapMissiles[MissileType::DragonBreath] = new Texture(strToFolder + "dragon_breath.png", m_pRenderer);
+	m_mapMissiles[MissileType::GryphonHammer] = new Texture(strToFolder + "gryphon_hammer.png", m_pRenderer);
+	m_mapMissiles[MissileType::SubmarineMissile] = new Texture(strToFolder + "submarine_missile.png", m_pRenderer);
+	m_mapMissiles[MissileType::TurtleMissile] = new Texture(strToFolder + "turtle_missile.png", m_pRenderer);
+
+	auto loadGridAnimation = [this, &strToFolder](SpellVisual visual,
+		const std::string& file, int frameSize, int interval) {
+		Texture* texture = new Texture(strToFolder + file, m_pRenderer);
+		Animation animation(texture, interval);
+		for (int y = 0; y + frameSize <= texture->getHeight(); y += frameSize)
+			for (int x = 0; x + frameSize <= texture->getWidth(); x += frameSize)
+				animation.addSprite(Sprite(animation.getBaseTexture(),
+					{x, y, frameSize, frameSize}));
+		m_spellAnimations[visual] = animation;
+	};
+	loadGridAnimation(SpellVisual::FlameShield, "flame_shield.png", 32, 100);
+	loadGridAnimation(SpellVisual::Blizzard, "blizzard.png", 32, 120);
+	loadGridAnimation(SpellVisual::Whirlwind, "tornado.png", 56, 120);
+	loadGridAnimation(SpellVisual::DeathAndDecay, "death_and_decay.png", 32, 120);
+	m_pAirUnitShadowTexture = new Texture(strToFolder + "unit_shadow.png", m_pRenderer);
+	m_airUnitShadow = Sprite(&m_pAirUnitShadowTexture, {0, 64, 32, 32});
 
 	m_pSmallFireTexture = new Texture(strToFolder + "small_fire.png", m_pRenderer);
 	m_smallFireAnimation = Animation(m_pSmallFireTexture, 100);
-	for (int y = 0; y < m_pSmallFireTexture->getHeight(); y += 32)
-		for (int x = 0; x < m_pSmallFireTexture->getWidth(); x += 32)
-			m_smallFireAnimation.addSprite(Sprite(
-				m_smallFireAnimation.getBaseTexture(), {x, y, 32, 32}));
+	// The looping flame consists of the five equally anchored frames in the
+	// first row. The isolated, much shorter image in row two is not part of
+	// this loop; including it made the flame visibly blink once per cycle.
+	for (int x = 0; x < 5 * 32; x += 32)
+		m_smallFireAnimation.addSprite(Sprite(
+			m_smallFireAnimation.getBaseTexture(), {x, 0, 32, 32}));
 
 	m_pBigFireTexture = new Texture(strToFolder + "big_fire.png", m_pRenderer);
 	m_bigFireAnimation = Animation(m_pBigFireTexture, 100);
@@ -1417,9 +1488,40 @@ void ResourceManager_wartools::readMissiles() {
 				m_bigFireAnimation.getBaseTexture(), {x, y, 48, 48}));
 }
 
+Animation ResourceManager_wartools::getSpellAnimation(SpellVisual visual) const {
+	return m_spellAnimations.at(visual);
+}
+
 
 Animation ResourceManager_wartools::getBuildingFireAnimation(bool large) const {
 	return large ? m_bigFireAnimation : m_smallFireAnimation;
+}
+
+Animation ResourceManager_wartools::getCorpseAnimation(
+	const Unit* unit, Direction direction) const {
+	assert(unit && m_pCorpseTexture);
+	Animation corpse(m_pCorpseTexture, 500, true);
+	int column = static_cast<int>(direction);
+	bool flipped = false;
+	if (column > 4) {
+		column -= (column - 4) * 2;
+		flipped = true;
+	}
+	constexpr int frameSize = 72;
+	const int footprintPixels = gMapUnitTilesize.at(typeid(*unit)) * Tile::TileWidth_px;
+	const Point offset{(footprintPixels - frameSize) / 2,
+		(footprintPixels - frameSize) / 2};
+	auto appendRepeated = [&](int row, int repetitions) {
+		for (int i = 0; i < repetitions; ++i)
+			corpse.addSprite(Sprite(corpse.getBaseTexture(),
+				{column * frameSize, row * frameSize, frameSize, frameSize},
+				offset, flipped));
+	};
+	// Faction-specific body, exposed skeleton, then scattered bones.
+	appendRepeated(unit->getFraction() == Fraction::Alliance ? 2 : 1, 7);
+	appendRepeated(4, 7);
+	appendRepeated(5, 5);
+	return corpse;
 }
 
 
@@ -1680,6 +1782,11 @@ Sprite ResourceManager_wartools::getIcon(Pud_Icon icon, Fraction fraction, Playe
    */
 
 	if (fraction == Fraction::Alliance)
+		return getIcon(icon, color);
+
+	// These are shared submenu buttons, not human/orc icon pairs.
+	if (icon == PUD_ICON_BUILD_STAGE_1 || icon == PUD_ICON_BUILD_STAGE_2 ||
+		icon == PUD_ICON_CANCEL)
 		return getIcon(icon, color);
 
 	// It is an Orc Icon:    

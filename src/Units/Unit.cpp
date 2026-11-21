@@ -20,12 +20,17 @@
 #include "Map/Map.h"
 #include "Map/AStar.h"
 #include "Global/PseudoRandom.h"
+#include "Global/GlobalAttributes.h"
 #include "Resources/SoundManager.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "EventHandling/StateCondition.h"
 #include "EventHandling/StateIdle.h"
 #include "EventHandling/StateMoving.h"
 #include "EventHandling/StateDead.h"
+#include "Units/Projectile.h"
+#include "Units/LandUnits/Ballista.h"
+#include "Units/LandUnits/Dwarfes/Dwarfes.h"
+#include "Units/LandUnits/Peasant/Peasant.h"
 #include <iostream>
 #include <filesystem>
 
@@ -50,6 +55,7 @@ Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, in
 
 	m_pIdle->addTransition(EventID(GeneralActions::Move), m_pMoving);
 	m_pIdle->addTransition(EventID(GeneralActions::Patrol), m_pPatrol);
+	m_pIdle->addTransition(EventID(GeneralActions::Attack), m_pMoving);
 
 	if (dynamic_cast<IArmed*>(this)) {
 		//   std::cerr << "Is armed: " << typeid(*this).name() << std::endl;
@@ -69,13 +75,14 @@ Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, in
 
 
 
-	m_pMoving->addTransition(EventID(GeneralActions::Attack), m_pIdle);
+	m_pMoving->addTransition(EventID(GeneralActions::Attack), m_pMoving);
 	m_pMoving->addTransition(EventID(GeneralActions::Stop), m_pIdle);
 	m_pMoving->addTransition(EventID(GeneralActions::Move), m_pMoving); // If a unit is already moving and another move event occurs
 
 
 	m_pPatrol->addTransition(EventID(GeneralActions::Stop), m_pIdle);
 	m_pPatrol->addTransition(EventID(GeneralActions::Move), m_pMoving);
+	m_pPatrol->addTransition(EventID(GeneralActions::Attack), m_pMoving);
 
 
 	auto f_isdead = [](int a, int b) {
@@ -100,6 +107,32 @@ void Unit::handleEvent(const Event& event) {
 	// interval would dereference an empty occupied-tile list.
 	if (!isPlacedOnMap())
 		return;
+	if (IArmed* armed = dynamic_cast<IArmed*>(this)) {
+		const auto action = static_cast<GeneralActions>(event.getEventID());
+		if (action == GeneralActions::Attack) {
+			removeBuff(BuffType::Invisibility);
+			Object* target = getMap()->getObjectOnTile({event.tileX(), event.tileY()});
+			if (target && target != this && target->isEnemy(this) &&
+				!target->getOwner()->isNeutral()) {
+				armed->assignTarget(target);
+				if (armed->activeTargetInRange(this)) {
+					// Stop an existing walk without clearing the target we just set.
+					m_stateMachine.handleEvent(Event(getID(), GeneralActions::Stop));
+					return;
+				}
+				if (Tile* approach = getMap()->getFreeTileAroundBuilding(target, this)) {
+					m_stateMachine.handleEvent(Event(getID(), GeneralActions::Attack,
+						approach->getX(), approach->getY()));
+					return;
+				}
+				return;
+			} else {
+				return;
+			}
+		} else if (action == GeneralActions::Move || action == GeneralActions::Stop) {
+			armed->clearActiveTarget();
+		}
+	}
 	m_stateMachine.handleEvent(event);
 }
 
@@ -129,11 +162,16 @@ void Unit::doHandleDeath() {
 	if (getOwner() && getOwner() != getMap()->getNeutralPlayer()) {
 		getOwner()->decreaseUsedFood();
 	}
+	if (isOrganic() && !isUnDead() && isLandObject() && isPlacedOnMap()) {
+		getMap()->addAnimation(getTile(),
+			g_pRessourceManager->getCorpseAnimation(this, m_facingDirection));
+	}
 	// ToDo: Stop all actions / states
 }
 
 
 void Unit::setIdleAnimation(Direction direction) {
+	m_facingDirection = direction;
 	m_currentAnimation = g_pRessourceManager->getUnitIdleAnimation(this, direction);
 }
 
@@ -153,6 +191,7 @@ Unit::~Unit() {
 void Unit::process() {
 	m_currentAnimation.process();
 	m_stateMachine.process();
+	updateCombat();
 
 	// Update buffs
 	for (auto& pair : m_activeBuffs) {
@@ -167,6 +206,82 @@ void Unit::process() {
 			++it;
 		}
 	}
+}
+
+Object* Unit::selectAutomaticTarget(IArmed* armed) const {
+	const std::set<Object*> targets = armed->findTargetObject(const_cast<Unit*>(this));
+	if (targets.empty()) return nullptr;
+	return *std::min_element(targets.begin(), targets.end(), [this](Object* lhs, Object* rhs) {
+		auto distance = [this](Object* object) {
+			const Point a = getTileLocation();
+			const Point b = object->getTileLocation();
+			return std::max(std::abs(a.x - b.x), std::abs(a.y - b.y));
+		};
+		const int lhsDistance = distance(lhs);
+		const int rhsDistance = distance(rhs);
+		if (lhsDistance != rhsDistance) return lhsDistance < rhsDistance;
+		return dynamic_cast<EventProcessor*>(lhs)->getID() <
+			dynamic_cast<EventProcessor*>(rhs)->getID();
+	});
+}
+
+void Unit::updateCombat() {
+	IArmed* armed = dynamic_cast<IArmed*>(this);
+	// Siege engines own a wind-up/release controller with different timing.
+	if (!armed || !armed->isArmed() || dynamic_cast<Ballista*>(this) ||
+		dynamic_cast<Dwarfes*>(this) ||
+		getOwner()->isNeutral() ||
+		isDead() || !isPlacedOnMap())
+		return;
+	if (m_attackCooldownRemaining > 0) {
+		if (--m_attackCooldownRemaining == 0)
+			setIdleAnimation(m_attackDirection);
+		return;
+	}
+	if (isMoving())
+		return;
+
+	Object* target = armed->activeTarget();
+	// Workers may defend themselves when explicitly ordered, but never acquire
+	// targets autonomously while idle.
+	if (!target && !dynamic_cast<Peasant*>(this) && isIdle()) {
+		target = selectAutomaticTarget(armed);
+		if (target) armed->assignTarget(target);
+	}
+	if (!target)
+		return;
+	if (!armed->activeTargetInRange(this)) {
+		// An explicitly selected target may have moved while we approached it.
+		if (isIdle()) {
+			const Point destination = target->getTileLocation();
+			handleEvent(Event(getID(), GeneralActions::Attack,
+				destination.x, destination.y));
+		}
+		return;
+	}
+
+	const Point ownPosition = getTileLocation();
+	const Point targetPosition = target->getTileLocation();
+	m_attackDirection = ownPosition == targetPosition ? Direction::N :
+		getTargetCardinalDirection(ownPosition, targetPosition);
+	m_facingDirection = m_attackDirection;
+	setCurrentAnimation(g_pRessourceManager->getUnitAnimation(
+		this, m_attackDirection,
+		ResourceManager_wartools::AnimationType::Attacking).playOnce());
+	if (armed->isCloseRangeUnit()) {
+		target->onAttackedBy(this);
+		target->takeDamage(armed->getAttackerStats());
+	} else {
+		getMap()->addMapObject(new Projectile(
+			ResourceManager_wartools::MissileType::Arrow, this, getMap(), target));
+	}
+	const int configured = armed->attackCooldownTicks();
+	m_attackCooldownRemaining = configured > 0 ? configured :
+		calculateRequiredTicksForGameAction(1000);
+	if (hasBuff(BuffType::Slow))
+		m_attackCooldownRemaining *= 2;
+	else if (hasBuff(BuffType::Haste) && isAirObject())
+		m_attackCooldownRemaining = std::max(1, m_attackCooldownRemaining / 2);
 }
 
 

@@ -8,8 +8,9 @@ set(MAGIC_SOURCES
     Runes.h
     SpellExecutor.cpp
     SpellExecutor.h
+	SpellEffect.cpp
+	SpellEffect.h
 )
 
 add_library(war25_magic OBJECT ${MAGIC_SOURCES})
 target_link_libraries(war25_magic PUBLIC war25_common)
-
