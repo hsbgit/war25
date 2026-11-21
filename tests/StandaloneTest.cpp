@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "GUI/CommandTargeting.h"
+#include "Global/UpgradeEffect.h"
 
 // Simple Point struct to avoid SDL dependency
 struct SimplePoint {
@@ -160,6 +161,17 @@ TEST_F(War25StandaloneTest, AttackerStats) {
 
     EXPECT_EQ(stats.getBasicDamage(), 15);
     EXPECT_EQ(stats.getPiercingDamage(), 8);
+}
+
+TEST_F(War25StandaloneTest, UpgradeEffectsAccumulateEveryStat) {
+    UpgradeEffect combined(1, 2, 3, 4, 5);
+    combined += UpgradeEffect(6, 7, 8, 9, 10);
+
+    EXPECT_EQ(combined.additionalPiercingDamage(), 7);
+    EXPECT_EQ(combined.additionalArmor(), 9);
+    EXPECT_EQ(combined.additionalHealth(), 11);
+    EXPECT_EQ(combined.additionalSight(), 13);
+    EXPECT_EQ(combined.additionalRange(), 15);
 }
 
 TEST_F(War25StandaloneTest, ActionEnums) {

@@ -29,8 +29,14 @@
 #include "EventHandling/StateDead.h"
 #include "Units/Projectile.h"
 #include "Units/LandUnits/Ballista.h"
+#include "Units/LandUnits/Archer.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
+#include "Units/LandUnits/Footman.h"
+#include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Peasant/Peasant.h"
+#include "Units/AirUnits/GryphonRider.h"
+#include "Units/SeaUnits/Battleship.h"
+#include "Units/SeaUnits/GnomishSubmarine.h"
 #include <iostream>
 #include <filesystem>
 
@@ -97,6 +103,25 @@ Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, in
 
 	m_stateMachine = StateMachine(m_pIdle);
 	//   setIdleAnimation();
+}
+
+int Unit::getSpeed() const {
+	if (hasBuff(BuffType::Slow))
+		return std::max(1, m_speed / 2);
+	if (!hasBuff(BuffType::Haste))
+		return m_speed;
+
+	// Warcraft II's Haste uses unit-specific speeds instead of a multiplier.
+	if (dynamic_cast<const Dwarfes*>(this)) return 17;
+	if (dynamic_cast<const Mage*>(this))
+		return getFraction() == Fraction::Orc ? 17 : 13;
+	if (dynamic_cast<const Ballista*>(this)) return 9;
+	if (dynamic_cast<const GryphonRider*>(this)) return 21;
+	if (dynamic_cast<const Battleship*>(this) || dynamic_cast<const GnomishSubmarine*>(this))
+		return 10;
+	if (dynamic_cast<const Peasant*>(this) || dynamic_cast<const Footman*>(this) ||
+		dynamic_cast<const Archer*>(this)) return 13;
+	return m_speed;
 }
 
 
@@ -268,9 +293,15 @@ void Unit::updateCombat() {
 	setCurrentAnimation(g_pRessourceManager->getUnitAnimation(
 		this, m_attackDirection,
 		ResourceManager_wartools::AnimationType::Attacking).playOnce());
+	removeBuff(BuffType::Invisibility);
 	if (armed->isCloseRangeUnit()) {
+		AttackerStats damage = armed->getAttackerStats();
+		if (hasBuff(BuffType::Bloodlust)) {
+			damage.setBasicDamage(damage.getBasicDamage() * 2);
+			damage.setPiercingDamage(damage.getPiercingDamage() * 2);
+		}
 		target->onAttackedBy(this);
-		target->takeDamage(armed->getAttackerStats());
+		target->takeDamage(damage);
 	} else {
 		getMap()->addMapObject(new Projectile(
 			ResourceManager_wartools::MissileType::Arrow, this, getMap(), target));
@@ -280,7 +311,7 @@ void Unit::updateCombat() {
 		calculateRequiredTicksForGameAction(1000);
 	if (hasBuff(BuffType::Slow))
 		m_attackCooldownRemaining *= 2;
-	else if (hasBuff(BuffType::Haste) && isAirObject())
+	else if (hasBuff(BuffType::Haste) && dynamic_cast<GryphonRider*>(this))
 		m_attackCooldownRemaining = std::max(1, m_attackCooldownRemaining / 2);
 }
 

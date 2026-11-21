@@ -31,7 +31,7 @@ public:
 	}
 
 	inline int getArmor() const override {
-		return m_armor + m_additionalArmor;
+		return m_armor + m_additionalArmor + m_upgradeStats.additionalArmor();
 	}
 
 	// IArmed

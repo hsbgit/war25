@@ -50,7 +50,7 @@ public:
     inline UpgradeEffect& operator+=(const UpgradeEffect& rhs) {
         m_addPiercingDamage += rhs.m_addPiercingDamage;
         m_addArmor += rhs.m_addArmor;
-        m_addHealth += rhs.m_addRange;
+        m_addHealth += rhs.m_addHealth;
         m_addSight += rhs.m_addSight;
         m_addRange += rhs.m_addRange;
         m_heals = rhs.m_heals;

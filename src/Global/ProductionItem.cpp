@@ -16,7 +16,7 @@
 */
 #include "ProductionItem.h"
 
-int factor_s = 10; // May be changed for debug purposes, should be '1000'
+int factor_s = 1000;
 
 
 std::unordered_map<ProductionItem::ItemType, ProductionItem> gMapProductionItems = {
@@ -36,7 +36,7 @@ std::unordered_map<ProductionItem::ItemType, ProductionItem> gMapProductionItems
 
 	// Harbour
 	{ProductionItem::ItemType::Tanker,  ProductionItem(ProductionItem::ItemType::Tanker, Resources(400,250), 50 * factor_s, UpgradeEffect(), PUD_ICON_HUMAN_TANKER, PUD_ICON_ORC_TANKER)},
-	{ProductionItem::ItemType::Transport,  ProductionItem(ProductionItem::ItemType::Transport, Resources(600,200,500), 7 * factor_s, UpgradeEffect(), PUD_ICON_HUMAN_TRANSPORT, PUD_ICON_ORC_TRANSPORT)},
+	{ProductionItem::ItemType::Transport,  ProductionItem(ProductionItem::ItemType::Transport, Resources(600,200,500), 70 * factor_s, UpgradeEffect(), PUD_ICON_HUMAN_TRANSPORT, PUD_ICON_ORC_TRANSPORT)},
 	{ProductionItem::ItemType::Destroyer,  ProductionItem(ProductionItem::ItemType::Destroyer, Resources(700,350,700), 90 * factor_s, UpgradeEffect(), PUD_ICON_ELVEN_DESTROYER, PUD_ICON_TROLL_DESTROYER)},
 	{ProductionItem::ItemType::Battleship,  ProductionItem(ProductionItem::ItemType::Battleship, Resources(1000,500,1000), 140 * factor_s, UpgradeEffect(), PUD_ICON_BATTLESHIP, PUD_ICON_JUGGERNAUGHT)},
 	{ProductionItem::ItemType::GnomishSubmarine,  ProductionItem(ProductionItem::ItemType::GnomishSubmarine, Resources(800,150,800), 100 * factor_s, UpgradeEffect(), PUD_ICON_GNOMISH_SUBMARINE, PUD_ICON_GIANT_TURTLE)},
@@ -88,13 +88,13 @@ std::unordered_map<ProductionItem::ItemType, ProductionItem> gMapProductionItems
    // In scenarios where you control both Hordeand Alliance units, researching an upgrade here will also grant you the equivalent Alliance upgrade
    {ProductionItem::ItemType::LumberMill_Arrows_1,  ProductionItem(ProductionItem::ItemType::LumberMill_Arrows_1, Resources(300,300), 200 * factor_s, UpgradeEffect(1), PUD_ICON_ARROW_1, PUD_ICON_SPEAR_1)},
    {ProductionItem::ItemType::LumberMill_Arrows_2,  ProductionItem(ProductionItem::ItemType::LumberMill_Arrows_2, Resources(900,500), 250 * factor_s, UpgradeEffect(1), PUD_ICON_ARROW_2, PUD_ICON_SPEAR_2)},
-   {ProductionItem::ItemType::LumberMill_Ranger,  ProductionItem(ProductionItem::ItemType::LumberMill_Ranger, Resources(1500), 250 * factor_s, UpgradeEffect(0,0,0,1), PUD_ICON_RANGER, PUD_ICON_BERSERKER)},
-   {ProductionItem::ItemType::LumberMill_RangerScouting,  ProductionItem(ProductionItem::ItemType::LumberMill_RangerScouting, Resources(1500), 250 * factor_s, UpgradeEffect(0,0,0,3), PUD_ICON_RANGER_SCOUTING, PUD_ICON_BERSERKER_SCOUTING)},
+   {ProductionItem::ItemType::LumberMill_Ranger,  ProductionItem(ProductionItem::ItemType::LumberMill_Ranger, Resources(1500), 250 * factor_s, UpgradeEffect(0,0,10), PUD_ICON_RANGER, PUD_ICON_BERSERKER)},
+   {ProductionItem::ItemType::LumberMill_RangerScouting,  ProductionItem(ProductionItem::ItemType::LumberMill_RangerScouting, Resources(1500), 250 * factor_s, UpgradeEffect(0,0,0,4), PUD_ICON_RANGER_SCOUTING, PUD_ICON_BERSERKER_SCOUTING)},
    {ProductionItem::ItemType::LumberMill_Longbow,  ProductionItem(ProductionItem::ItemType::LumberMill_Longbow, Resources(2000), 250 * factor_s, UpgradeEffect(0,0,0,0,1), PUD_ICON_LONGBOW, PUD_ICON_LIGHTER_AXES)},
    // Human specific
-   {ProductionItem::ItemType::LumberMill_Marksmanship,  ProductionItem(ProductionItem::ItemType::LumberMill_Marksmanship, Resources(1500), 250 * factor_s, UpgradeEffect(3), PUD_ICON_RANGER_MARKSMANSHIP)},
+   {ProductionItem::ItemType::LumberMill_Marksmanship,  ProductionItem(ProductionItem::ItemType::LumberMill_Marksmanship, Resources(2500), 250 * factor_s, UpgradeEffect(3), PUD_ICON_RANGER_MARKSMANSHIP)},
    // Troll specific
-   {ProductionItem::ItemType::LumberMill_TrollRegeneration,  ProductionItem(ProductionItem::ItemType::LumberMill_TrollRegeneration, Resources(2500), 250 * factor_s, UpgradeEffect(0,0,0,0,0,true), PUD_ICON_BERSERKER_REGENERATION)},
+   {ProductionItem::ItemType::LumberMill_TrollRegeneration,  ProductionItem(ProductionItem::ItemType::LumberMill_TrollRegeneration, Resources(3000), 250 * factor_s, UpgradeEffect(0,0,0,0,0,true), PUD_ICON_BERSERKER_REGENERATION)},
 
 
    // Foundry upgrades
@@ -170,5 +170,3 @@ PUD_ICON_RANGER_MARKSMANSHIP : PUD_ICON_BERSERKER_REGENERATION));
 
 
 			*/
-
-

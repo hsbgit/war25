@@ -53,7 +53,9 @@ public:
 	virtual void installUpgrade(const Upgrade& upgrade) {
 		if (m_setAllowedUpgrades.contains(upgrade.getItemType()) && !hasUpgrade(upgrade.getItemType())) {
 			m_setInstalledUpgrades.insert(upgrade.getItemType());
-
+			const int additionalHealth = upgrade.getUpgradeEffect().additionalHealth();
+			m_healthPoints += additionalHealth;
+			m_healthPointsMax += additionalHealth;
 			m_upgradeStats += upgrade.getUpgradeEffect();
 		}
 	}
@@ -167,7 +169,7 @@ public:
 
 
 	virtual int getArmor() const {
-		return m_armor;
+		return m_armor + m_upgradeStats.additionalArmor();
 	}
 
 	virtual int getSight() const {

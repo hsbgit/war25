@@ -44,13 +44,7 @@ SpellExecutor::~SpellExecutor() {
 void SpellExecutor::placeRunes(Runes& r, const Point& targetPos_world) {
     Tile* pTile = m_pMap->getTile(targetPos_world);
     if (pTile) {
-        if (pTile->hasObject() && pTile->getSeaOrLandUnit()) {
-            pTile->getSeaOrLandUnit()->takeDamage(AttackerStats(0, 50), true);
-            g_pSoundManager->playWAV(pTile, std::string("misc") + PATH_SEPARATOR + "explosion.wav");
-            m_pMap->addAnimation(pTile, g_pRessourceManager->getExplosionAnimation());
-        }
-        else if (!pTile->isDestroyable() && !pTile->isCoast()) {
-            // todo: just reduce mana if rune can be placed
+        if (!pTile->hasObject() && !pTile->isDestroyable() && !pTile->isCoast()) {
             r.vecRuneTiles.push_back(pTile);
         }
     }
@@ -133,7 +127,7 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
     {
         Unit* pUnit = unitOnTarget();
 
-        if (pUnit) {
+        if (pUnit && pUnit->isOrganic()) {
             pUnit->addBuff(Buff(BuffType::Bloodlust));
             g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "bloodlust.wav");
         }
@@ -244,7 +238,7 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
     {
         Unit* pUnit = unitOnTarget();
 
-        if (pUnit && pUnit->isOrganic()) {
+        if (pUnit) {
             if (typeid(*pUnit) == typeid(Dwarfes)) {
                  // You can also cast Unholy Armor on Demolition Squads and Goblin Sappers to blow them up.
                  // Unholy Armor's main weakness in the short time that it lasts. Often what the enemy will do is see Unholy Armor, run until the spell wears off and you're left with a unit with 1/2 hit points.
@@ -313,7 +307,7 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
 	case (int)MageActions::Blizzard:
 		m_pMap->addMapObject(new SpellEffect(caster, m_pMap, m_targetPos_world,
 			g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::Blizzard),
-			10000, 7, 2));
+			10000, 7, 2, SpellEffect::Motion::Fixed, nullptr, true));
 		g_pSoundManager->playWAV("spells/blizzard.wav");
 		break;
 
@@ -335,8 +329,9 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
 		const int damage = victims.empty() ? 0 : 50 / static_cast<int>(victims.size());
 		int drained = 0;
 		for (Unit* victim : victims) {
+			const int healthBefore = victim->getHealthPoints();
 			victim->takeDamage(AttackerStats(0, damage), true);
-			drained += damage;
+			drained += healthBefore - victim->getHealthPoints();
 		}
 		if (caster && drained > 0 && !caster->isDead()) caster->increaseHealth(drained);
 		g_pSoundManager->playWAV("spells/death_coil.wav");
@@ -365,27 +360,24 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
 	case (int)DeathKnightActions::DeathAndDecay:
 		m_pMap->addMapObject(new SpellEffect(caster, m_pMap, m_targetPos_world,
 			g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::DeathAndDecay),
-			10000, 7, 2));
+			10000, 7, 2, SpellEffect::Motion::Fixed, nullptr, true));
 		g_pSoundManager->playWAV("spells/death_and_decay.wav");
 		break;
 
     case (int)MageActions::Polymorph:
     {
         Unit* pUnit = unitOnTarget();
-        if (pUnit && pUnit->isLandObject() && pTargetTile->isLand()) {
-            // ToDo: Dragons yes, but what if dragons are on water?
+        if (pUnit && pUnit->isOrganic() && pTargetTile->isLand()) {
             // This turns any living creature into the critter for that map type such as Pig for Wasteland, Seal for Snow, Sheep for Forest, Boar for Swamp. 
             // There is no warning to enemy players that their units have been Polymorphs.
             // http://classic.battle.net/war2/units/mage.shtml
-            if (pUnit->isOrganic()) {
-                // Since we must place the critter we have to disconnect pUnit now from its tile
-                m_pMap->releaseObjectFromTile(pUnit);
+            // Since we must place the critter we have to disconnect pUnit now from its tile
+            m_pMap->releaseObjectFromTile(pUnit);
 
-                // Welcome new animal
-                Critter* critter = new Critter(m_pMap->getNeutralPlayer(), m_pMap);
-                m_pMap->placeUnit(pTargetTile, critter);
-                g_pSoundManager->playWAV("spells/polymorph.wav");
-            }
+            // Welcome new animal
+            Critter* critter = new Critter(m_pMap->getNeutralPlayer(), m_pMap);
+            m_pMap->placeUnit(pTargetTile, critter);
+            g_pSoundManager->playWAV("spells/polymorph.wav");
         }
     }
     break;

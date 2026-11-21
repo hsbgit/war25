@@ -13,12 +13,13 @@
 
 SpellEffect::SpellEffect(Object* caster, Map* map, const Point& centerTile,
 	const Animation& animation, int durationMs, int damagePerPulse,
-	int radiusTiles, Motion motion, Unit* target)
+	int radiusTiles, Motion motion, Unit* target, bool casterImmune)
 	: MapObject(caster), m_map(map), m_target(target), m_animation(animation),
 	  m_centerTile(centerTile), m_motion(motion),
 	  m_remainingTicks(calculateRequiredTicksForGameAction(durationMs)),
 	  m_pulseTicks(calculateRequiredTicksForGameAction(1000)),
-	  m_damagePerPulse(damagePerPulse), m_radiusTiles(radiusTiles) {
+	  m_damagePerPulse(damagePerPulse), m_radiusTiles(radiusTiles),
+	  m_casterImmune(casterImmune) {
 	updatePosition();
 }
 
@@ -38,7 +39,8 @@ void SpellEffect::applyDamage() {
 		(void)color;
 		if (!player) continue;
 		for (Object* object : player->getObjects()) {
-			if (!object || object->isDead() || !object->isPlacedOnMap() || object == m_target)
+			if (!object || object->isDead() || !object->isPlacedOnMap() || object == m_target ||
+				(m_casterImmune && object == m_pSource))
 				continue;
 			const Point position = object->getTileLocation();
 			if (std::max(std::abs(position.x - m_centerTile.x),

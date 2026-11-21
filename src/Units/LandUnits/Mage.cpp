@@ -22,10 +22,7 @@
 #include "Magic/SpellExecutor.h"
 
 
-// ToDo DeathKnight: +1 more range than the mage
-
-
-Mage::Mage(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 60, 0, 9, 8), IArmed(0, 9, 2) {
+Mage::Mage(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 60, 0, 9, 8), IArmed(0, 9, fraction == Fraction::Orc ? 3 : 2), IMagical(85) {
 	if (m_fraction == Fraction::Alliance) {
 		setDyingSound("human/basic_voices/dead.wav");
 		setSoundBaseDirectory("human/units/mage/");

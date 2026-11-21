@@ -18,7 +18,7 @@
 #include "Global/GlobalAttributes.h"
 
 
-IMagical::IMagical() : m_mana(255), m_maxMana(255) {
+IMagical::IMagical(int initialMana) : m_mana(initialMana), m_maxMana(255) {
     m_neededTicks = calculateRequiredTicksForGameAction(500);
     m_remainingTicks = m_neededTicks;
 }

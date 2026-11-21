@@ -40,13 +40,7 @@ public:
 	Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, int armor, int sight, int speed);
 	virtual ~Unit();
 
-	inline int getSpeed() const {
-		if (m_activeBuffs.contains(BuffType::Slow))
-			return std::max(1, m_speed / 2);
-		if (m_activeBuffs.contains(BuffType::Haste))
-			return m_speed + std::max(1, m_speed / 2);
-		return m_speed;
-	}
+	int getSpeed() const;
 
 	virtual bool isOrganic() const {
 		return true;

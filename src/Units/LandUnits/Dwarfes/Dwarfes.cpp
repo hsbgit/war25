@@ -20,7 +20,7 @@
 #include "Resources/resourcemanager_wartools.h"
 
 
-Dwarfes::Dwarfes(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 40, 0, 4, 11), IArmed(4, 4, 1) {
+Dwarfes::Dwarfes(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 40, 0, 4, 11), IArmed(4, 2, 1) {
 	if (m_fraction == Fraction::Alliance) {
 		setSoundBaseDirectory("human/units/dwarven_demolition_squad/");
 		setName("Dwarven Demolition Squad");

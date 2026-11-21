@@ -20,7 +20,7 @@
 #include "Global/GlobalAttributes.h"
 
 
-Archer::Archer(Player* pOwner, Fraction fraction, Map* pMap, bool isUpgraded) : Unit(pOwner, fraction, pMap, 50, 0, 5, 10), IArmed(3, 6, 4), m_berserkerRegenerationTicks(calculateRequiredTicksForGameAction(4000)) {
+Archer::Archer(Player* pOwner, Fraction fraction, Map* pMap, bool isUpgraded) : Unit(pOwner, fraction, pMap, 40, 0, 5, 10), IArmed(3, 6, 4), m_berserkerRegenerationTicks(calculateRequiredTicksForGameAction(4000)) {
 	if (m_fraction == Fraction::Alliance) {
 		setDyingSound("human/basic_voices/dead.wav");
 		setSoundBaseDirectory("human/units/elven_archer-ranger/");

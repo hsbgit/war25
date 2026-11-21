@@ -21,7 +21,7 @@
 #include "Magic/SpellExecutor.h"
 
 
-Knight::Knight(Player* pOwner, Fraction fraction, Map* pMap, bool isUpgraded) : Unit(pOwner, fraction, pMap, 90, 4, 4, 13), IArmed(8, 4, 1) {
+Knight::Knight(Player* pOwner, Fraction fraction, Map* pMap, bool isUpgraded) : Unit(pOwner, fraction, pMap, 90, 4, 5, 13), IArmed(8, 4, 1) {
 	if (m_fraction == Fraction::Alliance) {
 		setDyingSound("human/basic_voices/dead.wav");
 	}

@@ -48,15 +48,21 @@ void StateExplode::onExit() {
 	// Distance of two, see http://classic.battle.net/war2/units/gsdt.shtml:
 	//      "Demolition Squads, Goblin Sappersand Trees"
 	//      "Demolition Squad destroy about 2 rows of Trees."
-	std::vector<Tile*> vecNeighbourTiles = m_pOwner->getMap()->getNeighbourTiles(m_pOwner->getTile(), 2);
+	std::vector<Tile*> terrainTiles = m_pOwner->getMap()->getNeighbourTiles(m_pOwner->getTile(), 2);
+	std::vector<Tile*> damageTiles = m_pOwner->getMap()->getNeighbourTiles(m_pOwner->getTile(), 1);
 
 	std::set<Object*> setAlreadyDamagedObjects; // We must avoid that dwarfes damage the same building more than once as a building stands on different tiles
 
-	for (Tile* pTile : vecNeighbourTiles) {
+	for (Tile* pTile : terrainTiles) {
 		if (pTile->isSea())
 			continue;
 
 		pTile->destroy(); // Wood or rocks, if any
+	}
+
+	for (Tile* pTile : damageTiles) {
+		if (pTile->isSea())
+			continue;
 
 		// Includes the Transport, the only sea unit that can be destroyed if it is located/docked on a coastal tile
 		Object* pUnit = pTile->getSeaOrLandUnit();
@@ -68,9 +74,6 @@ void StateExplode::onExit() {
 				pUnit->takeDamage(AttackerStats(0, 400), true);
 				setAlreadyDamagedObjects.insert(pUnit);
 			}
-
-			// ToDo: 400 damage only to direct neighbour tiles
-			// ToDo: Currently crash after a second dwarves explosion?
 		}
 	}
 

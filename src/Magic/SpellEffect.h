@@ -12,7 +12,8 @@ public:
 
 	SpellEffect(Object* caster, Map* map, const Point& centerTile,
 		const Animation& animation, int durationMs, int damagePerPulse,
-		int radiusTiles, Motion motion = Motion::Fixed, Unit* target = nullptr);
+		int radiusTiles, Motion motion = Motion::Fixed, Unit* target = nullptr,
+		bool casterImmune = false);
 
 	void process() override;
 	bool isExpired() const override { return m_remainingTicks <= 0; }
@@ -34,5 +35,6 @@ private:
 	int m_ticksUntilPulse = 0;
 	int m_damagePerPulse;
 	int m_radiusTiles;
+	bool m_casterImmune;
 	int m_motionStep = 0;
 };

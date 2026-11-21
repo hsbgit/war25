@@ -20,6 +20,7 @@
 #include "Global/GlobalAttributes.h"
 #include "Map/Map.h"
 #include "Player.h"
+#include "Units/Unit.h"
 
 #include <algorithm>
 #include <cmath>
@@ -35,6 +36,10 @@ Projectile::Projectile(ResourceManager_wartools::MissileType type, Object* pSour
 	m_expired(false) {
 
 	initializeMissile(pSource, pTarget);
+	if (auto* unit = dynamic_cast<Unit*>(pSource); unit && unit->hasBuff(BuffType::Bloodlust)) {
+		m_attackerStats.setBasicDamage(m_attackerStats.getBasicDamage() * 2);
+		m_attackerStats.setPiercingDamage(m_attackerStats.getPiercingDamage() * 2);
+	}
 }
 
 

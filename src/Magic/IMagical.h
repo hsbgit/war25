@@ -19,7 +19,7 @@
 
 class IMagical {
 public:
-    IMagical();
+    explicit IMagical(int initialMana = 255);
 
     void process();
 
