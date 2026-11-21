@@ -17,11 +17,19 @@
 #pragma once
 
 #include "Units/Unit.h"
+#include <vector>
 
 
 class Transport : public Unit {
 public:
 	Transport(Player* pOwner, Fraction fraction, Map* pMap);
+
+	std::vector<Action> getActions() const override;
+	void handleEvent(const Event& event) override;
+	void process() override;
+	void doHandleDeath() override;
+	bool requestBoard(Unit* passenger);
+	std::size_t passengerCount() const { return m_passengers.size(); }
 
 	Type getType() const override {
 		return Type::Sea;
@@ -30,4 +38,10 @@ public:
 	bool isOrganic() const override {
 		return false;
 	}
+
+private:
+	void unloadAll();
+	static constexpr std::size_t Capacity = 6;
+	std::vector<EventProcessorID> m_passengers;
+	std::vector<EventProcessorID> m_pendingPassengers;
 };

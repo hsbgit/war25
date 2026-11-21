@@ -226,6 +226,9 @@ public:
 	inline std::vector<Tile*>& getOccupiedTiles() {
 		return m_vecOccupiedTiles;
 	}
+	inline const std::vector<Tile*>& getOccupiedTiles() const {
+		return m_vecOccupiedTiles;
+	}
 
 
 private:

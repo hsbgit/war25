@@ -37,6 +37,7 @@
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
 #include "Units/SeaUnits/GnomishSubmarine.h"
+#include "Units/SeaUnits/Transport.h"
 #include <iostream>
 #include <filesystem>
 
@@ -132,12 +133,31 @@ void Unit::handleEvent(const Event& event) {
 	// interval would dereference an empty occupied-tile list.
 	if (!isPlacedOnMap())
 		return;
+	if (static_cast<GeneralActions>(event.getEventID()) == GeneralActions::Move &&
+		isLandObject()) {
+		Object* clicked = getMap()->getObjectOnTile({event.tileX(), event.tileY()});
+		auto* transport = dynamic_cast<Transport*>(clicked);
+		if (transport && transport->getOwner() == getOwner() && transport->requestBoard(this)) {
+			if (Tile* approach = getMap()->getFreeTileAroundBuilding(transport, this))
+				m_stateMachine.handleEvent(Event(getID(), GeneralActions::Move,
+					approach->getX(), approach->getY()));
+			return;
+		}
+	}
 	if (IArmed* armed = dynamic_cast<IArmed*>(this)) {
 		const auto action = static_cast<GeneralActions>(event.getEventID());
+		if (action == GeneralActions::StandGround) {
+			m_standGround = true;
+			armed->clearActiveTarget();
+			m_stateMachine.handleEvent(Event(getID(), GeneralActions::Stop));
+			return;
+		}
 		if (action == GeneralActions::Attack) {
+			m_standGround = false;
 			removeBuff(BuffType::Invisibility);
 			Object* target = getMap()->getObjectOnTile({event.tileX(), event.tileY()});
 			if (target && target != this && target->isEnemy(this) &&
+				armed->canAttackTarget(target) &&
 				!target->getOwner()->isNeutral()) {
 				armed->assignTarget(target);
 				if (armed->activeTargetInRange(this)) {
@@ -155,6 +175,7 @@ void Unit::handleEvent(const Event& event) {
 				return;
 			}
 		} else if (action == GeneralActions::Move || action == GeneralActions::Stop) {
+			if (action == GeneralActions::Move) m_standGround = false;
 			armed->clearActiveTarget();
 		}
 	}
@@ -276,6 +297,10 @@ void Unit::updateCombat() {
 	if (!target)
 		return;
 	if (!armed->activeTargetInRange(this)) {
+		if (m_standGround) {
+			armed->clearActiveTarget();
+			return;
+		}
 		// An explicitly selected target may have moved while we approached it.
 		if (isIdle()) {
 			const Point destination = target->getTileLocation();

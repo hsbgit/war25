@@ -22,7 +22,7 @@
 #include "Resources/resourcemanager_wartools.h"
 
 
-GnomishInventor::GnomishInventor(Peasant* pErecter, Map* pMap) : Building(pErecter, pMap, 175, 700, 3) {
+GnomishInventor::GnomishInventor(Peasant* pErecter, Map* pMap) : Building(pErecter, pMap, 175, 500, 3) {
 	setProperties();
 }
 

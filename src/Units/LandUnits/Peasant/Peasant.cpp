@@ -34,6 +34,9 @@
 #include "Buildings/Shipyard.h"
 #include "Buildings/Foundry.h"
 #include "Buildings/OilRefinery.h"
+#include "Buildings/Building.h"
+#include "Units/SeaUnits/Transport.h"
+#include "EventHandling/EventBroker.h"
 
 #include <iostream>
 
@@ -109,6 +112,12 @@ void Peasant::handleEvent(const Event& event) {
 		}
 	}
 	EventID id = event.getEventID();
+	if ((PeasantActions)id == PeasantActions::Repair) {
+		beginRepair(event);
+		return;
+	}
+	m_repairTarget = 0;
+	m_repairTickCounter = 0;
 
 	bool harvestEvent = false;
 	Event normalizedEvent = event;
@@ -152,10 +161,91 @@ void Peasant::handleEvent(const Event& event) {
 
 void Peasant::process() {
 	Unit::process();
+	processRepair();
 	if (m_pendingCommand && currentlyCarrying() == ResourceType::Nothing && isPlacedOnMap()) {
 		Event pending = *m_pendingCommand;
 		m_pendingCommand.reset();
 		handleEvent(pending);
+	}
+}
+
+bool Peasant::isNextTo(const Object* target) const {
+	if (!target || !isPlacedOnMap() || !target->isPlacedOnMap()) return false;
+	const Point own = getTileLocation();
+	for (Tile* tile : target->getOccupiedTiles()) {
+		if (std::max(std::abs(own.x - tile->getX()),
+			std::abs(own.y - tile->getY())) <= 1)
+			return true;
+	}
+	return false;
+}
+
+void Peasant::beginRepair(const Event& event) {
+	Object* target = getMap()->getObjectOnTile(event.tileX(), event.tileY());
+	auto* processor = dynamic_cast<EventProcessor*>(target);
+	const bool repairable = target && target != this && !target->isDead() &&
+		target->getOwner() == getOwner() &&
+		(dynamic_cast<Building*>(target) || dynamic_cast<Transport*>(target));
+	if (!repairable || !processor || target->getHealthPoints() >= target->getMaxHealthPoints()) {
+		m_repairTarget = 0;
+		return;
+	}
+
+	m_pendingCommand.reset();
+	m_repairTarget = processor->getID();
+	m_repairTickCounter = 0;
+	if (isNextTo(target)) {
+		Unit::handleEvent(Event(getID(), GeneralActions::Stop));
+		return;
+	}
+	if (Tile* approach = getMap()->getFreeTileAroundBuilding(target, this))
+		Unit::handleEvent(Event(getID(), GeneralActions::Move,
+			approach->getX(), approach->getY()));
+	else
+		m_repairTarget = 0;
+}
+
+void Peasant::processRepair() {
+	if (!m_repairTarget || isDead() || !isPlacedOnMap()) return;
+	auto* target = dynamic_cast<Object*>(g_pEventBroker.getEventHandler(m_repairTarget));
+	if (!target || target->isDead() || target->getOwner() != getOwner() ||
+		(!dynamic_cast<Building*>(target) && !dynamic_cast<Transport*>(target))) {
+		m_repairTarget = 0;
+		return;
+	}
+	if (!isNextTo(target)) {
+		// A docked transport may have moved after the order was given.
+		if (!isMoving()) beginRepair(Event(getID(), PeasantActions::Repair,
+			target->getTileLocation().x, target->getTileLocation().y));
+		return;
+	}
+	if (isMoving()) Unit::handleEvent(Event(getID(), GeneralActions::Stop));
+
+	int interval = calculateRequiredTicksForGameAction(125); // 8 HP/s
+	if (hasBuff(BuffType::Haste)) interval = std::max(1, interval / 2);
+	if (hasBuff(BuffType::Slow)) interval *= 2;
+	if (++m_repairTickCounter < interval) return;
+	m_repairTickCounter = 0;
+
+	if (target->getHealthPoints() >= target->getMaxHealthPoints()) {
+		m_repairTarget = 0;
+		return;
+	}
+	if (m_repairHitPointsSincePayment == 3 &&
+		!getOwner()->takeFromResources(Resources(1, 1)))
+		return;
+
+	bool repaired = false;
+	if (auto* building = dynamic_cast<Building*>(target); building && building->isUnderConstruction())
+		repaired = building->addConstructionHitPoint();
+	else {
+		target->increaseHealth(1);
+		repaired = true;
+	}
+	if (repaired) {
+		m_repairHitPointsSincePayment = (m_repairHitPointsSincePayment + 1) % 4;
+		if (target->getHealthPoints() >= target->getMaxHealthPoints())
+			m_repairTarget = 0;
 	}
 }
 

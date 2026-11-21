@@ -47,6 +47,7 @@ public:
 	virtual bool canAttackAirUnits() const {
 		return false;
 	}
+	virtual bool canAttackTarget(const Object*) const { return true; }
 
 	inline int getBasicDamage() const {
 		return m_basicDamage;

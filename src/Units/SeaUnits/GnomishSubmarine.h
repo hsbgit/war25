@@ -43,4 +43,6 @@ public:
 	int getAdditionalAttackRange() const override {
 		return 0;
 	}
+
+	bool canAttackTarget(const Object* target) const override;
 };

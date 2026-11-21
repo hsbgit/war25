@@ -22,7 +22,7 @@
 #include <cassert>
 
 
-MageTower::MageTower(Peasant* pErecter, Map* pMap) : Building(pErecter, pMap, 125, 700, 3) {
+MageTower::MageTower(Peasant* pErecter, Map* pMap) : Building(pErecter, pMap, 125, 500, 3) {
 	setProperties();
 }
 
@@ -67,5 +67,4 @@ std::vector<ProductionItem::ItemType> MageTower::getProductionItemList() const {
 
 	return vecProductionItems;
 }
-
 

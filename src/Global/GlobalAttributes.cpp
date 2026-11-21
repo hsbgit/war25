@@ -63,9 +63,11 @@ int g_tick_ms;
 
 
 int calculateRequiredTicksForGameAction(int requiredTime_ms) {
-	assert(requiredTime_ms % g_tick_ms == 0); // Must be perfectly synchronized to dt_ms
-	int requiredTicks = requiredTime_ms / g_tick_ms;
-	return requiredTicks;
+	assert(g_tick_ms > 0);
+	// Asset animation intervals are not all exact multiples of the lockstep
+	// duration (for example Blizzard uses 120 ms at a 25 ms tick). Round up so
+	// actions remain deterministic without aborting every map during loading.
+	return std::max(1, (requiredTime_ms + g_tick_ms - 1) / g_tick_ms);
 }
 
 

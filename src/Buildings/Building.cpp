@@ -163,6 +163,18 @@ void Building::handleBuildProgress() {
 	}
 }
 
+bool Building::addConstructionHitPoint() {
+	if (!isUnderConstruction() || m_constructionElapsedTicks >= m_constructionTotalTicks)
+		return false;
+
+	const int previousHealth = m_healthPoints;
+	// Construction is time based. Advance just far enough to obtain one hit
+	// point so an assisting worker follows Warcraft II's 8 HP/s repair rate.
+	while (isUnderConstruction() && m_healthPoints == previousHealth)
+		handleBuildProgress();
+	return m_healthPoints > previousHealth;
+}
+
 
 void Building::onConstructionFinished() {
 	assert(m_pErecter);

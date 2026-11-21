@@ -33,5 +33,6 @@ enum class PaladinActions { HolyVision = 400, Heal, Excorcism };
 enum class OgreActions { EyeOfKillrogg = 500, Runes };
 enum class DwarfesActions { Explode = 600 };
 enum class BuildingActions { CancelConstruction = 800 };
+enum class TransportActions { Unload = 900 };
 
 enum class BuffType { Uninitialized = 700, Bloodlust, Haste, Slow, Invisibility, UnholyArmor };

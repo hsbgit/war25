@@ -57,8 +57,15 @@ public:
 	}
 
 private:
+	void beginRepair(const Event& event);
+	void processRepair();
+	bool isNextTo(const Object* target) const;
+
 	CompositeStateMining* m_pHarvestGold = nullptr;
 	CompositeStateChopWood* m_pHarvestWood = nullptr;
 	CompositeStateConstructBuilding* m_pConstructBuilding = nullptr;
 	std::optional<Event> m_pendingCommand;
+	EventProcessorID m_repairTarget = 0;
+	int m_repairTickCounter = 0;
+	int m_repairHitPointsSincePayment = 0;
 };

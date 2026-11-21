@@ -47,10 +47,10 @@ std::set<Object*> IArmed::findTargetObject(Object* pAttacker) const {
 	std::set<Object*> setObjectsInRange = pAttacker->getMap()->getVisibleObjectsWithinRange(pAttacker, attackRange(), canAttackAirUnits());
 
 	std::erase_if(setObjectsInRange,
-		[pAttacker](Object* pTarget) {
+		[pAttacker, this](Object* pTarget) {
 			return !pTarget->isEnemy(pAttacker) ||
 				pTarget->getFraction() == Fraction::Neutral ||
-				pTarget->getOwner()->isNeutral();
+				pTarget->getOwner()->isNeutral() || !canAttackTarget(pTarget);
 		});
 
 	return setObjectsInRange;

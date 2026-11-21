@@ -15,6 +15,10 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 #include "GnomishSubmarine.h"
+#include "Buildings/Shipyard.h"
+#include "Buildings/Foundry.h"
+#include "Buildings/OilRefinery.h"
+#include "Buildings/OilRig.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "Player.h"
 
@@ -42,4 +46,10 @@ GnomishSubmarine::GnomishSubmarine(Player* pOwner, Fraction fraction, Map* pMap)
     m_icon = g_pRessourceManager->getIcon(PUD_ICON_GNOMISH_SUBMARINE, this->getFraction(), getOwner()->getColor());
 
     setName((fraction == Fraction::Alliance) ? "Gnomish Submarine" : "Giant Turtle");
+}
+
+bool GnomishSubmarine::canAttackTarget(const Object* target) const {
+	return target && (target->isSeaObject() || dynamic_cast<const Shipyard*>(target) ||
+		dynamic_cast<const Foundry*>(target) || dynamic_cast<const OilRefinery*>(target) ||
+		dynamic_cast<const OilRig*>(target));
 }

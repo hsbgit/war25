@@ -74,6 +74,10 @@ public:
 		return (m_currState == BuildingState::InConstruction1 || m_currState == BuildingState::InConstruction2 || m_currState == BuildingState::InConstruction3);
 	}
 
+	// Additional workers use the normal repair rate while helping with a build.
+	// Returns true when at least one construction hit point was added.
+	bool addConstructionHitPoint();
+
 protected:
 	void playSoundSelected() override;
 

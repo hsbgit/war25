@@ -127,4 +127,5 @@ private:
 	int m_attackCooldownRemaining = 0;
 	Direction m_attackDirection = Direction::N;
 	Direction m_facingDirection = Direction::N;
+	bool m_standGround = false;
 };
