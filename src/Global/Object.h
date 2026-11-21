@@ -113,6 +113,10 @@ public:
 		return getType() == Type::Air;
 	}
 
+	// Transports may enter coastal tiles to let land units board and unload.
+	// Other ships remain restricted to open water.
+	virtual bool canDockOnCoast() const { return false; }
+
 	virtual bool isSelectable() const {
 		return !isDead();
 	}

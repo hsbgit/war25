@@ -19,6 +19,7 @@
 #include "Map/Map.h"
 #include "Map/Tile.h"
 #include "Global/Object.h"
+#include "Map/MovementRules.h"
 
 #include <algorithm>
 #include <cmath>
@@ -81,12 +82,10 @@ bool AStar::canVisit(const INode* from, const INode* to) const {
 		for (int y = topLeftY; y < topLeftY + m_unitSize; ++y) {
 			for (int x = topLeftX; x < topLeftX + m_unitSize; ++x) {
 				const Tile* tile = map->getTile({x, y});
-				if (m_pMovingObject->isLandObject()) {
-					if (!tile->isLand() || tile->isCoast() || tile->isRocks() ||
-						tile->isWood() || tile->isWall())
-						return false;
-				} else if (m_pMovingObject->isSeaObject() &&
-					(!tile->isSea() || tile->isCoast())) {
+				if (!MovementRules::terrainAllows(m_pMovingObject->isLandObject(),
+					m_pMovingObject->isSeaObject(), m_pMovingObject->canDockOnCoast(),
+					tile->isLand(), tile->isSea(), tile->isCoast(), tile->isRocks(),
+					tile->isWood(), tile->isWall())) {
 					return false;
 				}
 			}
@@ -155,7 +154,8 @@ Path AStar::findPath() {
 		const NeighbourNodes* neighbours;
 		if (m_pMovingObject) {
 			Tile* tile = static_cast<Tile*>(current);
-			neighbours = m_airPath ? &tile->neighbourTiles : &tile->neighbourTiles_SameType;
+			neighbours = (m_airPath || m_pMovingObject->canDockOnCoast())
+				? &tile->neighbourTiles : &tile->neighbourTiles_SameType;
 		} else {
 			availableNeighbours = current->getFreeNeighbourNodes(m_unitSize, m_airPath);
 			neighbours = &availableNeighbours;

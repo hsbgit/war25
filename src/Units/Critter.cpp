@@ -48,6 +48,10 @@ Critter::~Critter() {
 	g_pRessourceManager->deregisterSeasonObserver(this);
 }
 
+bool Critter::isMoving() const {
+	return m_currState == State::Moving;
+}
+
 
 void Critter::process() {
 	if (isDead()) {
@@ -179,7 +183,6 @@ void Critter::stateIdle() {
 }
 
 
-// ToDo: Replace with c++ state machine pattern just like a regular unit? 
 void Critter::stateMoving() {
 	Tile* pTile = pTileToMove;
 	Point dest = pTile->getPos();

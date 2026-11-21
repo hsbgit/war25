@@ -105,10 +105,7 @@ private:
 
 
     struct DebugSettings {
-        bool showDemoWindow = false;
-        bool showAnotherWindow = false;
 		bool showMetricsWindow = false;
-        ImVec4 clearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     } m_debugSettings;
 
     static constexpr size_t MAX_SAVED_SELECTIONS = 10;

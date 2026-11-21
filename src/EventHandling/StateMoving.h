@@ -19,8 +19,10 @@
 
 #include "State.h"
 #include "Map/Path.h"
+#include "Map/INode.h"
 #include "Direction.h"
 #include "Types.h"
+#include "Map/MovementRules.h"
 
 class Tile;
 
@@ -33,6 +35,7 @@ public:
     void onExit() override;
 
     State* process() override;
+	bool isMovingState() const override { return true; }
 
     void setTargetTile(const Point& targetPos_world);
 
@@ -42,6 +45,8 @@ private:
     Tile* m_pNextTileToMove = nullptr;
     Tile* getNextTile(bool* pathTemporarilyBlocked);
     Tile* getNextPathTile(bool* pathTemporarilyBlocked);
+	Tile* startPathfinding(bool* pathTemporarilyBlocked);
+	const NeighbourNodes& neighbourTilesForOwner() const;
     bool isOccupiedByAnotherUnit(const Tile* topLeft) const;
     bool canMoveTo(const Tile* tile) const;
 
@@ -63,5 +68,6 @@ private:
 
     Point m_targetPos_world;
     Tile* m_pTargetTile = nullptr;
+	MovementRules::NavigationProgress m_navigationProgress;
 
 };

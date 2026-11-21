@@ -22,7 +22,7 @@ namespace War25::Constants {
     // Game Logic Constants
     constexpr int TICKS_PER_SECOND = 40;
     constexpr int TICK_DURATION_MS = 1000 / TICKS_PER_SECOND;
-    constexpr int MAX_FRAMESKIP = 10;
+    constexpr int MAX_FRAMESKIP = 64;
 
     // Default Window Settings
     constexpr int DEFAULT_WINDOW_WIDTH = 1600;

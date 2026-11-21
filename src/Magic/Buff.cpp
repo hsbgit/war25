@@ -27,24 +27,23 @@ Buff::Buff() {
 Buff::Buff(BuffType t) : m_type(t) {
 	switch (t) {
 	case BuffType::UnholyArmor:
-		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000); // ToDo: Exact value unknown
+		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000);
 		break;
 
 	case BuffType::Invisibility:
-		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000); // ToDo: Exact value unknown
-		// Todo: Or until this unit attacks
+		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000);
 		break;
 
 	case BuffType::Slow:
-		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000); // ToDo: Exact value unknown
+		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000);
 		break;
 
 	case BuffType::Haste:
-		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000); // ToDo: Exact value unknown
+		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000);
 		break;
 
 	case BuffType::Bloodlust:
-		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000); // ToDo: Exact value unknown
+		m_originalLifespan_ticks = calculateRequiredTicksForGameAction(20 * 1000);
 		break;
 
 

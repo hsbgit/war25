@@ -27,10 +27,12 @@ class StateMoving;
 class CompositeStatePatrol : public State {
 public:
 	CompositeStatePatrol(Unit* pUnit);
+	~CompositeStatePatrol() override;
 
-	void onEnter(const Event* pEvent = nullptr);
+	void onEnter(const Event* pEvent = nullptr) override;
 
-	State* process();
+	State* process() override;
+	bool isMovingState() const override { return true; }
 
 private:
 	State* m_pCurrState = nullptr;

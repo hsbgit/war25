@@ -16,11 +16,6 @@
 */
 
 
-// ----------------------------------------------------------------------------
-// !!! ToDo: This file needs a big refactoring !!!
-// ----------------------------------------------------------------------------
-
-
 #include "StateMoving.h"
 #include "Map/AStar.h"
 #include "Map/Tile.h"
@@ -30,9 +25,7 @@
 #include "Units/Resource/IResourceCollector.h"
 
 Tile* StateMoving::isTargetTileANeighbourTile() {
-	const auto& neighbourTiles = m_pOwner->isAirObject()
-		? m_pOwner->getTileTopLeft()->neighbourTiles
-		: m_pOwner->getTileTopLeft()->neighbourTiles_SameType;
+	const auto& neighbourTiles = neighbourTilesForOwner();
 	auto it = std::find_if(neighbourTiles.begin(), neighbourTiles.end(), [this](const auto& it) {
 		return it.second == m_pTargetTile;
 		});
@@ -40,8 +33,16 @@ Tile* StateMoving::isTargetTileANeighbourTile() {
 	return (it != neighbourTiles.end()) ? dynamic_cast<Tile*>((*it).second) : nullptr;
 }
 
+const NeighbourNodes& StateMoving::neighbourTilesForOwner() const {
+	const Tile* tile = m_pOwner->getTileTopLeft();
+	return (m_pOwner->isAirObject() || m_pOwner->canDockOnCoast())
+		? tile->neighbourTiles : tile->neighbourTiles_SameType;
+}
+
 
 void StateMoving::setDirection(Direction direction) {
+	if (auto* unit = dynamic_cast<Unit*>(m_pOwner))
+		unit->setFacingDirection(direction);
 	if (direction != m_currentDirection) {
 		m_directionChanged = true;
 		m_currentDirection = direction;
@@ -79,6 +80,16 @@ Tile* StateMoving::getNextPathTile(bool* pathTemporarilyBlocked) {
 	setDirection(getTargetCardinalDirection(m_pOwner->getTile(), pNextTile));
 	m_path.popFront();
 	return pNextTile;
+}
+
+Tile* StateMoving::startPathfinding(bool* pathTemporarilyBlocked) {
+	assert(m_pTargetTile);
+	const int unitSize = gMapUnitTilesize.at(typeid(*m_pOwner));
+	AStar pathfinder(m_pOwner->getTileTopLeft(), m_pTargetTile, unitSize,
+		m_pOwner->isAirObject(), m_pOwner);
+	m_path = pathfinder.findPath();
+	m_navigationProgress.pathfindingStarted();
+	return m_path.isValid() ? getNextPathTile(pathTemporarilyBlocked) : nullptr;
 }
 
 bool StateMoving::canMoveTo(const Tile* tile) const {
@@ -147,6 +158,10 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	// Is a path used?
 	if (m_path.isValid())
 		return getNextPathTile(pathTemporarilyBlocked);
+	// Preserve cheap direct movement on open ground. If three completed steps
+	// fail to improve the distance, the greedy approach is circling an obstacle.
+	if (m_navigationProgress.shouldUsePathfinding())
+		return startPathfinding(pathTemporarilyBlocked);
 
 
 	// Otherwise use a simple approach: Simply walk into the target direction and avoid 1x1 obstacles if possible
@@ -156,7 +171,9 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 
 	const int unitSize_tile = gMapUnitTilesize.at(typeid(*m_pOwner));
 
-	auto mapFreeTiles = m_pOwner->getTileTopLeft()->getFreeNeighbourNodes(unitSize_tile, m_pOwner->isAirObject());
+	auto mapFreeTiles = m_pOwner->canDockOnCoast()
+		? NeighbourNodes(neighbourTilesForOwner())
+		: m_pOwner->getTileTopLeft()->getFreeNeighbourNodes(unitSize_tile, m_pOwner->isAirObject());
 	if (mapFreeTiles.contains(targetDir) &&
 		canMoveTo(dynamic_cast<Tile*>(mapFreeTiles[targetDir]))) {
 		setDirection(targetDir);
@@ -188,22 +205,7 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 		return dynamic_cast<Tile*>(mapFreeTiles[right]);
 	}
 
-	// Simple approach (straight,left, right) did not work, we are blocked
-	// Let's try AStar
-	assert(!m_path.isValid());  // error if target could not be reached
-	assert(m_pTargetTile);
-
-	AStar a(dynamic_cast<INode*>(m_pOwner->getTileTopLeft()), dynamic_cast<INode*>(m_pTargetTile),
-		unitSize_tile, m_pOwner->isAirObject(), m_pOwner);
-	m_path = a.findPath();
-
-	if (m_path.isValid()) {
-		return getNextPathTile(pathTemporarilyBlocked);
-	}
-
-	// A* treats units as temporary congestion, so failure here means there is
-	// no terrain-valid route to the requested destination.
-	return nullptr;
+	return startPathfinding(pathTemporarilyBlocked);
 }
 
 
@@ -232,6 +234,8 @@ void StateMoving::setTargetTile(const Point& targetPos_world) {
 	m_path.clear();
 	m_pathRetryTicks = 0;
 	m_blockedPathRetries = 0;
+	if (m_pOwner->isPlacedOnMap())
+		m_navigationProgress.reset(m_pOwner->getTileLocation(), targetPos_world);
 }
 
 
@@ -249,6 +253,7 @@ void StateMoving::onExit() {
 
 	m_path.clear();
 	m_blockedPathRetries = 0;
+	m_pathRetryTicks = 0;
 
 	State::onExit();
 }
@@ -273,7 +278,6 @@ State* StateMoving::process() {
 	}
 	Point currPos_tile = m_pOwner->getTileLocation();
 
-	// Todo: write comparision operator
 	// It is important to check whether m_pTileToMove is a nullptr
 	// We set the next tile always in advance, so the last animation would not run to the end.
 	// Hence, we have to wait until 'm_pTileToMove' is nullptr -> see end of this method
@@ -288,7 +292,6 @@ State* StateMoving::process() {
 
 		if (!m_pNextTileToMove) {
 			if (temporarilyBlocked) {
-				// TODO: Implement proper yielding that doesn't break pathfinding
 				return this; // Still blocked, wait
 			}
 			else
@@ -319,9 +322,6 @@ State* StateMoving::process() {
 	m_tickCounter = 0;*/
 
 
-	Point dest = m_pNextTileToMove->getPos();
-
-	// 10 -> 1 tile pro sekunde ?
 	Unit* pUnit = dynamic_cast<Unit*>(m_pOwner);
 	// Deklaration der Richtungsabh�ngigen Geschwindigkeit vorab
 	int speed_x = 0;
@@ -368,7 +368,8 @@ State* StateMoving::process() {
 	if (sgn(m_tilePositionOffset_px.x) != sgn(speed_x) || sgn(m_tilePositionOffset_px.y) != sgn(speed_y)) {
 		m_tilePositionOffset_px = { 0, 0 };
 		m_pOwner->clearTilePositionOffset();
-		m_pNextTileToMove = nullptr; // N�chstes Ziel-Tile zur�cksetzen, da das aktuelle Ziel erreicht wurde
+		m_pNextTileToMove = nullptr;
+		m_navigationProgress.recordStep(m_pOwner->getTileLocation(), m_targetPos_world);
 	}
 
 	return this;

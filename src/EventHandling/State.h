@@ -60,6 +60,7 @@ public:
 
 
 	virtual State* process() = 0;
+	virtual bool isMovingState() const { return false; }
 
 	State* checkForTransition(const Event& event);
 	State* checkForTransition();

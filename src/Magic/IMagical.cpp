@@ -16,16 +16,17 @@
 */
 #include "IMagical.h"
 #include "Global/GlobalAttributes.h"
+#include <algorithm>
 
 
-IMagical::IMagical(int initialMana) : m_mana(initialMana), m_maxMana(255) {
+IMagical::IMagical(int initialMana) : m_mana(std::clamp(initialMana, 0, 255)), m_maxMana(255) {
     m_neededTicks = calculateRequiredTicksForGameAction(500);
     m_remainingTicks = m_neededTicks;
 }
 
 
 void IMagical::process() {
-    if (m_remainingTicks-- == 0) {
+	if (--m_remainingTicks <= 0) {
         m_remainingTicks = m_neededTicks;
         m_mana = std::min(++m_mana, m_maxMana);
     }
@@ -33,7 +34,7 @@ void IMagical::process() {
 
 
 bool IMagical::reduceMana(int manaToReduce) {
-    if (manaToReduce > m_mana) {
+	if (manaToReduce < 0 || manaToReduce > m_mana) {
         return false;
     }
 

@@ -35,14 +35,14 @@ public:
 	const Sprite& sprite() const override;
 	void playSoundSelected() override;
 	void doHandleDeath() override;
-	bool isMoving() const { // ToDo: Can be removed if Critter is switched to a real state machine
-		return true;
-	}
+	bool isMoving() const override;
 
 	// SeasonObserver
 	void notifySeasonChanged(Season newSeason) override;
 
 private:
+	// Critters deliberately use a tiny autonomous state model: unlike commanded
+	// units they wander randomly and have no event-driven orders.
 	enum class State { Idle, Moving, Dead };
 	State m_currState = State::Idle;
 

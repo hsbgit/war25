@@ -84,44 +84,6 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
     // Very good literature: http://classic.battle.net/war2/advanced/statistics.shtml 
 
 
-    // ToDo: Death Coil
-    // When cast, you will lose mana even if no unit gets hit by the Death Coil.
-    // When multiple enemies are hit by Death Coil, the damage is distributed between them all.So the more enemies, the less damage it does.
-    // Cast a Death coil on a Sheep, Pig, Seal or Boar to heal your Death Knight 5 hit points. 
-    // Source: http://classic.battle.net/war2/units/deathknight.shtml 
-
-
-    // ToDo: Whirlwind
-    // "The Whirlwind tip must be exactly on a building to do any damage."
-    // Source: http://classic.battle.net/war2/units/deathknight.shtml 
-
-
-    // ToDo: Blizzard
-    // A Blizzard hits a 5x5 area with minimal damage of 7x7.When cast on a building it centers over the top left of the building.
-    // http://classic.battle.net/war2/advanced/bdnd.shtml
-
-
-    // ToDo: Flame Shield
-    // You cannot cast Flame Shield on air units such as Flying Machines and Gryphons.
-    // Because Flame Shield can damage air units, cast it on ground units then have them run underneath the enemy flying units. 
-    // Cast a Flame Shield on Peasants mining Gold.The Flame Shield will hit other Peasants walking to and from the Gold Mine.
-    // http://classic.battle.net/war2/units/mage.shtml
-
-
-    // ToDo: Fireball
-    // Launches a Fireball in one direction for approximately 8 spaces that has the ability to hit land, sea and air targets in the path. 
-    // The damage across that line varies but in some tests the average was about 34 damage.
-    // Units in the path of the Fireball received greater or less than 34. 
-    // The tip of the Fireball does the least amount of damage as units hit with it was usually less than 10 hit points.
-    // http://classic.battle.net/war2/units/mage.shtml
-
-
-    // ToDo: Raise the Dead
-    // Source: http://classic.battle.net/war2/units/deathknight.shtml 
-    // http://classic.battle.net/war2/advanced/bdnd.shtml
-
-
-
     switch ((int)spell) {
     case (int)BuffType::Bloodlust:
     {
@@ -153,38 +115,7 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
     {
         Unit* pUnit = unitOnTarget();
 
-        /*
-         * ToDo:
-         * "Haste increases the speed of most units, however, there are some units that Haste does not affect."
-         *
-         * "Haste does NOT noticeably increase attack speed or the number of attacks except in the case of Dragons.
-         *  Haste makes it appear through the animation, that units are attacking faster but actually they are not."
-         *
-         * Source: http://classic.battle.net/war2/units/deathknight.shtml
-         */
         if (pUnit) {
-            // ToDo: Handle haste effect
-           /*
-            Land
-            Peon/Peasant = 13 (Same as Ogre)
-            Grunt/Footman = 13 (Same as Ogre)
-            Axe thrower/Archer = 13 (Same as Ogre)
-            Ogres/Knights = no effect
-            Catapult/Ballista = 9 (Slower than a Grunt, Faster than a Mage/DK)
-            Sappers/Demos = Speed 17! (Same as Goblin Zeppelin)
-            Death Knights = Speed 17! (Same is Goblin Zeppelin)
-            Mage = Speed 13. So Hasted Death Knights are faster than Hasted Mages.
-            Air
-            Zeppelins/Flying Machines = no effect
-            Dragons/Gryphons = Faster than speed 17, about 21+ speed.
-
-            Sea
-            Tankers = no effect
-            Transports = no effect
-            Destroyers = no effect
-            Juggernaughts/Battleships = Speed 10 (Same as Oil Tanker, Transport, Destroyers)
-            Subs = Speed 10 (Same as tanker, trans, destroyers)
-            */
             pUnit->addBuff(Buff(BuffType::Haste));
             g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "haste.wav");
         }
@@ -194,7 +125,6 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
 
     case (int)BuffType::Invisibility:
     {
-        // ToDo: Object attribute "isVisible"? Submarines are never visible but a flying machine can see them
         // For each cast of Invisibility one unit is made invisible.
         // This can be cast on your units, teammates units, and even enemy units although that is not very wise.
         // The unit cannot be seen by anyone else except yourself and your teammates.

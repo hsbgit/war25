@@ -18,6 +18,7 @@
 #include "DebugWindow.h"
 #include "Map/Tile.h"
 #include "Global/DebugManager.h"
+#include "Global/SimulationSettings.h"
 
 
 namespace gui {
@@ -33,7 +34,8 @@ namespace gui {
 		ImGui::TextUnformatted("Simulation speed");
 		ImGui::SetNextItemWidth(-1.0f);
 		ImGui::SliderFloat("##SimulationSpeed", &gDebugManager.m_gameSpeedMultiplier,
-			0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic);
+			SimulationSettings::MinimumSpeed, SimulationSettings::MaximumSpeed,
+			"%.2fx", ImGuiSliderFlags_Logarithmic);
 		if (ImGui::Button("Reset speed to 1x"))
 			gDebugManager.m_gameSpeedMultiplier = 1.0f;
 		ImGui::TextDisabled("1x uses real seconds for game timings.");

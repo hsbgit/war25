@@ -8,6 +8,7 @@ set(MAGIC_SOURCES
     Runes.h
     SpellExecutor.cpp
     SpellExecutor.h
+	SpellCosts.h
 	SpellEffect.cpp
 	SpellEffect.h
 )

@@ -76,6 +76,7 @@ public:
 
 	void setIdleAnimation(Direction direction = Direction::N);
 	void setFacingDirection(Direction direction) { m_facingDirection = direction; }
+	Direction getFacingDirection() const { return m_facingDirection; }
 
 	void addBuff(const Buff& buff) {
 		auto it = m_activeBuffs.find(buff.getType());
@@ -99,10 +100,10 @@ public:
 	}
 
 
-	// ToDo: Information hiding
+
+	private:
 	std::map<BuffType, Buff> m_activeBuffs;
-
-
+	public:
 	State* m_pIdle = nullptr;
 	State* m_pMoving = nullptr;
 	State* m_pPatrol = nullptr;

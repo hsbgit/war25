@@ -37,8 +37,7 @@ public:
 	AStar(INode* pStartNode, INode* pEndNode, int unitSize = 1,
 		bool airPath = false, Object* movingObject = nullptr);
 
-	// ToDo: What about air? Only air units might block a path
-	Path findPath(); // ToDo: Maybe parameter "bool closest" such that if a tile cannot be reached the next close point is taken
+	Path findPath();
 
 	inline const std::unordered_set<INode*>& debug_openList() const {
 		return m_setOpenList;

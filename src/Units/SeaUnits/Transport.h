@@ -34,6 +34,7 @@ public:
 	Type getType() const override {
 		return Type::Sea;
 	}
+	bool canDockOnCoast() const override { return true; }
 
 	bool isOrganic() const override {
 		return false;

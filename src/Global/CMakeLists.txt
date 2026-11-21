@@ -20,6 +20,7 @@ set(GLOBAL_SOURCES
     PseudoRandom.h
     Resources.cpp
     Resources.h
+	SimulationSettings.h
     ProductionItem.cpp
     ProductionItem.h
     TechnologyManager.cpp

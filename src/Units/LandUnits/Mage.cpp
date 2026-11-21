@@ -20,6 +20,7 @@
 #include "Resources/SoundManager.h"
 #include "Global/TechnologyManager.h"
 #include "Magic/SpellExecutor.h"
+#include "Magic/SpellCosts.h"
 
 
 Mage::Mage(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 60, 0, 9, 8), IArmed(0, 9, fraction == Fraction::Orc ? 3 : 2), IMagical(85) {
@@ -47,22 +48,7 @@ void Mage::process() {
 
 void Mage::handleEvent(const Event& event) {
 	const EventID spell = event.getEventID();
-	int manaCost = -1;
-	switch (static_cast<int>(spell)) {
-	case static_cast<int>(MageActions::Fireball): manaCost = 100; break;
-	case static_cast<int>(BuffType::Slow): manaCost = 50; break;
-	case static_cast<int>(MageActions::FlameShield): manaCost = 80; break;
-	case static_cast<int>(BuffType::Invisibility): manaCost = 200; break;
-	case static_cast<int>(MageActions::Polymorph): manaCost = 200; break;
-	case static_cast<int>(MageActions::Blizzard): manaCost = 25; break;
-	case static_cast<int>(DeathKnightActions::DeathCoil): manaCost = 100; break;
-	case static_cast<int>(BuffType::Haste): manaCost = 50; break;
-	case static_cast<int>(DeathKnightActions::RaiseTheDead): manaCost = 50; break;
-	case static_cast<int>(DeathKnightActions::Whirlwind): manaCost = 100; break;
-	case static_cast<int>(BuffType::UnholyArmor): manaCost = 200; break;
-	case static_cast<int>(DeathKnightActions::DeathAndDecay): manaCost = 25; break;
-	default: break;
-	}
+	const int manaCost = SpellCosts::manaCost(static_cast<int>(spell));
 	if (manaCost >= 0) {
 		if (reduceMana(manaCost)) {
 			removeBuff(BuffType::Invisibility);

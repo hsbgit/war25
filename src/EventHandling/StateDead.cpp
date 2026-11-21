@@ -31,10 +31,8 @@ void StateDead::onEnter(const Event* pEvent) {
 	// Update animation according to direction
 	Unit* pUnit = dynamic_cast<Unit*>(m_pOwner);
 
-	Direction fixMeDummy = Direction::N;
-	//pUnit->setCurrentAnimation(g_pRessourceManager->getUnitAnimation(pUnit, fixMeDummy, ResourceManager_wartools::AnimationType::Dying));
-
-	pUnit->getMap()->addAnimation(pUnit->getTile(), g_pRessourceManager->getUnitAnimation(pUnit, fixMeDummy, ResourceManager_wartools::AnimationType::Dying));
+	pUnit->getMap()->addAnimation(pUnit->getTile(), g_pRessourceManager->getUnitAnimation(
+		pUnit, pUnit->getFacingDirection(), ResourceManager_wartools::AnimationType::Dying));
 }
 
 

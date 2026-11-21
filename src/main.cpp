@@ -15,6 +15,7 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 #include "Global/Constants.h"
+#include "Global/SimulationSettings.h"
 
 int windowWidth = War25::Constants::DEFAULT_WINDOW_WIDTH;
 int windowHeight = War25::Constants::DEFAULT_WINDOW_HEIGHT;
@@ -224,7 +225,7 @@ int main(int argc, char** argv)
             const auto now = std::chrono::steady_clock::now();
             accumulatedTime += now - previousTime;
             previousTime = now;
-			const float gameSpeed = std::clamp(gDebugManager.m_gameSpeedMultiplier, 0.25f, 4.0f);
+			const float gameSpeed = SimulationSettings::clampSpeed(gDebugManager.m_gameSpeedMultiplier);
 			const auto tickDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::duration<double, std::milli>(g_tick_ms / gameSpeed));
 

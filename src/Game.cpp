@@ -453,51 +453,6 @@ void Game::doRendering() {
 
 
 
-    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-    if (m_debugSettings.showDemoWindow)
-	{
-		ImGui::SetNextWindowPos(ImVec2(1010.0f, 30.0f), ImGuiCond_Once);
-        ImGui::ShowDemoWindow(&m_debugSettings.showDemoWindow);
-	}
-
-
-    // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-    {
-        static float f = 0.0f;
-        static int counter = 0;
-
-		ImGui::SetNextWindowPos(ImVec2(10.0f, 30.0f), ImGuiCond_Once);
-        ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-        ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-        ImGui::Checkbox("Demo Window", &m_debugSettings.showDemoWindow);      // Edit bools storing our window open/close state
-        ImGui::Checkbox("Another Window", &m_debugSettings.showAnotherWindow);
-		ImGui::Checkbox("Metrics Window", &m_debugSettings.showMetricsWindow);
-
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-        ImGui::ColorEdit3("clear color", (float*)&m_debugSettings.clearColor); // Edit 3 floats representing a color
-
-        if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-            counter++;
-        ImGui::SameLine();
-        ImGui::Text("counter = %d", counter);
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::End();
-    }
-
-    // 3. Show another simple window.
-    if (m_debugSettings.showAnotherWindow)
-    {
-        ImGui::Begin("Another Window", &m_debugSettings.showAnotherWindow);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-        ImGui::Text("Hello from another window!");
-        if (ImGui::Button("Close Me"))
-            m_debugSettings.showAnotherWindow = false;
-        ImGui::End();
-    }
-
-
-
     wDebug.draw();
     wPlayer.draw();
     wMenuBar.draw();

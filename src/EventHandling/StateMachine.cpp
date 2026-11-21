@@ -39,7 +39,7 @@ void StateMachine::handleEvent(const Event& event) {
 
 
 bool StateMachine::isCurrentStateMovingState() const {
-	return dynamic_cast<StateMoving*>(m_pCurrState) ? true : false;
+	return m_pCurrState->isMovingState();
 }
 
 bool StateMachine::isCurrentState(const State* state) const {

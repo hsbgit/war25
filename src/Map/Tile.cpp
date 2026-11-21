@@ -17,6 +17,7 @@
 #include "Tile.h"
 #include "Map/Map.h"
 #include "Global/Object.h"
+#include "Map/MovementRules.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "Sprite.h"
 #include <algorithm>
@@ -293,12 +294,13 @@ bool Tile::isBlockedForUnit(const Object* pObj, Object** pBlockingObject) const 
 	if (pBlockingObject)
 		*pBlockingObject = (m_pUnit != pObj) ? m_pUnit : nullptr;
 
-	if (pObj->isLandObject())
-		return !isLand() || m_isCoast || m_isRocks || m_isWood || m_isWall ||
-			(m_pUnit && m_pUnit != pObj);
+	if (!MovementRules::terrainAllows(pObj->isLandObject(), pObj->isSeaObject(),
+		pObj->canDockOnCoast(), isLand(), isSea(), isCoast(),
+		isRocks(), isWood(), isWall()))
+		return true;
 
-	if (pObj->isSeaObject())
-		return !isSea() || m_isCoast || (m_pUnit && m_pUnit != pObj);
+	if (pObj->isLandObject() || pObj->isSeaObject())
+		return m_pUnit && m_pUnit != pObj;
 
 	return false;
 }

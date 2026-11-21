@@ -56,7 +56,7 @@ Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, in
 
 	// Setup StateMachine
 	m_pIdle = new StateIdle(this);
-	m_pMoving = new StateMoving(this); // ToDo: Keep track and delete them when object is destroyed!
+	m_pMoving = new StateMoving(this);
 	m_pPatrol = new CompositeStatePatrol(this);
 	m_pDead = new StateDead(this);
 
@@ -212,7 +212,6 @@ void Unit::doHandleDeath() {
 		getMap()->addAnimation(getTile(),
 			g_pRessourceManager->getCorpseAnimation(this, m_facingDirection));
 	}
-	// ToDo: Stop all actions / states
 }
 
 
@@ -229,6 +228,7 @@ Unit::~Unit() {
 	delete m_pIdle;
 	std::cerr << "\tUnit::~Unit() m_pMoving" << std::endl;
 	delete m_pMoving;
+	delete m_pPatrol;
 	std::cerr << "\tUnit::~Unit() m_pDead" << std::endl;
 	delete m_pDead;
 }

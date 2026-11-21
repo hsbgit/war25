@@ -8,6 +8,7 @@ set(MAP_SOURCES
     MapInfo.cpp
     MapInfo.h
     MapObject.h
+	MovementRules.h
     Path.cpp
     Path.h
     Tile.cpp
@@ -16,4 +17,3 @@ set(MAP_SOURCES
 
 add_library(war25_map OBJECT ${MAP_SOURCES})
 target_link_libraries(war25_map PUBLIC war25_common)
-

@@ -36,6 +36,7 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/EventHandling/EventBroker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/EventHandling/EventProcessor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/Global/PseudoRandom.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/../src/Magic/IMagical.cpp
 )
 
 # Include directories for war25 source code

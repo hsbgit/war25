@@ -30,6 +30,11 @@ CompositeStatePatrol::CompositeStatePatrol(Unit* pUnit) : State(pUnit) {
     m_pCurrState = m_movingToPatrolPoint;
 }
 
+CompositeStatePatrol::~CompositeStatePatrol() {
+	delete m_movingToStartPoint;
+	delete m_movingToPatrolPoint;
+}
+
 
 void CompositeStatePatrol::onEnter(const Event* pEvent) {
     assert(pEvent);
@@ -37,7 +42,9 @@ void CompositeStatePatrol::onEnter(const Event* pEvent) {
     Point startPoint = m_pOwner->getTile()->getPos();
     m_movingToStartPoint->setTargetTile(startPoint);
 
-    // Patrol point was set by the user and is part of pEvent
+	// A fresh patrol command always starts by walking to the clicked point.
+	// Without this reset, re-entering patrol could head to the stale start point.
+	m_pCurrState = m_movingToPatrolPoint;
     m_pCurrState->onEnter(pEvent);
 }
 
