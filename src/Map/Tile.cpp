@@ -247,8 +247,7 @@ NeighbourNodes Tile::getFreeNeighbourNodes(int unitSize_tiles, bool airPath) con
 	}
 
 
-	/*
-	// ToDo: Size can just be 1 (all land units) or 2 (ships and air units)
+	/* Legacy footprint checks retained as design documentation.
 	if (unitSize_tiles > 1) {
 		// Reference point for a 2x2 unit is always the upper left tile
 

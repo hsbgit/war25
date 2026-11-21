@@ -19,6 +19,7 @@ Copyright (C) 2024 P. Last
 #include "Window.h"
 #include <set>
 #include <chrono>
+#include <optional>
 
 class Object;
 // Forward-Decl reicht für den Header:
@@ -38,6 +39,7 @@ namespace gui {
 
 		inline bool isActionButtonActive() const { return m_selectedAction != kNoAction; }
 		bool getSelectedBuildingAction(PeasantActions& action) const;
+		std::optional<int> selectedActionEvent() const;
 
 		void draw() override;
 

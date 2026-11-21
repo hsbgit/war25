@@ -26,11 +26,9 @@
 #include <queue>
 #include <unordered_map>
 
-#ifdef _DEBUG
 std::unordered_set<INode*> g_debugSetOpenList;
 std::unordered_set<INode*> g_debugSetClosedList;
 Path g_debugPath;
-#endif
 
 namespace {
 struct QueueEntry {
@@ -179,10 +177,8 @@ Path AStar::findPath() {
 		}
 	}
 
-#ifdef _DEBUG
 	g_debugSetClosedList = m_setClosedList;
 	g_debugSetOpenList = m_setOpenList;
 	g_debugPath = result;
-#endif
 	return result;
 }

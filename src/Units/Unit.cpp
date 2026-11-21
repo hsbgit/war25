@@ -37,6 +37,7 @@
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
 #include "Units/SeaUnits/GnomishSubmarine.h"
+#include "Units/SeaUnits/Destroyer.h"
 #include "Units/SeaUnits/Transport.h"
 #include <iostream>
 #include <filesystem>
@@ -48,10 +49,9 @@
 
 // Fraction may differ from the fraction of pOwner. E.g., an alliance player owning a DeathKnight
 Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, int armor, int sight, int speed) : Object(pOwner, pMap, healthPointsMax, armor, sight), EventProcessor(), m_speed(speed) {
-	m_fraction = fraction; // Todo: refactoring
+	m_fraction = fraction;
 
 	 // currentAnimation = pResManager->getUnitIdleAnimation(this, Direction::N); Does not work at this point since the object is currently created and unitidle works with virtual (typeid)
-	//Object::setWaitTime(300); // Todo: individual
 	getOwner()->increaseUsedFood();
 
 	// Setup StateMachine
@@ -208,10 +208,14 @@ void Unit::doHandleDeath() {
 	if (getOwner() && getOwner() != getMap()->getNeutralPlayer()) {
 		getOwner()->decreaseUsedFood();
 	}
-	if (isOrganic() && !isUnDead() && isLandObject() && isPlacedOnMap()) {
+	if (isPlacedOnMap()) {
+		getMap()->addAnimation(getTile(), g_pRessourceManager->getUnitAnimation(
+			this, m_facingDirection, ResourceManager_wartools::AnimationType::Dying).playOnce());
+	}
+	if (isOrganic() && !isUnDead() && isLandObject() && isPlacedOnMap() &&
+		!dynamic_cast<Mage*>(this))
 		getMap()->addAnimation(getTile(),
 			g_pRessourceManager->getCorpseAnimation(this, m_facingDirection));
-	}
 }
 
 
@@ -328,8 +332,25 @@ void Unit::updateCombat() {
 		target->onAttackedBy(this);
 		target->takeDamage(damage);
 	} else {
+		ResourceManager_wartools::MissileType missile = ResourceManager_wartools::MissileType::Arrow;
+		if (auto* archer = dynamic_cast<Archer*>(this); archer && getFraction() == Fraction::Orc)
+			missile = ResourceManager_wartools::MissileType::Axe;
+		else if (dynamic_cast<Mage*>(this))
+			missile = getFraction() == Fraction::Orc
+				? ResourceManager_wartools::MissileType::TouchOfDeath
+				: ResourceManager_wartools::MissileType::NormalSpell;
+		else if (dynamic_cast<GryphonRider*>(this))
+			missile = getFraction() == Fraction::Orc
+				? ResourceManager_wartools::MissileType::DragonBreath
+				: ResourceManager_wartools::MissileType::GryphonHammer;
+		else if (dynamic_cast<Battleship*>(this) || dynamic_cast<Destroyer*>(this))
+			missile = ResourceManager_wartools::MissileType::Cannon;
+		else if (dynamic_cast<GnomishSubmarine*>(this))
+			missile = getFraction() == Fraction::Orc
+				? ResourceManager_wartools::MissileType::TurtleMissile
+				: ResourceManager_wartools::MissileType::SubmarineMissile;
 		getMap()->addMapObject(new Projectile(
-			ResourceManager_wartools::MissileType::Arrow, this, getMap(), target));
+			missile, this, getMap(), target));
 	}
 	const int configured = armed->attackCooldownTicks();
 	m_attackCooldownRemaining = configured > 0 ? configured :

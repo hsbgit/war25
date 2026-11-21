@@ -27,8 +27,7 @@ public:
 
 	// IResourceAcceptor
 	bool acceptsResource(ResourceType t) const override {
-		// todo: when under construction return false
-		return (t == ResourceType::Wood);
+		return !isUnderConstruction() && t == ResourceType::Wood;
 	}
 
 	// BuildingEventHandler

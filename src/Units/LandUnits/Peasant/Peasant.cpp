@@ -64,13 +64,12 @@ Peasant::Peasant(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fr
 
 
 	m_pHarvestGold = new CompositeStateMining(this);
-	m_pHarvestGold->addTransition(EventID(GeneralActions::Stop), m_pIdle); // Todo make me work
+	m_pHarvestGold->addTransition(EventID(GeneralActions::Stop), m_pIdle);
 	m_pHarvestGold->addTransition(EventID(GeneralActions::Move), m_pMoving);
 	m_pHarvestGold->addTransition(EventID(PeasantActions::HarvestGold), m_pHarvestGold);
 
-	// ToDo: Connect gold with wood state if goldmine is empty
 	m_pHarvestWood = new CompositeStateChopWood(this);
-	m_pHarvestWood->addTransition(EventID(GeneralActions::Stop), m_pIdle); // Todo make me work
+	m_pHarvestWood->addTransition(EventID(GeneralActions::Stop), m_pIdle);
 	m_pHarvestWood->addTransition(EventID(GeneralActions::Move), m_pMoving);
 	m_pHarvestWood->addTransition(EventID(PeasantActions::HarvestGold), m_pHarvestGold);
 	m_pHarvestWood->addTransition(EventID(PeasantActions::HarvestWood), m_pHarvestWood);

@@ -94,9 +94,6 @@ void Object::setDeathProperties() {
 	// Case 2: Objects that do not vanish and that can not be re-surrected as skeletons: Ballista, Mage, Dragon, ...
    // m_pMap->removeObject(this);
 
-	// todo: no dying sound when dwarf
-	// todo: if biological place corpse
-
 	// All subclasses must handle their death
 	doHandleDeath();
 }

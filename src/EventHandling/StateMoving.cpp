@@ -23,6 +23,7 @@
 #include "EventHandling/StateIdle.h"
 #include "Global/GlobalAttributes.h"
 #include "Units/Resource/IResourceCollector.h"
+#include "Units/Unit.h"
 
 Tile* StateMoving::isTargetTileANeighbourTile() {
 	const auto& neighbourTiles = neighbourTilesForOwner();
@@ -158,6 +159,10 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	// Is a path used?
 	if (m_path.isValid())
 		return getNextPathTile(pathTemporarilyBlocked);
+	// Multi-tile hulls need a globally consistent route. Greedy left/right
+	// choices make them oscillate at coast corners and narrow channels.
+	if (m_pOwner->isSeaObject())
+		return startPathfinding(pathTemporarilyBlocked);
 	// Preserve cheap direct movement on open ground. If three completed steps
 	// fail to improve the distance, the greedy approach is circling an obstacle.
 	if (m_navigationProgress.shouldUsePathfinding())
@@ -208,20 +213,8 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	return startPathfinding(pathTemporarilyBlocked);
 }
 
-
-
-
-
-#include "Map/AStar.h"
-#include "Map/Path.h"
-#include "Global/Object.h"
-#include "Units/Unit.h"
-
-
-
 void StateMoving::onEnter(const Event* pEvent) {
 	if (pEvent) {
-		// Todo: replace Point with own structure
 		Point targetPos_world = { pEvent->tileX(), pEvent->tileY() };
 		setTargetTile(targetPos_world);
 	}
@@ -234,6 +227,7 @@ void StateMoving::setTargetTile(const Point& targetPos_world) {
 	m_path.clear();
 	m_pathRetryTicks = 0;
 	m_blockedPathRetries = 0;
+	m_ticksUntilPathCheck = calculateRequiredTicksForGameAction(2 * 1000);
 	if (m_pOwner->isPlacedOnMap())
 		m_navigationProgress.reset(m_pOwner->getTileLocation(), targetPos_world);
 }
@@ -266,16 +260,6 @@ StateMoving::StateMoving(Object* pOwner) : State(pOwner) {
 
 
 State* StateMoving::process() {
-	// Workers and ships periodically discard their cached route. This lets
-	// resource collectors benefit from newly built drop-off buildings and all
-	// naval units react to map changes that open a shorter path.
-	const bool shouldRecheckPath = dynamic_cast<IResourceCollector*>(m_pOwner) ||
-		m_pOwner->getType() == Object::Type::Sea;
-	if (shouldRecheckPath && !m_pNextTileToMove &&
-		--m_ticksUntilPathCheck <= 0) {
-		m_path.clear();
-		m_ticksUntilPathCheck = calculateRequiredTicksForGameAction(2 * 1000);
-	}
 	Point currPos_tile = m_pOwner->getTileLocation();
 
 	// It is important to check whether m_pTileToMove is a nullptr

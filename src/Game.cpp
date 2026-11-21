@@ -16,11 +16,6 @@
 */
 
 
-// ------------------------------------------------------------------------
-// !!! ToDo: This file needs a big refactoring !!!
-// ------------------------------------------------------------------------
-
-
 #include "Game.h"
 #include "Renderer.h"
 #include "EventHandling/EventBroker.h"
@@ -34,6 +29,7 @@
 #include "Global/PseudoRandom.h"
 #include "Global/BuildingPlacement.h"
 #include "Units/Critter.h"
+#include "Units/IArmed.h"
 #include "Buildings/Goldmine.h"
 #include "GUI/MiniMap.h"
 #include "Player.h"
@@ -47,7 +43,6 @@
 #include <SDL_opengl.h>
 
 
-// ToDo: Where to move this?
 Map* pMap = nullptr;
 
 
@@ -122,7 +117,6 @@ Game::~Game() {
 }
 
 
-// ToDo: Sampling does not always work...
 void Game::handleUnitGrouping(const Uint8* keyboardState) {
     // Update all saved selections -> if an object is not selectable anymore it may be dead
     for (auto& savedSelection : m_savedUserSelections) {
@@ -171,26 +165,9 @@ void Game::doEventHandling() {
         if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_ENTER) {
             g_pRessourceManager->refreshLoadedCursor();
         }
-
-        // ToDo: Triggered, but setting cursor does not work?
-        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_EXPOSED) {
-    //        g_pRessourceManager->setCursor(CursorTypes::HumanGauntlet);
-        }
-
-
         if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == SDLK_s) {
-                g_pRessourceManager->switchSeason(Season::Summer);
-            }
-            else if (event.key.keysym.sym == SDLK_d) {
-                g_pRessourceManager->switchSeason(Season::Swamp);
-            }
-            else if (event.key.keysym.sym == SDLK_w) {
-                g_pRessourceManager->switchSeason(Season::Winter);
-            }
-            else if (event.key.keysym.sym == SDLK_a) {
-                g_pRessourceManager->switchSeason(Season::Wasteland);
-            }
+			if (const auto season = seasonForHotkey(static_cast<char>(event.key.keysym.sym)))
+				g_pRessourceManager->switchSeason(*season);
             else if (event.key.keysym.sym == SDLK_ESCAPE) {
                 m_selectedObjects.clear();
             }
@@ -217,11 +194,32 @@ void Game::doEventHandling() {
 
             Point tile_world = gViewport.screenToWorld_tile(gViewport.pixelToTile(posMouse));
             Object* pObject = pMap->getObjectOnTile(tile_world);
-
-            if (pObject)
-                g_pRessourceManager->setCursor(CursorTypes::MagnifyingGlass);
-            else
-                g_pRessourceManager->setCursor(CursorTypes::HumanGauntlet);
+			const bool alliance = pMap->humanControlledPlayer()->getFraction() == Fraction::Alliance;
+			auto combatCursor = [alliance](bool targeting) {
+				if (alliance) return targeting ? CursorTypes::RedEagle : CursorTypes::YellowEagle;
+				return targeting ? CursorTypes::RedCrosshairs : CursorTypes::YellowCrosshairs;
+			};
+			const bool armedSelection = std::any_of(m_selectedObjects.begin(), m_selectedObjects.end(),
+				[](Object* object) {
+					auto* armed = dynamic_cast<IArmed*>(object);
+					return object->getOwner() == pMap->humanControlledPlayer() && armed && armed->isArmed();
+				});
+			const bool enemyHover = pObject && !pObject->getOwner()->isNeutral() &&
+				pObject->getOwner() != pMap->humanControlledPlayer();
+			if (const auto selectedAction = m_infoWindow.selectedActionEvent()) {
+				const bool attackLike = *selectedAction == static_cast<int>(GeneralActions::Attack) ||
+					*selectedAction == static_cast<int>(DwarfesActions::Explode);
+				const bool spell = *selectedAction >= static_cast<int>(MageActions::Fireball) &&
+					*selectedAction <= static_cast<int>(OgreActions::Runes);
+				g_pRessourceManager->setCursor((attackLike || spell)
+					? combatCursor(attackLike) : (pObject ? CursorTypes::MagnifyingGlass : CursorTypes::HumanGauntlet));
+			} else if (enemyHover && armedSelection) {
+				g_pRessourceManager->setCursor(combatCursor(true));
+			} else if (pObject) {
+				g_pRessourceManager->setCursor(CursorTypes::MagnifyingGlass);
+			} else {
+				g_pRessourceManager->setCursor(alliance ? CursorTypes::HumanGauntlet : CursorTypes::OrcishClaw);
+			}
 
         }
 
@@ -323,8 +321,7 @@ void Game::doEventHandling() {
                             h += y;
                         }
 
-                        // ToDo: Bug       
-                        // Map may be smaller than the Window/Viewport!
+						// Clamp selection to the map when it is smaller than the viewport.
                         const Point viewportOrigin = gViewport.getCurrentPosition_TL_tile();
                         int mapWidth_px = (gViewport.getMaxViewableMapWidth_tiles() - viewportOrigin.x) * Tile::TileWidth_px - 1;
                         int mapHeight_px = (gViewport.getMaxViewableMapHeight_tiles() - viewportOrigin.y) * Tile::TileWidth_px - 1;
@@ -596,7 +593,6 @@ void Game::applyDisplaySettings() {
 
 // AStar debug (not optimized for performance -> not visible tiles are also rendered)
 void Game::debugRenderAStar() {  
-#ifdef _DEBUG
     Rect r = { 0,0,31,31 };
 
     // Closed List
@@ -625,5 +621,4 @@ void Game::debugRenderAStar() {
             g_pRenderer->drawRect(r, 0, 255, 0);
         }
     }
-#endif
 }

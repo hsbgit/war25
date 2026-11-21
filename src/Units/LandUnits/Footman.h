@@ -36,7 +36,6 @@ public:
         return m_upgradeStats.additionalRange();
     }
 
-     // ToDo: To IArmed?
     inline int getArmor() const override {
         return m_armor + m_additionalArmor + m_upgradeStats.additionalArmor();
     }

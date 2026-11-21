@@ -16,6 +16,7 @@
 */
 #pragma once
 #include <SDL.h>
+#include <array>
 
 class Tile;
 
@@ -34,6 +35,11 @@ bool operator==(const SDL_Point& p1, const SDL_Point& p2);
  * See, e.g., ResourceManager_wartools::getCritterSprite()
  */
 enum class Direction { N = 0, NE, E, SE, S, SW, W, NW};
+
+inline constexpr std::array<Direction, 8> AllDirections = {
+	Direction::N, Direction::NE, Direction::E, Direction::SE,
+	Direction::S, Direction::SW, Direction::W, Direction::NW
+};
 
 Direction getTargetCardinalDirection(const SDL_Point& currPos_tile, const SDL_Point& targetPos_tile);
 Direction getTargetCardinalDirection(const Tile* pCurrTile, const Tile* pTargetTile);

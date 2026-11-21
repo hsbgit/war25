@@ -26,10 +26,10 @@ const std::string SoundManager::strFolderPrefix = "data/sounds/";
 
 SoundManager::SoundManager() {
     if (Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 4096) == -1) {
-        throw std::logic_error("Error initializing SDL_mixer"); // ToDo: SDL_GetError
+		throw std::runtime_error(std::string("Error initializing SDL_mixer: ") + Mix_GetError());
     }
 
-	Mix_AllocateChannels(12); // ToDo: 12 Channels might not be available on each PC. Determine this value automatically
+	Mix_AllocateChannels(12);
 	Mix_ReserveChannels(1); // Channel 0 is dedicated to non-overlapping selection voices.
 }
 
@@ -53,7 +53,7 @@ void SoundManager::playWAV(const Tile* pTile, const std::string& strFileName) {
         }
     }
     catch (std::exception& e) {
-        std::cerr << e.what() << std::endl; // Todo: log info that no sufficient channels were available
+        std::cerr << "Unable to play positional sound: " << e.what() << std::endl;
     }
 }
 
@@ -67,8 +67,7 @@ void SoundManager::playWAV(const Object* pObj, const std::string& strFileName) {
         }
     }
     catch (std::exception& e) {
-        // Todo: log info that no sufficient channels were available
-        std::cout << "playWAV exception: " << e.what() << std::endl;
+        std::cerr << "Unable to play object sound: " << e.what() << std::endl;
     }
 }
 
@@ -82,7 +81,7 @@ void SoundManager::playWAV(const MapObject* pObj, const std::string& strFileName
         }
     }
     catch (std::exception& e) {
-        std::cerr << e.what() << std::endl; // Todo: log info that no sufficient channels were available
+        std::cerr << "Unable to play map-object sound: " << e.what() << std::endl;
     }
 }
 
@@ -93,7 +92,7 @@ void SoundManager::playWAV(const std::string& strFileName) {
         playWAVInternal(strFileName);
     }
     catch (std::exception& e) {
-        std::cerr << e.what() << std::endl; // Todo: log info that no sufficient channels were available
+        std::cerr << "Unable to play sound: " << e.what() << std::endl;
     }
 }
 

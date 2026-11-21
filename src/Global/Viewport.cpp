@@ -138,10 +138,15 @@ bool Viewport::isObjectVisible(const Object* pObj) {
     // T|T|T
     // T|T|T
     // p: Position in Map, Tiles covered by texture belonging to the Goldmine
-    const Point& pos_Tile = pObj->getTileTopLeft()->getPos();
-    int unitTileSize = gMapUnitTilesize[typeid(*pObj)];
-
-    return isUnitOnTileVisible(pos_Tile, unitTileSize);
+    const Point& pos = pObj->getTileTopLeft()->getPos();
+    const Point& offset = pObj->getTilePositionOffset();
+    const int sizePixels = gMapUnitTilesize[typeid(*pObj)] * Tile::TileWidth_px;
+    const int left = pos.x * Tile::TileWidth_px + offset.x;
+    const int top = pos.y * Tile::TileWidth_px + offset.y;
+    const int viewLeft = m_viewPos_UL_tile.x * Tile::TileWidth_px + m_viewOffset_px.x;
+    const int viewTop = m_viewPos_UL_tile.y * Tile::TileWidth_px + m_viewOffset_px.y;
+    return left + sizePixels > viewLeft && left < viewLeft + m_windowWidth_px &&
+        top + sizePixels > viewTop && top < viewTop + m_windowHeight_px;
 }
 
 
@@ -162,7 +167,6 @@ bool Viewport::isTileVisible(const Tile* pTile) const {
 bool Viewport::isUnitOnTileVisible(const Point& pos_Tile, int unitTileSize) const {
     if (((pos_Tile.x + unitTileSize) >= m_viewPos_UL_tile.x) && (pos_Tile.x < getMaxViewableMapWidth_tiles())) {
         if ((pos_Tile.y + (unitTileSize) >= m_viewPos_UL_tile.y) && (pos_Tile.y < getMaxViewableMapHeight_tiles())) {
-            // ToDo: Units moving from the bottom into the current view area "pop up" -> consider getTilePositionOffset 
             return true;
         }
     }

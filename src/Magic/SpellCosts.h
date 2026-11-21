@@ -1,8 +1,20 @@
 #pragma once
 
 #include "Units/UnitActions.h"
+#include <algorithm>
 
 namespace SpellCosts {
+
+struct ExorcismResult {
+	int damage = 0;
+	int mana = 0;
+};
+
+inline ExorcismResult exorcism(int availableMana, int targetHealth) {
+	if (availableMana <= 0 || targetHealth <= 0) return {};
+	const int damage = std::min(targetHealth, availableMana / 4);
+	return {damage, damage * 4};
+}
 
 inline int manaCost(int spell) {
 	switch (spell) {

@@ -35,7 +35,6 @@ int windowHeight = War25::Constants::DEFAULT_WINDOW_HEIGHT;
 
 #include "Game.h"
 
-// ToDo: Common header which includes all buildings, units etc. at once?
 #include "Buildings/Farm.h"
 #include "Buildings/Barracks.h"
 #include "Buildings/Blacksmith.h"
@@ -119,8 +118,8 @@ int main(int argc, char** argv)
     int imgFlags = IMG_INIT_PNG;
     if (!(IMG_Init(imgFlags) & imgFlags)) {
         std::cerr << "SDL2_image could not be initialized: " << IMG_GetError() << std::endl;
-        assert(0);
-        // ToDo: Exception
+		SDL_Quit();
+		return -1;
     }
 
 
@@ -135,8 +134,15 @@ int main(int argc, char** argv)
     std::cout << "g_tick_ms: " << g_tick_ms << std::endl;
 
 
+	const Uint32 windowFlags = smokeTestMap ? SDL_WINDOW_HIDDEN : SDL_WINDOW_OPENGL;
     SDL_Window *window = SDL_CreateWindow("War 2.5", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                           windowWidth, windowHeight, SDL_WINDOW_OPENGL);
+		windowWidth, windowHeight, windowFlags);
+	if (!window) {
+		std::cerr << "Could not create SDL window: " << SDL_GetError() << std::endl;
+		IMG_Quit();
+		SDL_Quit();
+		return -1;
+	}
 
     g_pRenderer = new Renderer(window);
     SDL_Renderer* renderer = g_pRenderer->accessSDLRenderer();
@@ -147,7 +153,7 @@ int main(int argc, char** argv)
     war2_init();
 
   
-    // ToDo: switching to winter required as wasteland and winter have IDs which are not part of summer 
+    // Load a complete initial tile mapping before the map selects its PUD era.
      g_pRessourceManager->switchSeason(Season::Winter);
  
 
@@ -227,7 +233,8 @@ int main(int argc, char** argv)
             previousTime = now;
 			const float gameSpeed = SimulationSettings::clampSpeed(gDebugManager.m_gameSpeedMultiplier);
 			const auto tickDuration = std::chrono::duration_cast<std::chrono::nanoseconds>(
-				std::chrono::duration<double, std::milli>(g_tick_ms / gameSpeed));
+				std::chrono::duration<double, std::milli>(
+					SimulationSettings::tickDurationMilliseconds(g_tick_ms, gameSpeed)));
 
             int processedTicks = 0;
             while (accumulatedTime >= tickDuration && processedTicks < MAX_FRAMESKIP) {

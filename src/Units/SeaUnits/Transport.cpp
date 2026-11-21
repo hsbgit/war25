@@ -20,6 +20,7 @@
 #include "Map/Map.h"
 #include "EventHandling/EventBroker.h"
 #include "Global/GlobalAttributes.h"
+#include "Resources/SoundManager.h"
 #include <algorithm>
 
 
@@ -56,9 +57,20 @@ bool Transport::requestBoard(Unit* passenger) {
 	return true;
 }
 
+bool Transport::isDocked() const {
+	if (!isPlacedOnMap()) return false;
+	return std::any_of(getOccupiedTiles().begin(), getOccupiedTiles().end(),
+		[](const Tile* tile) { return tile->isCoast(); });
+}
+
 void Transport::process() {
 	Unit::process();
 	if (!isPlacedOnMap() || isDead()) return;
+	const bool docked = isDocked();
+	if (m_dockStateInitialized && docked && !m_wasDocked)
+		g_pSoundManager->playWAV(this, "misc/transport_docking.wav");
+	m_wasDocked = docked;
+	m_dockStateInitialized = true;
 	for (auto it = m_pendingPassengers.begin(); it != m_pendingPassengers.end();) {
 		auto* passenger = dynamic_cast<Unit*>(g_pEventBroker.getEventHandler(*it));
 		if (!passenger || passenger->isDead() || passenger->getOwner() != getOwner()) {

@@ -26,6 +26,10 @@ class Sound {
 public:
     Sound(const std::string& strFileName);
     ~Sound();
+	Sound(const Sound&) = delete;
+	Sound& operator=(const Sound&) = delete;
+	Sound(Sound&& other) noexcept;
+	Sound& operator=(Sound&& other) noexcept;
 
     inline Mix_Chunk* getSample() const {
         assert(m_pSample);
@@ -33,5 +37,5 @@ public:
     }
 
 private:
-    Mix_Chunk* m_pSample;
+    Mix_Chunk* m_pSample = nullptr;
 };

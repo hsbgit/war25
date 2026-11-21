@@ -30,6 +30,7 @@ public:
 	void doHandleDeath() override;
 	bool requestBoard(Unit* passenger);
 	std::size_t passengerCount() const { return m_passengers.size(); }
+	bool isDocked() const;
 
 	Type getType() const override {
 		return Type::Sea;
@@ -45,4 +46,6 @@ private:
 	static constexpr std::size_t Capacity = 6;
 	std::vector<EventProcessorID> m_passengers;
 	std::vector<EventProcessorID> m_pendingPassengers;
+	bool m_wasDocked = false;
+	bool m_dockStateInitialized = false;
 };

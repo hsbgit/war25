@@ -28,11 +28,6 @@ StateDead::StateDead(Object* pOwner) : State(pOwner) {
 
 void StateDead::onEnter(const Event* pEvent) {
 	std::cerr << "Entered StateDead" << std::endl;
-	// Update animation according to direction
-	Unit* pUnit = dynamic_cast<Unit*>(m_pOwner);
-
-	pUnit->getMap()->addAnimation(pUnit->getTile(), g_pRessourceManager->getUnitAnimation(
-		pUnit, pUnit->getFacingDirection(), ResourceManager_wartools::AnimationType::Dying));
 }
 
 

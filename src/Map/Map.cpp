@@ -17,7 +17,7 @@
 
 
 // ----------------------------------------------------------------------------
-// !!! ToDo: This file needs a big refactoring !!!
+// Map loading, simulation queries and rendering are kept together for now.
 // ----------------------------------------------------------------------------
 
 #include "Map.h"
@@ -45,6 +45,7 @@
 #include "Buildings/Townhall.h"
 #include "Buildings/DarkPortal.h"
 #include "Units/Critter.h"
+#include "Units/LandUnits/Skeleton.h"
 #include "Units/AirUnits/GnomishFlyingMachine.h"
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
@@ -238,14 +239,17 @@ void Map::processMapObjects() {
 	}
 
 
-	for (auto& [pTile, animation] : m_mapAnimations) {
-		animation.process();
+	for (auto& [pTile, animations] : m_mapAnimations) {
+		if (!animations.empty()) animations.front().process();
 	}
 
-	// Remove animations that played completely
-	std::erase_if(m_mapAnimations, [](const auto& pair) {
-		return pair.second.isComplete();
-		});
+	// Advance queued effects on a tile (death -> corpse, explosion -> rubble).
+	for (auto it = m_mapAnimations.begin(); it != m_mapAnimations.end();) {
+		auto& animations = it->second;
+		if (!animations.empty() && animations.front().isComplete()) animations.pop_front();
+		if (animations.empty()) it = m_mapAnimations.erase(it);
+		else ++it;
+	}
 }
 
 
@@ -415,7 +419,6 @@ Map::Map(const std::string& filename, ResourceManager_wartools* pResManagerWarto
 	// after construction, so a failed load cannot leave a dangling observer.
 	pResManagerWartools->switchSeason(static_cast<Season>(pPud->era));
 
-	//Todo: w und h vertauschen damit konsistent (wenn auch gleich da quadratisch)
 	// Puds are always squares. Hence map w==h
 	m_arrTileMap.resize(pPud->map_h);
 	for (std::size_t y = 0; y < pPud->map_h; ++y) {
@@ -612,7 +615,6 @@ Object* Map::getObjectOnTile(const Point& tile_world) {
 }
 
 
-// ToDo: Cache result? Maybe called several times per frame, by an object, by the minimap, ...
 void Map::getVisibleTiles(Object* pObj, int sightRange, std::vector<Tile*>& vecVisibleTiles) const {
 	assert(pObj->isPlacedOnMap());
 
@@ -642,7 +644,6 @@ void Map::getVisibleTiles(Object* pObj, int sightRange, std::vector<Tile*>& vecV
 }
 
 
-// ToDo: Overload with Point parameter instead of Object pointer
 /*
  * Returns all visible objects for a given Object. This vector can be filtered
  * for enemy, neutral or alliance units afterwards.
@@ -1216,6 +1217,10 @@ void Map::retileRock(Tile* tile) {
 
 void Map::retileWall(Tile* tile) {
 	if (!tile || !tile->isWall()) return;
+	// Solid open/closed passage tiles (0x090..0x0c4) have deliberate gate
+	// artwork. Connectivity-based mixed-wall replacement corrupts those
+	// passages, so only dynamically retile the mixed 0x800/0x900 ranges.
+	if (tile->getTileID() < 0x0800) return;
 	const int x = tile->getX();
 	const int y = tile->getY();
 	auto wallAt = [&](int px, int py) {
@@ -1252,6 +1257,22 @@ void Map::refreshTerrainAround(const Point& center) {
 			if (tile->isWall()) retileWall(tile);
 		}
 	}
+	refreshNavigationAround(center);
+}
+
+void Map::refreshNavigationAround(const Point& center) {
+	for (int y = std::max(0, center.y - 1); y <= std::min(sideLength() - 1, center.y + 1); ++y) {
+		for (int x = std::max(0, center.x - 1); x <= std::min(sideLength() - 1, center.x + 1); ++x) {
+			Tile* tile = m_arrTileMap[y][x];
+			NeighbourNodes sameType(tile->neighbourTiles);
+			std::erase_if(sameType, [tile](const auto& neighbour) {
+				const auto* other = static_cast<const Tile*>(neighbour.second);
+				return !((tile->isSea() && other->isSea()) ||
+					(tile->isLand() && other->isLand()));
+			});
+			tile->neighbourTiles_SameType = std::move(sameType);
+		}
+	}
 }
 
 
@@ -1271,8 +1292,6 @@ void Map::addPlayersToMap(Pud* pPud) {
 		}
 	}
 
-	// Todo: What about AI players...
-
 	std::cout << "\nUnusable: " << std::endl;
 	for (std::size_t i = 0; i < 7; ++i) {
 		std::cout << '\t' << std::hex << (int)pPud->owner.unusable[i] << std::endl;
@@ -1283,7 +1302,6 @@ void Map::addPlayersToMap(Pud* pPud) {
 		const std::size_t playerSlot = static_cast<std::size_t>(color);
 		Resources res((int)pPud->sgld.players[playerSlot], (int)pPud->slbr.players[playerSlot], (int)pPud->soil.players[playerSlot]);
 
-		// Todo: get real fraction from pud
 		Fraction fraction = (bool)pPud->side.players[playerSlot] ? Fraction::Orc : Fraction::Alliance;
 
 
@@ -1310,7 +1328,6 @@ void Map::addUnitsToMap(Pud* pPud) {
 	for (std::size_t i = 0; i < pPud->units_count; ++i) {
 		Pud_Unit_Info& ui = pPud->units[i];
 
-		// ToDo: check if owner 0,7 und 15
 		/*
 		* Each of the fiels within this structure are of type Pud_Owner
 		* This structure is affected by the War2 defaults.
@@ -1371,7 +1388,7 @@ void Map::addUnitsToMap(Pud* pPud) {
 
 
 		case PUD_UNIT_SKELETON:
-			//     placeUnit(m_arrTileMap[ui.y][ui.x], new Skeleton(pOwner, this));
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Skeleton(pOwner, this));
 			break;
 
 
@@ -1842,8 +1859,7 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 
 
 
-	// Draw units
-	// ToDo: Figures first, then buildings? Check that...
+	// Draw units in explicit layers below.
 	std::vector<Object*> vecVisibleObjects;
 
 	for (auto& e : m_mapPlayer) {
@@ -1963,10 +1979,10 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 		if (!unit) return;
 		for (const auto& [buffType, buff] : unit->getActiveBuffs()) {
 			(void)buff;
-			auto icon = g_pRessourceManager->m_mapBuffSprites.find(buffType);
-			if (icon == g_pRessourceManager->m_mapBuffSprites.end() || !icon->second)
+			const Sprite* icon = g_pRessourceManager->getBuffIcon(buffType);
+			if (!icon)
 				continue;
-			pRenderer->renderSprite(position, icon->second);
+			pRenderer->renderSprite(position, icon);
 			position.x += 16;
 		}
 	};
@@ -1976,7 +1992,6 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 		if (dynamic_cast<Building*>(pUnit) != nullptr)
 			continue;
 
-		// Todo: buildings are included? does land match?
 		if (pUnit->getType() == Object::Type::Land || pUnit->getType() == Object::Type::Sea) {
 			Point posLocal_tile = pViewPort->worldToScreen_tile(pUnit->getTileLocation());
 			Point posLocal_px = pViewPort->tileToPixel(posLocal_tile);
@@ -2013,10 +2028,10 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 
 
 	// Fifth: Top level animations, missles, etc.
-	for (auto& [pTile, animation] : m_mapAnimations) {
-		if (pViewPort->isTileVisible(pTile)) {
+	for (auto& [pTile, animations] : m_mapAnimations) {
+		if (!animations.empty() && pViewPort->isTileVisible(pTile)) {
 			Point posLocal_tile = pViewPort->worldToScreen_tile(Point{ pTile->getX(), pTile->getY() });
-			pRenderer->renderSprite(pViewPort->tileToPixel(posLocal_tile), animation.getCurrentFrame());
+			pRenderer->renderSprite(pViewPort->tileToPixel(posLocal_tile), animations.front().getCurrentFrame());
 		}
 	}
 

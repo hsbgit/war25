@@ -25,6 +25,7 @@ public:
 	Knight(Player* pOwner, Fraction fraction, Map* pMap, bool isPaladin = false);
 
 	void process() override;
+	void handleEvent(const Event& event) override;
 
 	Type getType() const override {
 		return Type::Land;

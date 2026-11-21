@@ -32,11 +32,12 @@ public:
 	void onEnter(const Event* pEvent = nullptr) override;
 
 	State* process() override;
-	bool isMovingState() const override { return true; }
+	bool isMovingState() const override { return !m_pausedForCombat; }
 
 private:
 	State* m_pCurrState = nullptr;
 
 	StateMoving* m_movingToStartPoint = nullptr;
 	StateMoving* m_movingToPatrolPoint = nullptr;
+	bool m_pausedForCombat = false;
 };

@@ -16,8 +16,6 @@
 */
 
 
-// Refactored and improved resource management system
-
 #pragma once
 
 
@@ -31,6 +29,8 @@ const char PATH_SEPARATOR = '/';
 #include <map>
 #include <string>
 #include <vector>
+#include <memory>
+#include <utility>
 
 class Texture;
 class Sprite;
@@ -38,26 +38,12 @@ class Renderer;
 
 
 
-// ToDo: refactoring
-#include "Units/Unit.h"
+#include "Units/UnitActions.h"
+#include "Resources/Season.h"
 
 
 #include <pud.h> // Contains all icon definitions in enum 'Pud_Icon'
 
-
-
-class TileSetContainer {
-public:
-	TileSetContainer(Renderer* pRenderer);
-
-	std::vector<Texture*> vecBuildings;
-
-
-
-	Texture* pIcons = nullptr;
-	//    BuildingContainer buildingSprites;
-	std::map<std::string, Texture*> mapTextures;
-};
 
 
 #include <typeindex>
@@ -73,13 +59,6 @@ class Building;
 #include "Direction.h"
 #include "Units/Resource/ResourceType.h"
 
-
-enum class Season : uint8_t {
-	Summer = 0,
-	Winter = 1,
-	Wasteland = 2,
-	Swamp = 3
-};
 
 /*
  * Contains human and orc textures in all PlayerColors, accessed by their file name.
@@ -135,13 +114,6 @@ class Object;
 
 
 
-class SeasonObserver {
-public:
-	virtual ~SeasonObserver() = default;
-	virtual void notifySeasonChanged(Season newSeason) = 0;
-};
-
-
 #include "Buildings/ScoutTower.h"
 #include "Buildings/Townhall.h"
 
@@ -167,6 +139,9 @@ class ResourceManager_wartools {
 
 public:
 	ResourceManager_wartools(const std::string& pathToGraphicsFolder, Renderer* pRenderer);
+	~ResourceManager_wartools();
+	ResourceManager_wartools(const ResourceManager_wartools&) = delete;
+	ResourceManager_wartools& operator=(const ResourceManager_wartools&) = delete;
 
 
 	void loadCursors();
@@ -175,31 +150,23 @@ public:
 	void setCursor(CursorTypes type);
 
 
-	void typeTest(Object* pObj);
-
 	void switchSeason(Season s);
-	Season m_currentSeason;
+	Season currentSeason() const { return m_currentSeason; }
 
 
 	inline void registerSeasonObserver(SeasonObserver* pObserver) {
-		m_vecSeasonObservers.push_back(pObserver);
+		if (pObserver && std::find(m_vecSeasonObservers.begin(), m_vecSeasonObservers.end(), pObserver) == m_vecSeasonObservers.end())
+			m_vecSeasonObservers.push_back(pObserver);
 	}
 
 	inline void deregisterSeasonObserver(SeasonObserver* pObserver) {
 		m_vecSeasonObservers.erase(std::remove(m_vecSeasonObservers.begin(), m_vecSeasonObservers.end(), pObserver), m_vecSeasonObservers.end());
 	}
 
-	std::vector<SeasonObserver*> m_vecSeasonObservers;
-
-	void notifySeasonObservers() const {
-		for (auto& pObserver : m_vecSeasonObservers) {
-			pObserver->notifySeasonChanged(m_currentSeason);
-		}
-	}
-
 
 	enum class MissileType { Arrow, Axe, Cannon, BallistaBolt, CatapultRock,
-		Fireball, DragonBreath, GryphonHammer, SubmarineMissile, TurtleMissile };
+		Fireball, DragonBreath, GryphonHammer, SubmarineMissile, TurtleMissile,
+		NormalSpell, TouchOfDeath };
 	Sprite getMissile(MissileType t, Direction direction = Direction::N);
 	enum class SpellVisual { FlameShield, Blizzard, Whirlwind, DeathAndDecay };
 	Animation getSpellAnimation(SpellVisual visual) const;
@@ -281,34 +248,36 @@ public:
 
 
 
-	const Sprite* getBuildingIcon(int i) const;
-	Sprite* pFarm = nullptr;
-
-	std::vector<Sprite*> vecSprites;
-
-
-	Texture* pTileset = nullptr;
-
-
-	std::map<BuffType, Sprite*> m_mapBuffSprites;
+	const Sprite* getBuffIcon(BuffType type) const;
 
 private:
+	template<typename... Args>
+	Texture* makeTexture(Args&&... args) {
+		auto texture = std::make_unique<Texture>(std::forward<Args>(args)...);
+		Texture* result = texture.get();
+		m_ownedTextures.push_back(std::move(texture));
+		return result;
+	}
+
+	void notifySeasonObservers() const;
+	Season m_currentSeason = Season::Summer;
+	std::vector<SeasonObserver*> m_vecSeasonObservers;
+	std::vector<std::unique_ptr<Texture>> m_ownedTextures;
+	std::map<BuffType, std::unique_ptr<Sprite>> m_buffSprites;
+	std::unordered_map<std::string, Texture*> m_uiTextures;
+
 	Texture* getUnitTexture(Unit* pUnit, ResourceType carriedResource);
 	void createUnitSprites(Fraction fraction);
 	void loadCoastalConstructionSprites();
 	void createidleAnimations();
 	void createidleAnimation(std::type_index correspondingType, int squareWidth_px, int rows, int cols, unsigned int interval_ms, Point posOffset);
 
-	std::vector<Sprite*> extractSprites(Texture** pTexture, int cntRows, int cntCols, int iconWidth_px, int iconHeight_px);
-
 	static const std::string strPrefix;
-
-	void readDirectoryRecursively(const std::string& pathToGraphicsFolder);
 
 
 
 	// Icons -----------------------------------------------------
-public: // ToDo: Debug
+private:
 	/*
 	 * All these m_ActiveSeason<...> variables are actually just for fun.
 	 * They allow easy tileset switching during runtime;
@@ -353,7 +322,7 @@ private:
 
 
 	// Buildings -----------------------------------------------------
-	void readBuildings(bool orcs);
+	void readBuildings();
 	void readBuildingSprite(Season season, const std::string& pathToFile, bool orcs);
 
 	BuildingTextureMap m_mapBuildingTexturesHuman, m_mapBuildingTexturesOrc;
@@ -365,9 +334,7 @@ private:
 	MultiBuildingTextureMap<ScoutTower::UpgradeLevel> m_mapScoutTowerTexturesHuman, m_mapScoutTowerTexturesOrc;
 	MultiBuildingActiveSeason<ScoutTower::UpgradeLevel> m_ActiveSeasonScoutTowerTexturesHuman, m_ActiveSeasonScoutTowerTexturesOrc;
 
-public: // Debug,w ar private
 	NeutralBuildingTextureMap m_mapNeutralBuildingTextures, m_mapActiveNeutralBuildingTextures;
-private:
 	void switchBuildingSprites(Season season);
 public:
 	Sprite getBuildingSprite(Building* pBuilding, Fraction fraction, PlayerColor color, bool underConstruction = false);
@@ -381,9 +348,9 @@ private:
 
 
 	// TileSets --------------------------------------------------
-public: // debug
 	Texture* m_pActiveTileSet = nullptr;
 
+	public:
 	Sprite* getTileSprite(int tile_id);
 
 	// Some special tiles are not part of a pud file (or better: they can not as they can not be placed inside an editor)
@@ -405,10 +372,7 @@ private:
 	// TileSets --------------------------------------------------
 
 
-	void loadTilesets();
 	Renderer* m_pRenderer = nullptr;
-	//public:
-		//TileSetContainer tileSetContainer;
 };
 
 

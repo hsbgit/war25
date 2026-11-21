@@ -34,7 +34,6 @@ public:
 		return m_originPosition;
 	}
 
-	// Todo: delete if expired)
 	bool isExpired() const override {
 		return m_expired;
 	}

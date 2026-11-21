@@ -242,9 +242,8 @@ std::unordered_map<std::type_index, int> gMapProductionTimes_ms = {
 	{typeid(Townhall), 200 * 1000}, // Upgrade times are( identical?? )handled internally in class 'Townhall'
 
 
-	// Todo korrekte werte
-
-
+	// Values below are temporary balance data until the remaining production
+	// table is imported from the original game data.
 	{typeid(GnomishInventor), 987 * 1000},
 	{typeid(GryphonAviary), 987 * 1000},
 	{typeid(Foundry), 987 * 1000},

@@ -24,7 +24,6 @@
 #include <climits>
 
 
-// Todo: more generalization -> oil tanker?
 StateReturningResource::StateReturningResource(Unit* pCollector, State* pIdle) : StateMoving(pCollector), m_pIdle(pIdle) {
 
 }
@@ -48,7 +47,6 @@ void StateReturningResource::selectNearestAcceptor() {
         IResourceAcceptor* pRA = dynamic_cast<IResourceAcceptor*>(pObj);
 
 
-        // Todo: there was a bug when pObj was not connected to a tile, meaning pObj->getTile()->getX() caused a crash
         if (pRA && !pObj->isDead() && pObj->getTile() && m_pOwner->getTile() &&
             pRA->acceptsResource(dynamic_cast<IResourceCollector*>(m_pOwner)->currentlyCarrying())) {
             int distance = std::abs(m_pOwner->getTile()->getX() - pObj->getTile()->getX()) + std::abs(m_pOwner->getTile()->getY() - pObj->getTile()->getY());

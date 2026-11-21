@@ -53,6 +53,9 @@ Building::Building(Player* pOwner, Fraction fraction, Map* pMap, int healthPoint
 
 
 Building::~Building() {
+	// Normal map teardown is not destruction in the simulation. In particular,
+	// changing maps must not emit a battlefield full of explosion/death sounds.
+	if (!isDead()) return;
 	g_pSoundManager->playWAV(getTile(), std::string("misc") + PATH_SEPARATOR + "explosion.wav");
 	getMap()->addAnimation(getTile(), g_pRessourceManager->getExplosionAnimation());
 
@@ -85,7 +88,6 @@ Building::~Building() {
 		m_pErecter->die();
 	}
 
-	// Todo: if m_pErecter -> delete
 	std::cerr << "Building 0x" << std::hex << this << " destroyed" << std::endl;
 }
 
@@ -104,6 +106,9 @@ void Building::process() {
 		handleBuildProgress();
 		return;
 	}
+	// A completed building may temporarily be surrounded. Keep trying until
+	// its builder can safely leave instead of losing the unit inside forever.
+	if (m_pErecter) releaseErecter();
 
 	BuildingEventProcessor::doEventHandling();
 	updateFireAnimation();
@@ -184,17 +189,7 @@ void Building::onConstructionFinished() {
 	else
 		g_pSoundManager->playWAV("orc/basic_voices/work_complete.wav");
 
-	// Place peasant on map!
-	// Todo: what if no tile is free?
-	Tile* pFreeTileNextToBuilding = Object::m_pMap->getFreeTileAroundBuilding(this, m_pErecter);
-	assert(pFreeTileNextToBuilding);
-
-	if (pFreeTileNextToBuilding) {
-		assert(pFreeTileNextToBuilding->getSeaOrLandUnit() == nullptr);
-
-		Object::m_pMap->placeUnit(pFreeTileNextToBuilding, m_pErecter);
-		m_pErecter = nullptr;
-	}
+	releaseErecter();
 }
 
 bool Building::releaseErecter() {
@@ -243,7 +238,6 @@ std::vector<Action> Building::getActions() const {
 	EventProcessorID id = EventProcessor::getID();
 
 
-	// ToDo: if EventProcessor: EventAlready queued -> nicht anzeigen (Queue-able action?)
 	// Simply use Upgrade Enum ID as EventID
 	std::vector<ProductionItem::ItemType> vecProductionItemList = getProductionItemList(); // Get information from subclasses which must implement "getProductionItemList"
 	std::vector<Action> vecActions;

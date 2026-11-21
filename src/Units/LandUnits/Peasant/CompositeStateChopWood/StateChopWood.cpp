@@ -100,8 +100,8 @@ State* StateLumberWood::process() {
     }
 
     if (m_requiredTicksForChop-- % m_ticksPerSecond == 0) {
-        // ToDo: only loud/hearable when in field of view. this has currently 100% everywhere
-        g_pSoundManager->playWAV("misc/tree_chopping/" + std::to_string(PseudoRandom::cosmeticRnd(1, 4)) + ".wav");
+        g_pSoundManager->playWAV(m_pTileWithWood,
+            "misc/tree_chopping/" + std::to_string(PseudoRandom::cosmeticRnd(1, 4)) + ".wav");
     }
 
     if (m_requiredTicksForChop == 0) {

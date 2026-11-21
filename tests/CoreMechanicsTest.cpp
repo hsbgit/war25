@@ -4,6 +4,7 @@
 #include "Magic/SpellCosts.h"
 #include "Map/MovementRules.h"
 #include "Global/SimulationSettings.h"
+#include "Resources/Season.h"
 
 int g_tick_ms = 25;
 
@@ -78,8 +79,37 @@ TEST(MagicTest, ManaRegeneratesAfterExactlyOneInterval) {
 	EXPECT_EQ(mana.getMana(), 101);
 }
 
+TEST(MagicTest, ExorcismUsesFourManaPerActualHitPoint) {
+	const auto lethal = SpellCosts::exorcism(255, 60);
+	EXPECT_EQ(lethal.damage, 60);
+	EXPECT_EQ(lethal.mana, 240);
+
+	const auto limited = SpellCosts::exorcism(100, 60);
+	EXPECT_EQ(limited.damage, 25);
+	EXPECT_EQ(limited.mana, 100);
+}
+
+TEST(MagicTest, ExorcismDoesNotSpendRemainderWithoutEnoughManaForDamage) {
+	const auto result = SpellCosts::exorcism(3, 60);
+	EXPECT_EQ(result.damage, 0);
+	EXPECT_EQ(result.mana, 0);
+}
+
 TEST(SimulationSettingsTest, SpeedSupportsSixteenTimesAndClampsInvalidValues) {
 	EXPECT_FLOAT_EQ(SimulationSettings::clampSpeed(16.0f), 16.0f);
 	EXPECT_FLOAT_EQ(SimulationSettings::clampSpeed(20.0f), 16.0f);
 	EXPECT_FLOAT_EQ(SimulationSettings::clampSpeed(0.0f), 0.25f);
+}
+
+TEST(SimulationSettingsTest, SixteenTimesAcceleratesEverySimulationTickEqually) {
+	EXPECT_DOUBLE_EQ(SimulationSettings::tickDurationMilliseconds(25, 1.0f), 25.0);
+	EXPECT_DOUBLE_EQ(SimulationSettings::tickDurationMilliseconds(25, 16.0f), 1.5625);
+}
+
+TEST(SeasonHotkeysTest, RuntimeWasdMappingIsPreserved) {
+	EXPECT_EQ(seasonForHotkey('w'), Season::Winter);
+	EXPECT_EQ(seasonForHotkey('s'), Season::Summer);
+	EXPECT_EQ(seasonForHotkey('a'), Season::Wasteland);
+	EXPECT_EQ(seasonForHotkey('d'), Season::Swamp);
+	EXPECT_FALSE(seasonForHotkey('x').has_value());
 }

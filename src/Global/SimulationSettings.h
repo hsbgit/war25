@@ -9,4 +9,8 @@ inline constexpr float MaximumSpeed = 16.0f;
 inline float clampSpeed(float speed) {
 	return std::clamp(speed, MinimumSpeed, MaximumSpeed);
 }
+
+inline double tickDurationMilliseconds(int tickMilliseconds, float speed) {
+	return static_cast<double>(tickMilliseconds) / clampSpeed(speed);
+}
 }

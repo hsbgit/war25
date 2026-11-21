@@ -21,12 +21,22 @@
 Sound::Sound(const std::string& strFileName) {
     m_pSample = Mix_LoadWAV(strFileName.c_str());
     if (!m_pSample) {
-        // ToDo: SDL_error
-        throw std::logic_error("Sound file does not exist: " + strFileName);
+		throw std::runtime_error("Could not load sound '" + strFileName + "': " + Mix_GetError());
     }
 }
 
+Sound::Sound(Sound&& other) noexcept : m_pSample(other.m_pSample) {
+	other.m_pSample = nullptr;
+}
+
+Sound& Sound::operator=(Sound&& other) noexcept {
+	if (this == &other) return *this;
+	if (m_pSample) Mix_FreeChunk(m_pSample);
+	m_pSample = other.m_pSample;
+	other.m_pSample = nullptr;
+	return *this;
+}
 
 Sound::~Sound() {
-    //Mix_FreeChunk(sample); // ToDo: dangerous -> see emplace in map of SoundManager
+	if (m_pSample) Mix_FreeChunk(m_pSample);
 }

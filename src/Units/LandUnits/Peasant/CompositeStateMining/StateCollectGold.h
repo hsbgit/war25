@@ -33,7 +33,7 @@ public:
 private:
     State* m_pIdle;
 
-    // ToDo: Never store a pointer to an object. However, a pointer to a tile is always valid!
+    // Tiles are map-owned and stable for the lifetime of this state.
     Tile* m_pTileGoldMine = nullptr;
     bool m_enteringSuccessful = false;
 };

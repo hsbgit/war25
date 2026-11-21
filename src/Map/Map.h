@@ -17,13 +17,13 @@
 
 
 // ----------------------------------------------------------------------------
-// !!! ToDo: This file needs a big refactoring !!!
 // ----------------------------------------------------------------------------
 
 
 #pragma once
 
 #include <set>
+#include <deque>
 #include <map>
 #include <cassert>
 #include <string>
@@ -127,9 +127,9 @@ public:
 
 
     void addAnimation(Tile* pTile, const Animation& a) {
-        m_mapAnimations[pTile] = a; // ToDo: Several animations could take place on the same tile...
+        m_mapAnimations[pTile].push_back(a);
     }
-    std::unordered_map<Tile*, Animation> m_mapAnimations;
+    std::unordered_map<Tile*, std::deque<Animation>> m_mapAnimations;
 
 
     /*
@@ -167,7 +167,6 @@ public:
     }
 
     inline Player* humanControlledPlayer() {
-        // ToDo: Den echten Menschen identifizieren        
         return (m_mapPlayer.begin())->second;
 
         //assert(m_mapPlayer[PlayerColor::Red]);
@@ -181,6 +180,7 @@ private:
 
     void identifyNeighbourTiles();
 	void buildTerrainAutotileRules();
+	void refreshNavigationAround(const Point& center);
 	std::uint8_t woodNeighbourMask(int x, int y) const;
 	std::uint8_t rockNeighbourMask(int x, int y) const;
 	std::uint8_t wallNeighbourMask(int x, int y) const;

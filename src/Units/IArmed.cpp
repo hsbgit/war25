@@ -84,5 +84,5 @@ void IArmed::setActiveTarget(Object* pActiveTarget) {
 	if (m_pActiveTarget == pActiveTarget) return;
 	clearActiveTarget();
 	m_pActiveTarget = pActiveTarget;
-	m_pActiveTarget->registerAttacker(this); // ToDo: Move to IArmed?
+	m_pActiveTarget->registerAttacker(this);
 }

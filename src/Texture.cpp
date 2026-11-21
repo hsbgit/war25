@@ -18,6 +18,7 @@
 #include "Renderer.h"
 #include <iostream>
 #include <cassert>
+#include <stdexcept>
 
 
 Texture::Texture(SDL_Texture* pSDLTexture, int width, int height) : m_pSDLTexture(pSDLTexture), m_width(width), m_height(height) {
@@ -30,9 +31,7 @@ Texture::Texture(const std::string& pathToImg, Renderer* pRenderer, bool freeSur
     SDL_Surface* pSurface  = IMG_Load(pathToImg.c_str());
 
     if(!pSurface) {
-        std::cout << "Coult not load file " << pathToImg << ", " << SDL_GetError() << std::endl;
-        assert(0);
-        // ToDo: exception;
+		throw std::runtime_error("Could not load image '" + pathToImg + "': " + IMG_GetError());
     }  
 
     convertSurfaceToTexture(pSurface, pRenderer, freeSurface);
@@ -51,12 +50,13 @@ Texture::Texture(SDL_Surface* pSurface, Renderer* pRenderer, bool freeSurface) {
 
 
 void Texture::convertSurfaceToTexture(SDL_Surface* pSurface, Renderer* pRenderer, bool freeSurface) {
+	if (!pSurface)
+		throw std::invalid_argument("Cannot create texture from a null surface");
     m_pSDLTexture = SDL_CreateTextureFromSurface(pRenderer->SDLRenderer(), pSurface);
 
     if(!m_pSDLTexture) {
-        std::cerr << "Coult not create texture from surface: " << SDL_GetError() << std::endl;
-        assert(0);
-        // ToDo: exception;
+		if (freeSurface) SDL_FreeSurface(pSurface);
+		throw std::runtime_error(std::string("Could not create texture from surface: ") + SDL_GetError());
     }
 
     if(freeSurface)

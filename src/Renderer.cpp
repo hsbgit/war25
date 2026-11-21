@@ -18,16 +18,18 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <stdexcept>
 
 Renderer* g_pRenderer = nullptr; 
 
 
 Renderer::Renderer(SDL_Window* pWindow) {
     m_pRenderer = SDL_CreateRenderer(pWindow, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-    if (m_pRenderer == 0){
-        // ToDo: throw
-        SDL_Log("Error creating SDL_Renderer!");
-    }
+	if (!m_pRenderer)
+		m_pRenderer = SDL_CreateRenderer(pWindow, -1, SDL_RENDERER_SOFTWARE);
+	if (!m_pRenderer) {
+		throw std::runtime_error(std::string("Error creating SDL renderer: ") + SDL_GetError());
+	}
 }
 
 

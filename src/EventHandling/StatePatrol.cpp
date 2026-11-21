@@ -18,6 +18,7 @@
 #include "StatePatrol.h"
 #include "EventHandling/StateMoving.h"
 #include "Units/Unit.h"
+#include "Units/IArmed.h"
 
 
 CompositeStatePatrol::CompositeStatePatrol(Unit* pUnit) : State(pUnit) {
@@ -45,12 +46,30 @@ void CompositeStatePatrol::onEnter(const Event* pEvent) {
 	// A fresh patrol command always starts by walking to the clicked point.
 	// Without this reset, re-entering patrol could head to the stale start point.
 	m_pCurrState = m_movingToPatrolPoint;
+	m_pausedForCombat = false;
     m_pCurrState->onEnter(pEvent);
 }
 
 
 State* CompositeStatePatrol::process() {
-    // State* pPotentialNextState = State::checkForTransition();
+	auto* armed = dynamic_cast<IArmed*>(m_pOwner);
+	if (armed && armed->isArmed()) {
+		Object* target = armed->activeTarget();
+		if (target && (target->isDead() || !armed->activeTargetInRange(m_pOwner))) {
+			armed->clearActiveTarget();
+			target = nullptr;
+		}
+		if (!target) {
+			const auto targets = armed->findTargetObject(m_pOwner);
+			if (!targets.empty()) {
+				target = *targets.begin();
+				armed->assignTarget(target);
+			}
+		}
+		m_pausedForCombat = target && armed->activeTargetInRange(m_pOwner);
+		if (m_pausedForCombat) return this;
+	}
+	m_pausedForCombat = false;
 
     m_pCurrState = m_pCurrState->process();
     return this;

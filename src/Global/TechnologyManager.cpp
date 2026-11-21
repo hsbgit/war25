@@ -161,17 +161,10 @@ void TechnologyManager::researchFinished(ProductionItem::ItemType t) {
     if (t > ProductionItem::ItemType::UPGRADES_BEGIN && t < ProductionItem::ItemType::UPGRADES_END) {
         const Upgrade& u = gMapProductionItems[t];
 
-        // ToDo: Check who gets this upgrade?
-        for (auto& pObject : m_pPlayer->getObjects()) {
+		for (auto& pObject : m_pPlayer->getObjects()) {
             pObject->installUpgrade(u);
         }
     }
-
-
-    // ToDo: Notify/update units depending on technology
-    // increase oil, gold, wood income
-    // ...
-    // m_pPlayer->
 }
 
 

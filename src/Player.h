@@ -147,11 +147,7 @@ private:
 
     std::string m_name;
     PlayerColor m_color;
-public:
-    // ToDo: Fix hack
     Fraction m_fraction;
-
-private:
 
     int m_totalFood = 0, m_usedFood = 0;
 

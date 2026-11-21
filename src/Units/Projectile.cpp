@@ -60,6 +60,10 @@ void Projectile::initializeMissile(Object* pSource, Object* pTarget) {
 	} else if (m_type == ResourceManager_wartools::MissileType::Fireball ||
 		m_type == ResourceManager_wartools::MissileType::DragonBreath) {
 		g_pSoundManager->playWAV(this, "missiles/fireball_throw.wav");
+	} else if (m_type == ResourceManager_wartools::MissileType::TouchOfDeath) {
+		g_pSoundManager->playWAV(this, "spells/touch_of_darkness.wav");
+	} else if (m_type == ResourceManager_wartools::MissileType::NormalSpell) {
+		g_pSoundManager->playWAV(this, "spells/lightning.wav");
 	} else {
 		g_pSoundManager->playWAV(this, "missiles/catapult-ballista_attack.wav");
 	}
@@ -179,6 +183,10 @@ void Projectile::playCollisionSound() {
 	case ResourceManager_wartools::MissileType::Fireball:
 	case ResourceManager_wartools::MissileType::DragonBreath:
 		g_pSoundManager->playWAV(this, "missiles/fireball_hit.wav");
+		break;
+	case ResourceManager_wartools::MissileType::NormalSpell:
+	case ResourceManager_wartools::MissileType::TouchOfDeath:
+		g_pSoundManager->playWAV(this, "missiles/punch.wav");
 		break;
 
 	case ResourceManager_wartools::MissileType::BallistaBolt:

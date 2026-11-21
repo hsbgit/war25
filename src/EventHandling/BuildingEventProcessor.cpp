@@ -60,7 +60,19 @@ BuildingEventProcessor::~BuildingEventProcessor() {
         delete m_pCompletedUnit;
         m_pCompletedUnit = nullptr;
     }
-    // ToDo: cancel ongoing research stuff
+	if (!m_pObjectOwner) return;
+	TechnologyManager* technology = m_pObjectOwner->getTechnologyCoordinator();
+	if (EventProcessor::isEventInProgress() && m_currEventInProgressItem.isResearchItem()) {
+		const auto item = static_cast<ProductionItem::ItemType>(m_eventQueue.front().getEventID());
+		if (technology->isResearchOngoing(item)) technology->cancelResearch(item);
+	}
+	auto queuedItems = m_vecQueuedProductionItems;
+	while (!queuedItems.empty()) {
+		const ProductionItem& item = queuedItems.front();
+		if (item.isResearchItem() && technology->isResearchOngoing(item.getItemType()))
+			technology->cancelResearch(item.getItemType());
+		queuedItems.pop();
+	}
 }
 
 

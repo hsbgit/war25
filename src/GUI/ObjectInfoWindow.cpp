@@ -21,6 +21,7 @@ Copyright (C) 2024 P. Last
 #include "EventHandling/EventBroker.h"
 #include "Resources/SoundManager.h"
 #include "Units/Unit.h"
+#include "Units/SeaUnits/Transport.h"
 #include "Units/Critter.h"
 #include "Buildings/Goldmine.h"
 #include "Buildings/Farm.h"
@@ -107,6 +108,13 @@ bool ObjectInfoWindow::getSelectedBuildingAction(PeasantActions& buildingAction)
     return isBuildingAction(buildingAction);
 }
 
+std::optional<int> ObjectInfoWindow::selectedActionEvent() const {
+	if (!m_pCurrSelectedObject || m_selectedAction == kNoAction) return std::nullopt;
+	const auto actions = m_pCurrSelectedObject->getActions();
+	if (!isValidActionIndex(m_selectedAction, actions)) return std::nullopt;
+	return static_cast<int>(actions[m_selectedAction].getEventID());
+}
+
 void ObjectInfoWindow::playAcknowledgeDebounced(std::chrono::milliseconds minInterval) {
     const auto now = std::chrono::steady_clock::now();
     if (now - m_lastAcknowledgeTs >= minInterval) {
@@ -120,6 +128,24 @@ void ObjectInfoWindow::onRightClicked(const Point& tile_world) {
     if (m_selectedObjects.empty()) return;
 	Map* map = (*m_selectedObjects.begin())->getMap();
 	Object* clickedObject = map->getObjectOnTile(tile_world);
+	if (auto* transport = dynamic_cast<Transport*>(clickedObject);
+		transport && transport->getOwner() == map->humanControlledPlayer()) {
+		for (Object* object : m_selectedObjects) {
+			auto* unit = dynamic_cast<Unit*>(object);
+			if (!unit || !unit->isLandObject() || unit->getOwner() != map->humanControlledPlayer())
+				continue;
+			auto actions = unit->getActions();
+			const auto move = std::find_if(actions.begin(), actions.end(), [](const Action& action) {
+				return action.getEventID() == static_cast<EventID>(GeneralActions::Move);
+			});
+			if (move != actions.end()) {
+				g_pEventBroker.lockEventProcessor(move->getEventProcessorID());
+				move->trigger(tile_world);
+			}
+		}
+		playAcknowledgeDebounced(War25::Constants::SOUND_DEBOUNCE_INTERVAL);
+		return;
+	}
 	const bool attackOrder = clickedObject &&
 		clickedObject->getOwner() != map->humanControlledPlayer() &&
 		!clickedObject->getOwner()->isNeutral();
@@ -306,8 +332,6 @@ void ObjectInfoWindow::renderActions() {
     if (actions.empty()) return;
 
     ImGui::Separator();
-    ImGui::TextUnformatted("Actions:");
-
     auto isBasicBuilding = [](EventID id) {
         const auto action = static_cast<PeasantActions>(id);
         return action == PeasantActions::BuildTownhall ||

@@ -81,7 +81,6 @@ void ScoutTower::process() {
 		m_tickCnt = m_AttackCooldownTime_ticks;
 	}
 
-	// ToDo: Rework following code
 	if (!isBuildingCurrentlyUpgrading() && isArmed()) {
 		// A target is only valid while it remains inside the tower's actual
 		// attack range. Projectiles already in flight may still hit it.
@@ -89,12 +88,6 @@ void ScoutTower::process() {
 			clearActiveTarget();
 			m_tickCnt = 0;
 		}
-		// Redundant Code in ScoutTower and SeaUnit -> Refactoring
-		// alles in armed verschieben?
-		// isAttackInProgress
-		// cooldown etc?
-
-		// IArmed::findTarget
 		if (!hasActiveTarget()) {
 			std::set<Object*> setEnemiesInRange = IArmed::findTargetObject(this);
 
@@ -106,7 +99,6 @@ void ScoutTower::process() {
 			}
 		}
 		else {
-			// Todo: (wenn feind reichweite verlässt, angriff abbrechen. z.b. bei ballista). 
 			if (m_tickCnt++ == m_AttackCooldownTime_ticks) {
 				ResourceManager_wartools::MissileType type = (m_upgradeLevel == UpgradeLevel::GuardTower) ? ResourceManager_wartools::MissileType::Arrow : ResourceManager_wartools::MissileType::Cannon;
 

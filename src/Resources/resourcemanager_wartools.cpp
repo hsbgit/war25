@@ -37,7 +37,6 @@ namespace fs = std::filesystem;
 namespace {
     constexpr int PALETTE_COLOR_OFFSET = 208;
     constexpr int PALETTE_COLOR_COUNT = 4;
-    constexpr int TILE_OFFSET_INCREMENT = 0x010;
     constexpr int EXPLOSION_SPRITE_SIZE = 320 / 5;
     constexpr int EXPLOSION_SPRITE_COUNT = 16;
     constexpr int BUBBLE_WIDTH_PX = 504 / 7;
@@ -47,180 +46,33 @@ namespace {
     constexpr unsigned int RUNE_ANIMATION_INTERVAL = 150;
 }
 
-void ResourceManager_wartools::parseLUATileSetFile(Season season, const std::string& strFile) {
-	std::ifstream file(strFile);
-
-	if (!file) {
-		throw std::runtime_error("Unable to open LUA tileset file: " + strFile);
-	}
-
-
-	int tile_id = 0x000;
-	std::string s;
-	while (std::getline(file, s))
-	{
-		// Second condition avoids rows which have "--" but do not represent tile id values (look at file...)
-		if ((s.find("--") != std::string::npos) && (s.substr(0, 4) == "    ")) {
-			s.erase(std::remove(s.begin(), s.end(), '{'), s.end());
-			s.erase(std::remove(s.begin(), s.end(), '}'), s.end());
-			s.erase(std::remove(s.begin(), s.end(), ' '), s.end());
-
-			// Special case: Last relevant address entry;
-			// Has no comma at required position -> we would cut a valid value!
-			// So we cut only if it is not the 9D0 row
-			if (s.find("9D0") == std::string::npos) {
-				// Cut everything from last ',' till end of line
-				auto itLast = s.find_last_of(',');
-				s = s.erase(itLast, s.size());
-			}
-
-			//std::cerr<<strFile<<"\t"<<std::hex<<tile_id<<"\t"<<std::dec<<s.size()<<"\t"<<s<<std::endl;
-
-			if (s.size()) {
-				std::string entry;
-				std::stringstream ss(s);
-
-				int sub_tile_id = tile_id;
-				while (getline(ss, entry, ',')) {
-					try {
-						int index = std::stoi(entry);
-
-						if (index != 0) {
-							if (index == 142) {
-								std::cerr << std::hex << sub_tile_id << std::endl;
-							}
-							m_mapPUDId_to_TileSetIndex[sub_tile_id][season] = index;
-						}
-					}
-					catch (const std::exception& e) {
-						std::cerr << "Warning: Invalid tile index in " << strFile << ": " << entry << " (" << e.what() << ")" << std::endl;
-					}
-
-					++sub_tile_id;
-				}
-			}
-
-			tile_id += TILE_OFFSET_INCREMENT;
-		}
-	}
-
-	m_mapPUDId_to_TileSetIndex[SpecialTile::RemovedWood][season] = 126; // How to get this: Look at *.png and cnt rows and columns: 7*16+14 = 126
-	m_mapPUDId_to_TileSetIndex[SpecialTile::RemovedRock][season] = 10 * 16 + 6;
-
-	// Todo: implement all walls correct
-	m_mapPUDId_to_TileSetIndex[SpecialTile::DestroyedWalls][season] = 5 * 16 + 8;
-
-
-	int indexDestroyedWallsBegin = 5 * 16 + 8;
-	int cntTiles = 14;
-
-	for (int i = indexDestroyedWallsBegin; i < indexDestroyedWallsBegin + cntTiles; ++i) {
-		//  m_mapPUDId_to_TileSetIndex[i][season] = 
-	}
-
-
-}
-
-
 ResourceManager_wartools* g_pRessourceManager = nullptr;
 
 
 const std::string ResourceManager_wartools::strPrefix = std::string("data") + PATH_SEPARATOR + std::string("graphics") + PATH_SEPARATOR;
 
+ResourceManager_wartools::~ResourceManager_wartools() {
+	for (auto& [type, cursor] : m_cursors) {
+		(void)type;
+		SDL_FreeCursor(cursor);
+	}
+}
+
+void ResourceManager_wartools::notifySeasonObservers() const {
+	// Work on a copy: an observer may deregister itself while handling the
+	// notification (for example when a map is replaced).
+	const auto observers = m_vecSeasonObservers;
+	for (SeasonObserver* observer : observers)
+		if (observer) observer->notifySeasonChanged(m_currentSeason);
+}
+
+const Sprite* ResourceManager_wartools::getBuffIcon(BuffType type) const {
+	const auto found = m_buffSprites.find(type);
+	return found == m_buffSprites.end() ? nullptr : found->second.get();
+}
+
 
 // Unfortunately required as SDL_SetCursor does not always work properly -> Windows default cursor is set again so we call refreshLoadedCursor
-void ResourceManager_wartools::refreshLoadedCursor() {
-	if (m_pLastSetCursor) {
-		SDL_SetCursor(m_pLastSetCursor);
-	}
-}
-
-
-void ResourceManager_wartools::setCursor(CursorTypes type) {
-	assert(m_cursors.contains(type));
-	SDL_SetCursor(m_cursors[type]);
-	m_pLastSetCursor = m_cursors[type];
-}
-
-
-void ResourceManager_wartools::loadCursors() {
-	// Human Cursors
-	std::string strHumanPath = strPrefix + "ui" + PATH_SEPARATOR + "human" + PATH_SEPARATOR + "cursors" + PATH_SEPARATOR;
-
-	SDL_Surface* pSurface = IMG_Load((strHumanPath + "red_eagle.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: " + strHumanPath + "red_eagle.png");
-	}
-	m_cursors[CursorTypes::RedEagle] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-
-
-	pSurface = IMG_Load((strHumanPath + "yellow_eagle.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: " + strHumanPath + "yellow_eagle.png");
-	}
-	m_cursors[CursorTypes::YellowEagle] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-
-	pSurface = IMG_Load((strHumanPath + "green_eagle.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: " + strHumanPath + "green_eagle.png");
-	}
-	m_cursors[CursorTypes::GreenEagle] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-
-	pSurface = IMG_Load((strHumanPath + "human_gauntlet.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: " + strHumanPath + "human_gauntlet.png");
-	}
-	m_cursors[CursorTypes::HumanGauntlet] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-
-
-
-	// Orc Cursors
-	std::string strOrcPath = strPrefix + "ui" + PATH_SEPARATOR + "orc" + PATH_SEPARATOR + "cursors" + PATH_SEPARATOR;
-
-	pSurface = IMG_Load((strOrcPath + "red_crosshairs.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: " + strOrcPath + "red_crosshairs.png");
-	}
-	m_cursors[CursorTypes::RedCrosshairs] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-
-	pSurface = IMG_Load((strOrcPath + "yellow_crosshairs.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: " + strOrcPath + "yellow_crosshairs.png");
-	}
-	m_cursors[CursorTypes::YellowCrosshairs] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-
-	pSurface = IMG_Load((strOrcPath + "green_crosshairs.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: " + strOrcPath + "green_crosshairs.png");
-	}
-	m_cursors[CursorTypes::GreenCrosshairs] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-
-	pSurface = IMG_Load((strOrcPath + "orcish_claw.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: " + strOrcPath + "orcish_claw.png");
-	}
-	m_cursors[CursorTypes::OrcishClaw] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-
-	// Neutral
-	pSurface = IMG_Load((strPrefix + "ui" + PATH_SEPARATOR + "cursors" + PATH_SEPARATOR + "magnifying_glass.png").c_str());
-	if (!pSurface) {
-		throw std::runtime_error("Failed to load cursor texture: magnifying_glass.png");
-	}
-	m_cursors[CursorTypes::MagnifyingGlass] = SDL_CreateColorCursor(pSurface, 0, 0);
-	SDL_FreeSurface(pSurface);
-}
-
-
-
-
 #include "Animation.h"
 #include "Units/Unit.h"
 #include "Player.h"
@@ -273,10 +125,7 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 	assert(pTexture);
 
 
-	// Mage,Footman,ARcher
-	// ToDo: already in direction.h?
-	std::vector<Direction> vecDirections = { Direction::N, Direction::NE, Direction::E, Direction::SE, Direction::S, Direction::SW, Direction::W, Direction::NW };
-	for (Direction direction : vecDirections) {
+	for (Direction direction : AllDirections) {
 		// Do we have to flip the sprites?
 		int colOffset = (int)direction;
 		bool flip = false;
@@ -375,8 +224,7 @@ void ResourceManager_wartools::createVesselAnimations(std::type_index correspond
 
 
 	// In direction.h?
-	std::vector<Direction> vecDirections = { Direction::N, Direction::NE, Direction::E, Direction::SE, Direction::S, Direction::SW, Direction::W, Direction::NW };
-	for (Direction direction : vecDirections) {
+	for (Direction direction : AllDirections) {
 		// Do we have to flip the sprites?
 		int colOffset = (int)direction;
 		bool flip = false;
@@ -559,7 +407,8 @@ Sprite ResourceManager_wartools::getCritterSprite(Direction direction, bool dead
 
 Animation ResourceManager_wartools::getUnitIdleAnimation(Unit* pUnit, Direction direction) {
 	const std::type_index type = typeid(*pUnit);
-	auto* animations = pUnit->isSeaObject() ? &mapUnitMovementAnimations : &mapIdleAnimations;
+	auto* animations = (pUnit->isSeaObject() || pUnit->isAirObject())
+		? &mapUnitMovementAnimations : &mapIdleAnimations;
 	if (!animations->contains(type))
 		return Animation();
 	auto& directional = animations->at(type);
@@ -649,7 +498,7 @@ void ResourceManager_wartools::createidleAnimation(std::type_index corresponding
 
 	for (int r = 0; r < rows; ++r) {
 		for (int c = 0; c < cols; ++c) {
-			anim.addSprite(Sprite(anim.getBaseTexture(), rect, posOffset));  // ToDo: Ordering maybe wrong?
+			anim.addSprite(Sprite(anim.getBaseTexture(), rect, posOffset));
 			rect.y += squareWidth_px;
 		}
 
@@ -664,7 +513,7 @@ void ResourceManager_wartools::createExplosionAnimation() {
 	int iconSquareWidth_px = EXPLOSION_SPRITE_SIZE;
 	int spriteCnt = EXPLOSION_SPRITE_COUNT;
 
-	Texture* pTexture = new Texture("data/graphics/missiles/explosion.png", m_pRenderer);
+	Texture* pTexture = makeTexture("data/graphics/missiles/explosion.png", m_pRenderer);
 
 	Point posOffset = { -16, -16 };
 
@@ -698,7 +547,7 @@ void ResourceManager_wartools::loadAndStoreDestroyedBuildingTexture(const std::s
 	if (!pSurface)
 		assert(0);
 
-	m_mapDestroyedSites[type][season] = new Texture(pSurface, m_pRenderer, false);
+	m_mapDestroyedSites[type][season] = makeTexture(pSurface, m_pRenderer, false);
 	SDL_FreeSurface(pSurface);
 }
 
@@ -756,7 +605,7 @@ void ResourceManager_wartools::createRuneAnimation() {
 	SDL_Surface* pSurface = IMG_Load((strPrefix + "missiles" + PATH_SEPARATOR + "rune.png").c_str());
 	assert(pSurface);
 
-	Texture* pTexRune = new Texture(pSurface, m_pRenderer, false);
+	Texture* pTexRune = makeTexture(pSurface, m_pRenderer, false);
 	SDL_free(pSurface);
 
 
@@ -781,34 +630,33 @@ void ResourceManager_wartools::createBuffIcons() {
 	SDL_Surface* pSurface = IMG_Load(strPath.c_str());
 	assert(pSurface);
 
-	pBuffIcons = new Texture(pSurface, m_pRenderer, false);
+	pBuffIcons = makeTexture(pSurface, m_pRenderer, false);
 	SDL_free(pSurface);
 
 	const int squareWidth_px = 16;
 
 	Rect rect = { 0, 0, squareWidth_px, squareWidth_px };
-	m_mapBuffSprites[BuffType::Bloodlust] = new Sprite(&pBuffIcons, rect);
+	m_buffSprites[BuffType::Bloodlust] = std::make_unique<Sprite>(&pBuffIcons, rect);
 
 	rect.y += 16;
-	m_mapBuffSprites[BuffType::Haste] = new Sprite(&pBuffIcons, rect);
-
-
-	rect.y += 16;
-	m_mapBuffSprites[BuffType::Slow] = new Sprite(&pBuffIcons, rect);
-
-	rect.y += 16;
-	m_mapBuffSprites[BuffType::Invisibility] = new Sprite(&pBuffIcons, rect);
+	m_buffSprites[BuffType::Haste] = std::make_unique<Sprite>(&pBuffIcons, rect);
 
 
 	rect.y += 16;
-	m_mapBuffSprites[BuffType::UnholyArmor] = new Sprite(&pBuffIcons, rect);
+	m_buffSprites[BuffType::Slow] = std::make_unique<Sprite>(&pBuffIcons, rect);
+
+	rect.y += 16;
+	m_buffSprites[BuffType::Invisibility] = std::make_unique<Sprite>(&pBuffIcons, rect);
+
+
+	rect.y += 16;
+	m_buffSprites[BuffType::UnholyArmor] = std::make_unique<Sprite>(&pBuffIcons, rect);
 }
 
 
 void ResourceManager_wartools::createidleAnimations() {
-	// See png files for row/column structure
-	//   createidleAnimation(typeid(Skeleton), 280 / 5, 1, 1, 99999);  // ToDo: Internal structure differs completely from other units...
-
+	// See png files for row/column structure. Skeletons use their movement
+	// sheet for idle frames and are initialized separately below.
 	createidleAnimation(typeid(Ballista), 320 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 	createidleAnimation(typeid(Dwarfes), 280 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 	createidleAnimation(typeid(Archer), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
@@ -829,7 +677,6 @@ void ResourceManager_wartools::createidleAnimations() {
 	createVesselAnimations(typeid(Transport), 360 / 5);
 
 
-	//   createUnitAnimations(typeid(Skeleton), 360 / 5, 5, 5, 4);  // ToDo: Internal structure differs completely from other units...
 	createUnitAnimations(typeid(Archer), 360 / 5, 5, 2, 3);
 
 	// Again, internal structure differs completely from other units...
@@ -923,7 +770,7 @@ void ResourceManager_wartools::createidleAnimations() {
 								anim.addSprite(new Sprite(anim.getBaseTexture(), r));
 
 
-								// todo: alle einzeln aktualisieren
+								// Individual sprite pointers follow the active texture indirection.
 								// oder
 								// der pointer auf pointer ansatz
 
@@ -998,7 +845,6 @@ Sprite ResourceManager_wartools::getBuildingSprite(Building* pBuilding, Fraction
 
 	Texture** pTexture = nullptr;
 
-	// Fixme -> underConstruction
 	if (pTownHall) {
 		Townhall::UpgradeLevel ul = pTownHall->getUpgradeLevel();
 
@@ -1026,7 +872,8 @@ Sprite ResourceManager_wartools::getBuildingSprite(Building* pBuilding, Fraction
 		pTexture = &scoutTowerTexTargetMap[ul][color];
 	}
 	else {
-		pTexture = &texMap[type][color]; // ?! todo: activeTextMap anstatt texmap
+		if (texMap.contains(type) && texMap.at(type).contains(color))
+			pTexture = &texMap.at(type).at(color);
 	}
 
 	if (!pTexture || !*pTexture) {
@@ -1097,12 +944,10 @@ std::unordered_map<Season, std::string> mapSeasonToPath = {
 };
 
 
-void ResourceManager_wartools::readBuildings(bool orcs) {
+void ResourceManager_wartools::readBuildings() {
 	std::string strToFolder("data/graphics/tilesets/");
 
-	// ToDo: consider all...
-	std::vector<Season> seasons = { Season::Summer, Season::Swamp, Season::Wasteland, Season::Winter };
-	for (Season season : seasons) {
+	for (Season season : AllSeasons) {
 		std::string strPathToSeasonFolder(strToFolder);
 		strPathToSeasonFolder += mapSeasonToPath[season];
 
@@ -1123,47 +968,13 @@ void ResourceManager_wartools::readBuildings(bool orcs) {
 			if (!pSurface)
 				continue; // return
 
-			// ToDo: Extract method
-			std::string pngPath(tmp);
-			std::size_t posSlash = tmp.find_last_of('/');
-			pngPath = pngPath.erase(0, posSlash + 1);
+			const std::string pngPath = fs::path(tmp).filename().string();
 
 			std::type_index correspondingType = ResourceMappings::getNeutralBuildingMap().at(pngPath);
-			m_mapNeutralBuildingTextures[correspondingType][season] = new Texture(pSurface, m_pRenderer, false);
+			m_mapNeutralBuildingTextures[correspondingType][season] = makeTexture(pSurface, m_pRenderer, false);
 			SDL_FreeSurface(pSurface);
 		}
 	}
-}
-
-
-Sprite* ResourceManager_wartools::getTileSprite(int tile_id) {
-	assert(m_pActiveTileSet); // Required tileset texture available?
-
-	// tile_id and corresponding season exist?
-	if (!m_mapPUDId_to_TileSetIndex.contains(tile_id) ||
-		!m_mapPUDId_to_TileSetIndex.at(tile_id).contains(m_currentSeason)) {
-		// Custom maps occasionally use an empty/invalid tile slot. Keep the map
-		// loadable and display the first tileset cell as a visible placeholder.
-		std::cerr << "Warning: tile id 0x" << std::hex << tile_id
-			<< " has no mapping for tileset " << std::dec << static_cast<int>(m_currentSeason)
-			<< "; using placeholder" << std::endl;
-		m_mapPUDId_to_TileSetIndex[tile_id][m_currentSeason] = 0;
-	}
-
-	// Just create one sprite for a tile_id, not several!
-	if (!m_tileLookUp.contains(tile_id)) {
-		int val = m_mapPUDId_to_TileSetIndex[tile_id][m_currentSeason];
-		int rowOffset = val / 16;
-		int colOffset = val % 16;
-
-		int iconWidth_px = 32;
-		int iconHeight_px = 32;
-		Rect rect = { colOffset * iconWidth_px, rowOffset * iconHeight_px, iconWidth_px, iconHeight_px };
-
-		m_tileLookUp.insert_or_assign(tile_id, Sprite(&m_pActiveTileSet, rect));
-	}
-
-	return &m_tileLookUp.at(tile_id);
 }
 
 
@@ -1174,10 +985,7 @@ void ResourceManager_wartools::readBuildingSprite(Season season, const std::stri
 
 	assert(pSurface);
 
-	// ToDo: Extract method
-	std::string pngPath(pathToFile);
-	std::size_t posSlash = pathToFile.find_last_of('/'); // ToDo: use PATH_SEPARATOR
-	pngPath = pngPath.erase(0, posSlash + 1);
+	const std::string pngPath = fs::path(pathToFile).filename().string();
 
 	BuildingTextureMap& texTargetMap = orcs ? m_mapBuildingTexturesOrc : m_mapBuildingTexturesHuman;
 
@@ -1188,7 +996,7 @@ void ResourceManager_wartools::readBuildingSprite(Season season, const std::stri
 		SDL_SetPaletteColors(pSurface->format->palette, &palette[0], PALETTE_COLOR_OFFSET, PALETTE_COLOR_COUNT);
 
 		std::type_index correspondingType = mapFileNameToTypeID.at(pngPath);
-		Texture* pTexture = new Texture(pSurface, m_pRenderer, false);
+		Texture* pTexture = makeTexture(pSurface, m_pRenderer, false);
 
 		// Special case... TownHall, Keep and Castle all map to the same class... (ugly, I know)
 		// typedef std::unordered_map<Townhall::, std::unordered_map<Season, std::unordered_map<PlayerColor, Texture*>>> TownhallTextureMap;
@@ -1255,13 +1063,8 @@ void ResourceManager_wartools::createUnitSprites(Fraction fraction) {
 
 	for (const auto& entry : fs::directory_iterator(strToFolder)) {
 		if (entry.is_regular_file() && fs::path(entry.path()).extension() == ".png") {
-			// ToDo: Extract method
-			std::string pngPath(entry.path().string());
-			std::size_t posSlash = entry.path().string().find_last_of(PATH_SEPARATOR);
-			pngPath = pngPath.erase(0, posSlash + 1);
-			std::cout << "\t\t\t pngPath: " << pngPath << std::endl;
-
-			SDL_Surface* pSurface = IMG_Load(entry.path().string().c_str());  // ToDo: Delete pSurface after creating Texture?
+			const std::string pngPath = entry.path().filename().string();
+			SDL_Surface* pSurface = IMG_Load(entry.path().string().c_str());
 			assert(pSurface);
 
 			TextureMap* targetMap = textMap;
@@ -1285,12 +1088,11 @@ void ResourceManager_wartools::createUnitSprites(Fraction fraction) {
 			else if (fraction == Fraction::Orc && pngPath == "oil_tanker_full.png")
 				targetMap = &m_mapWorkerResourceTexturesOrc[ResourceType::Oil];
 
-			// Todo: Extract method?
 			for (auto const& [color, palette] : mapPlayerPaletteColors) {
 				SDL_SetPaletteColors(pSurface->format->palette, &palette[0], 208, 4);
 
 				std::type_index correspondingType = ResourceMappings::getUnitTypeMap().at(pngPath);
-				(*targetMap)[correspondingType][color] = new Texture(pSurface, m_pRenderer, false);
+				(*targetMap)[correspondingType][color] = makeTexture(pSurface, m_pRenderer, false);
 			}
 			SDL_FreeSurface(pSurface);
 		}
@@ -1298,53 +1100,11 @@ void ResourceManager_wartools::createUnitSprites(Fraction fraction) {
 }
 
 
-TileSetContainer::TileSetContainer(Renderer* pRenderer) {
-	pIcons = new Texture("data/graphics/tilesets/summer/terrain/summer.png", pRenderer);
-
-
-	for (const auto& entry : fs::directory_iterator("data/graphics/tilesets/summer/human/buildings")) {
-		if (entry.is_regular_file() && fs::path(entry.path()).extension() == ".png") {
-			std::string pngPath(entry.path().string());
-			std::size_t posSlash = entry.path().string().find_last_of(PATH_SEPARATOR);
-			pngPath = pngPath.erase(0, posSlash + 1);
-			//std::cout << "\t\t: "<< entry.path().string().erase(0,entry.path().string().find_last_of(PATH_SEPARATOR)+1) << std::endl;
-
-
-			SDL_Surface* pSurface = IMG_Load(entry.path().string().c_str());
-			assert(pSurface);
-
-
-
-
-			/* Each building *.png has at least two Sprites: Finished and under construction.
-			 * The oilrig is special: It has a third Sprite when visited by an oiltanker
-			 */
-			int cntSprites = pSurface->h / pSurface->w;
-			int spriteHeight = pSurface->h / cntSprites;
-
-
-			SDL_SetPaletteColors(pSurface->format->palette, &violetPaletteColors[0], 208, 4);
-
-			mapTextures[pngPath] = new Texture(pSurface, pRenderer);
-
-
-			//buildingSprites.
-			//new Sprite(&vecTextures.back(), r);
-			//  mapTextures.back
-		}
-	}
-
-
-}
-
-std::unordered_map<std::string, Texture*> mapUIPngs;
-
-
-Texture* pTextureFarm = nullptr;
 ResourceManager_wartools::ResourceManager_wartools(const std::string& pathToGraphicsFolder, Renderer* pRenderer) : m_pRenderer(pRenderer) {
-	if (pathToGraphicsFolder.rfind("titi", 0) != 0) {
-		assert("Unexpected data folder prefix!");
-	}
+	if (!m_pRenderer)
+		throw std::invalid_argument("ResourceManager requires a renderer");
+	if (!fs::is_directory(pathToGraphicsFolder))
+		throw std::runtime_error("Graphics directory does not exist: " + pathToGraphicsFolder);
 
 
 	loadCursors();
@@ -1354,7 +1114,7 @@ ResourceManager_wartools::ResourceManager_wartools(const std::string& pathToGrap
 	readIcons();
 	readTileSetTextures();
 	readCritters();
-	readBuildings(false);
+	readBuildings();
 	loadCoastalConstructionSprites();
 	//readBuilding(true);
 
@@ -1381,7 +1141,7 @@ ResourceManager_wartools::ResourceManager_wartools(const std::string& pathToGrap
 	{
 		SDL_Surface* pSurface = IMG_Load("data/graphics/neutral/buildings/land_construction_site.png");
 
-		m_pTextureConstructionSites = new Texture(pSurface, m_pRenderer);
+		m_pTextureConstructionSites = makeTexture(pSurface, m_pRenderer);
 		Rect size = { 0, 0, 63, 63 };
 		m_pSpriteConstructionSiteSmall = Sprite(&m_pTextureConstructionSites, size);
 
@@ -1390,73 +1150,31 @@ ResourceManager_wartools::ResourceManager_wartools(const std::string& pathToGrap
 	}
 
 
-	SDL_Surface* pSurface = IMG_Load("data/graphics/tilesets/summer/human/buildings/farm.png");
-
-	/* For details about this magic (exact colors and the offset 208)
-	 * refer to wargus-master/scrips/stratagus.lua and search for "DefinePlayerColorIndex(208, 4)"
-	 *
-	 *
-	 * DefinePlayerColors({
-  "red", {{164, 0, 0}, {124, 0, 0}, {92, 4, 0}, {68, 4, 0}},
-  "blue", {{12, 72, 204}, {4, 40, 160}, {0, 20, 116}, {0, 4, 76}},
-  "green", {{44, 180, 148}, {20, 132, 92}, {4, 84, 44}, {0, 40, 12}},
-  "violet", {{152, 72, 176}, {116, 44, 132}, {80, 24, 88}, {44, 8, 44}},
-  "orange", {{248, 140, 20}, {200, 96, 16}, {152, 60, 16}, {108, 32, 12}},
-  "black", {{40, 40, 60}, {28, 28, 44}, {20, 20, 32}, {12, 12, 20}},
-  "white", {{224, 224, 224}, {152, 152, 180}, {84, 84, 128}, {36, 40, 76}},
-  "yellow", {{252, 252, 72}, {228, 204, 40}, {204, 160, 16}, {180, 116, 0}},
-  "red", {{164, 0, 0}, {124, 0, 0}, {92, 4, 0}, {68, 4, 0}},
-  "blue", {{12, 72, 204}, {4, 40, 160}, {0, 20, 116}, {0, 4, 76}},
-  "green", {{44, 180, 148}, {20, 132, 92}, {4, 84, 44}, {0, 40, 12}},
-  "violet", {{152, 72, 176}, {116, 44, 132}, {80, 24, 88}, {44, 8, 44}},
-  "orange", {{248, 140, 20}, {200, 96, 16}, {152, 60, 16}, {108, 32, 12}},
-  "black", {{40, 40, 60}, {28, 28, 44}, {20, 20, 32}, {12, 12, 20}},
-  "white", {{224, 224, 224}, {152, 152, 180}, {84, 84, 128}, {36, 40, 76}},
-  "yellow", {{252, 252, 72}, {228, 204, 40}, {204, 160, 16}, {180, 116, 0}},
-})
-	 */
-	 //  std::vector<SDL_Color> sdlColors =  {{12, 72, 204, 255}, {4, 40, 160, 255}, {0, 20, 116, 255}, {0, 4, 76, 255}};
-	if (!SDL_SetPaletteColors(pSurface->format->palette, &bluePaletteColors[0], 208, 4)) {
-		std::cout << "PALETTE: " << SDL_GetError() << std::endl;
-		printf("SDL_Init failed: %s\n", SDL_GetError());
-	}
-
-
-
-
-	pTextureFarm = new Texture(pSurface, m_pRenderer);
-	Rect size = { 0,0,63,127 };
-	pFarm = new Sprite(&pTextureFarm, size);
-	int columns = 2;
-	int iconWidth_px = 64;
-	int iconHeight_px = 64;
-
-
 	switchSeason(Season::Summer);
-	// units [alliance][color]
-	// buildings [tileset][alliance][color]
 }
 
 
 void ResourceManager_wartools::readMissiles() {
 	std::string strToFolder("data/graphics/missiles/");
-	m_pCorpseTexture = new Texture(
+	m_pCorpseTexture = makeTexture(
 		"data/graphics/neutral/units/corpses.png", m_pRenderer);
 
-	m_mapMissiles[MissileType::Arrow] = new Texture(strToFolder + "arrow.png", m_pRenderer);
-	m_mapMissiles[MissileType::Axe] = new Texture(strToFolder + "axe.png", m_pRenderer);
-	m_mapMissiles[MissileType::BallistaBolt] = new Texture(strToFolder + "ballista_bolt.png", m_pRenderer);
-	m_mapMissiles[MissileType::Cannon] = new Texture(strToFolder + "cannon.png", m_pRenderer);
-	m_mapMissiles[MissileType::CatapultRock] = new Texture(strToFolder + "catapult_rock.png", m_pRenderer);
-	m_mapMissiles[MissileType::Fireball] = new Texture(strToFolder + "fireball.png", m_pRenderer);
-	m_mapMissiles[MissileType::DragonBreath] = new Texture(strToFolder + "dragon_breath.png", m_pRenderer);
-	m_mapMissiles[MissileType::GryphonHammer] = new Texture(strToFolder + "gryphon_hammer.png", m_pRenderer);
-	m_mapMissiles[MissileType::SubmarineMissile] = new Texture(strToFolder + "submarine_missile.png", m_pRenderer);
-	m_mapMissiles[MissileType::TurtleMissile] = new Texture(strToFolder + "turtle_missile.png", m_pRenderer);
+	m_mapMissiles[MissileType::Arrow] = makeTexture(strToFolder + "arrow.png", m_pRenderer);
+	m_mapMissiles[MissileType::Axe] = makeTexture(strToFolder + "axe.png", m_pRenderer);
+	m_mapMissiles[MissileType::BallistaBolt] = makeTexture(strToFolder + "ballista_bolt.png", m_pRenderer);
+	m_mapMissiles[MissileType::Cannon] = makeTexture(strToFolder + "cannon.png", m_pRenderer);
+	m_mapMissiles[MissileType::CatapultRock] = makeTexture(strToFolder + "catapult_rock.png", m_pRenderer);
+	m_mapMissiles[MissileType::Fireball] = makeTexture(strToFolder + "fireball.png", m_pRenderer);
+	m_mapMissiles[MissileType::DragonBreath] = makeTexture(strToFolder + "dragon_breath.png", m_pRenderer);
+	m_mapMissiles[MissileType::GryphonHammer] = makeTexture(strToFolder + "gryphon_hammer.png", m_pRenderer);
+	m_mapMissiles[MissileType::SubmarineMissile] = makeTexture(strToFolder + "submarine_missile.png", m_pRenderer);
+	m_mapMissiles[MissileType::TurtleMissile] = makeTexture(strToFolder + "turtle_missile.png", m_pRenderer);
+	m_mapMissiles[MissileType::NormalSpell] = makeTexture(strToFolder + "normal_spell.png", m_pRenderer);
+	m_mapMissiles[MissileType::TouchOfDeath] = makeTexture(strToFolder + "touch_of_death.png", m_pRenderer);
 
 	auto loadGridAnimation = [this, &strToFolder](SpellVisual visual,
 		const std::string& file, int frameSize, int interval) {
-		Texture* texture = new Texture(strToFolder + file, m_pRenderer);
+		Texture* texture = makeTexture(strToFolder + file, m_pRenderer);
 		Animation animation(texture, interval);
 		for (int y = 0; y + frameSize <= texture->getHeight(); y += frameSize)
 			for (int x = 0; x + frameSize <= texture->getWidth(); x += frameSize)
@@ -1468,10 +1186,10 @@ void ResourceManager_wartools::readMissiles() {
 	loadGridAnimation(SpellVisual::Blizzard, "blizzard.png", 32, 120);
 	loadGridAnimation(SpellVisual::Whirlwind, "tornado.png", 56, 120);
 	loadGridAnimation(SpellVisual::DeathAndDecay, "death_and_decay.png", 32, 120);
-	m_pAirUnitShadowTexture = new Texture(strToFolder + "unit_shadow.png", m_pRenderer);
+	m_pAirUnitShadowTexture = makeTexture(strToFolder + "unit_shadow.png", m_pRenderer);
 	m_airUnitShadow = Sprite(&m_pAirUnitShadowTexture, {0, 64, 32, 32});
 
-	m_pSmallFireTexture = new Texture(strToFolder + "small_fire.png", m_pRenderer);
+	m_pSmallFireTexture = makeTexture(strToFolder + "small_fire.png", m_pRenderer);
 	m_smallFireAnimation = Animation(m_pSmallFireTexture, 100);
 	// The looping flame consists of the five equally anchored frames in the
 	// first row. The isolated, much shorter image in row two is not part of
@@ -1480,7 +1198,7 @@ void ResourceManager_wartools::readMissiles() {
 		m_smallFireAnimation.addSprite(Sprite(
 			m_smallFireAnimation.getBaseTexture(), {x, 0, 32, 32}));
 
-	m_pBigFireTexture = new Texture(strToFolder + "big_fire.png", m_pRenderer);
+	m_pBigFireTexture = makeTexture(strToFolder + "big_fire.png", m_pRenderer);
 	m_bigFireAnimation = Animation(m_pBigFireTexture, 100);
 	for (int y = 0; y < m_pBigFireTexture->getHeight(); y += 48)
 		for (int x = 0; x < m_pBigFireTexture->getWidth(); x += 48)
@@ -1576,9 +1294,9 @@ void ResourceManager_wartools::loadCoastalConstructionSprites() {
 		{typeid(OilRefinery), "refinery_construction_site.png"}
 	};
 	for (const auto& [type, file] : buildings) {
-		m_coastalConstructionTextures[type][Fraction::Alliance] = new Texture(
+		m_coastalConstructionTextures[type][Fraction::Alliance] = makeTexture(
 			"data/graphics/human/buildings/" + file, m_pRenderer);
-		m_coastalConstructionTextures[type][Fraction::Orc] = new Texture(
+		m_coastalConstructionTextures[type][Fraction::Orc] = makeTexture(
 			"data/graphics/orc/buildings/" + file, m_pRenderer);
 	}
 }
@@ -1588,261 +1306,9 @@ Sprite ResourceManager_wartools::getUISprite(const std::string& strPngPath) {
 	const std::string strPathUIFolder("data/graphics/ui/");
 	std::string strPathToElement = strPathUIFolder + strPngPath;
 
-	if (!mapUIPngs.contains(strPathToElement)) {
-		mapUIPngs[strPathToElement] = new Texture(strPathToElement, m_pRenderer);
+	if (!m_uiTextures.contains(strPathToElement)) {
+		m_uiTextures[strPathToElement] = makeTexture(strPathToElement, m_pRenderer);
 	}
 
-	return Sprite(&mapUIPngs[strPathToElement]);
-}
-
-
-void ResourceManager_wartools::readDirectoryRecursively(const std::string& pathToGraphicsFolder) {
-	for (const auto& entry : fs::directory_iterator(pathToGraphicsFolder)) {
-		std::cout << entry.path() << " " << entry.is_directory() << " " << entry.is_regular_file() << " " << fs::path(entry.path()).extension() << std::endl;
-		std::cout << "\t\t: " << entry.path().string().erase(0, strPrefix.size()) << std::endl;
-
-		if (entry.is_directory()) {
-			readDirectoryRecursively(entry.path().string());
-		}
-		else if (entry.is_regular_file() && fs::path(entry.path()).extension() == ".png") {
-			// new Texture(entry.path().string(), m_pRenderer);
-		}
-	}
-}
-
-
-const Sprite* ResourceManager_wartools::getBuildingIcon(int i) const {
-	return 0;
-}
-
-
-
-// !! pointer copy?
-std::vector<Sprite*> ResourceManager_wartools::extractSprites(Texture** pTexture, int cntRows, int cntCols, int iconWidth_px, int iconHeight_px) {
-	std::vector<Sprite*> sprites;
-
-	for (int r = 0; r < cntRows; ++r) {
-		for (int c = 0; c < cntCols; ++c) {
-			int offset_cols = c * iconWidth_px;
-			int offset_rows = r * iconHeight_px;
-
-			Rect size = { offset_cols, offset_rows, iconWidth_px, iconHeight_px };
-			sprites.push_back(new Sprite(pTexture, size));
-		}
-	}
-
-	return sprites;
-}
-
-
-void ResourceManager_wartools::switchBuildingSprites(Season s) {
-	// Okay, this needs a bit of explanation. Wasteland actually uses many of the
-	// summer sprites. As we just copy the pointers / color maps to the 'm_ActiveSeasonBuildingsHuman' (and orc) container,
-	// we copy summer first and the few individual wasteland keys/values are replacing the some of the summer sprites afterwards
-	if (s == Season::Wasteland)
-		switchBuildingSprites(Season::Summer);
-
-	// Sprites keep Texture** pointers to entries in these active maps. Replacing
-	// an entire unordered_map destroys its nodes and leaves every existing
-	// building with dangling pointers. Update values in place so their addresses
-	// remain stable across season changes.
-	auto updateColors = [](auto& target, const auto& source) {
-		for (const auto& [color, texture] : source)
-			target[color] = texture;
-	};
-	auto updateUpgradeLevels = [&updateColors](auto& target, const auto& source) {
-		for (const auto& [level, colors] : source)
-			updateColors(target[level], colors);
-	};
-
-	for (const auto& [buildingType, seasonMap] : m_mapBuildingTexturesHuman) {
-		if (seasonMap.contains(s))
-			updateColors(m_ActiveSeasonBuildingsHuman[buildingType], seasonMap.at(s));
-	}
-
-	for (const auto& [buildingType, seasonMap] : m_mapBuildingTexturesOrc) {
-		if (seasonMap.contains(s))
-			updateColors(m_ActiveSeasonBuildingsOrc[buildingType], seasonMap.at(s));
-	}
-
-
-	// Townhall and ScoutTower are special, as 3 different *.pngs map to the same typeid -> Townhall and ScoutTower
-	// Thus, they have different structured maps.
-	if (m_mapTownhallTexturesHuman.contains(s))
-		updateUpgradeLevels(m_ActiveSeasonTownhallHuman, m_mapTownhallTexturesHuman.at(s));
-
-	if (m_mapTownhallTexturesOrc.contains(s))
-		updateUpgradeLevels(m_ActiveSeasonTownhallOrc, m_mapTownhallTexturesOrc.at(s));
-
-	if (m_mapScoutTowerTexturesHuman.contains(s))
-		updateUpgradeLevels(m_ActiveSeasonScoutTowerTexturesHuman, m_mapScoutTowerTexturesHuman.at(s));
-
-	if (m_mapScoutTowerTexturesOrc.contains(s))
-		updateUpgradeLevels(m_ActiveSeasonScoutTowerTexturesOrc, m_mapScoutTowerTexturesOrc.at(s));
-}
-
-
-void ResourceManager_wartools::switchSeason(Season season) {
-	m_currentSeason = season;
-	switchSeasonIcons(season);
-	switchBuildingSprites(season);
-	m_pActiveTileSet = m_mapTileSets[season];
-	m_pActiveCritterTexture = m_mapCritters[season];
-
-
-	// Refresh tile sprites, each Tile object has a pointer
-	// to one of the stored sprites
-	for (auto& [tile_id, sprite] : m_tileLookUp) {
-		int val = m_mapPUDId_to_TileSetIndex[tile_id][season];
-		int rowOffset = val / 16;
-		int colOffset = val % 16;
-
-		// startoffset
-		int iconWidth_px = 32;
-		int iconHeight_px = 32;
-
-		Rect rect = { colOffset * iconWidth_px, rowOffset * iconHeight_px, iconWidth_px, iconHeight_px };
-		sprite = Sprite(&m_pActiveTileSet, rect);
-	}
-
-	m_animDestroyedBuilding.setBaseTexture(m_mapDestroyedSites[BuildingDestroyedType::DestroyedBig][m_currentSeason]);
-	m_animDestroyedBuildingSea.setBaseTexture(m_mapDestroyedSites[BuildingDestroyedType::DestroyedBig][m_currentSeason]);
-
-	notifySeasonObservers();
-}
-
-
-void ResourceManager_wartools::switchSeasonIcons(Season s) {
-	for (auto const& [color, palette] : mapPlayerPaletteColors) {
-		m_ActiveSeasonIcons[color] = m_SeasonIcons[s][color];
-	}
-}
-
-
-void ResourceManager_wartools::readIcons() {
-	std::string strToFolder("data/graphics/tilesets/");
-	SDL_Surface* pSurface_Icons_Summer = IMG_Load((strToFolder + "summer/icons.png").c_str());
-	SDL_Surface* pSurface_Icons_Swamp = IMG_Load((strToFolder + "swamp/icons.png").c_str());
-	SDL_Surface* pSurface_Icons_Winter = IMG_Load((strToFolder + "winter/icons.png").c_str());
-	SDL_Surface* pSurface_Icons_Wasteland = IMG_Load((strToFolder + "wasteland/icons.png").c_str());
-
-	assert(pSurface_Icons_Summer);
-	assert(pSurface_Icons_Swamp);
-	assert(pSurface_Icons_Winter);
-	assert(pSurface_Icons_Wasteland);
-
-	for (auto const& [color, palette] : mapPlayerPaletteColors) {
-		SDL_SetPaletteColors(pSurface_Icons_Summer->format->palette, &palette[0], 208, 4);
-		SDL_SetPaletteColors(pSurface_Icons_Swamp->format->palette, &palette[0], 208, 4);
-		SDL_SetPaletteColors(pSurface_Icons_Winter->format->palette, &palette[0], 208, 4);
-		SDL_SetPaletteColors(pSurface_Icons_Wasteland->format->palette, &palette[0], 208, 4);
-
-		m_SeasonIcons[Season::Summer][color] = new Texture(pSurface_Icons_Summer, m_pRenderer, false);
-		m_SeasonIcons[Season::Swamp][color] = new Texture(pSurface_Icons_Swamp, m_pRenderer, false);
-		m_SeasonIcons[Season::Winter][color] = new Texture(pSurface_Icons_Winter, m_pRenderer, false);
-		m_SeasonIcons[Season::Wasteland][color] = new Texture(pSurface_Icons_Wasteland, m_pRenderer, false);
-	}
-
-	SDL_FreeSurface(pSurface_Icons_Summer);
-	SDL_FreeSurface(pSurface_Icons_Swamp);
-	SDL_FreeSurface(pSurface_Icons_Winter);
-	SDL_FreeSurface(pSurface_Icons_Wasteland);
-}
-
-
-
-
-std::unordered_map<std::type_index, Pud_Icon> mapTypeToIcon = { {typeid(Ballista), Pud_Icon::PUD_ICON_BALLISTA},
-																 {typeid(Battleship), Pud_Icon::PUD_ICON_BATTLESHIP},
-																 {typeid(Dwarfes), Pud_Icon::PUD_ICON_DWARVES},
-																 {typeid(Archer), Pud_Icon::PUD_ICON_ARCHER},
-																 {typeid(Destroyer), Pud_Icon::PUD_ICON_ELVEN_DESTROYER},
-																 {typeid(Footman), Pud_Icon::PUD_ICON_FOOTMAN},
-																 {typeid(GnomishFlyingMaschine), Pud_Icon::PUD_ICON_GNOMISH_FLYING_MACHINE},
-																 {typeid(GnomishSubmarine), Pud_Icon::PUD_ICON_GNOMISH_SUBMARINE},
-																 {typeid(GryphonRider), Pud_Icon::PUD_ICON_GRYPHON_RIDER},
-																 {typeid(Knight), Pud_Icon::PUD_ICON_KNIGHT},
-																 {typeid(Mage), Pud_Icon::PUD_ICON_MAGE},
-																 {typeid(Tanker), Pud_Icon::PUD_ICON_HUMAN_TANKER},
-																 {typeid(Peasant), Pud_Icon::PUD_ICON_PEASANT},
-																 {typeid(Transport), Pud_Icon::PUD_ICON_HUMAN_TRANSPORT}
-	// Critter missing
-};
-
-/*
- * Parameter fraction is only of interest if we, e.g., search for "PUD_ICON_MAGE" which
- * has id 14. All orc units of the same type follow, this means the Death Knight "PUD_ICON_DEATH_KNIGHT"
- * has id 15. Thus, if fraction==orc we simply add 1 to the icon index.
- */
-Sprite ResourceManager_wartools::getIcon(Pud_Icon icon, Fraction fraction, PlayerColor color) {
-	/*
-		PUD_ICON_SWORD_0
-	    PUD_ICON_HUMAN_ARR
-	    PUD_ICON_HUMAN_SHIELD_0
-   */
-
-	if (fraction == Fraction::Alliance)
-		return getIcon(icon, color);
-
-	// These are shared submenu buttons, not human/orc icon pairs.
-	if (icon == PUD_ICON_BUILD_STAGE_1 || icon == PUD_ICON_BUILD_STAGE_2 ||
-		icon == PUD_ICON_CANCEL)
-		return getIcon(icon, color);
-
-	// It is an Orc Icon:    
-	// Special cases because we have icons that change during upgrades. Hence, we cant increment as the ordering is, e.g., human sword 0,1,2 and then axe 0,1,2
-	if (icon == PUD_ICON_SWORD_0)
-		icon = PUD_ICON_AXE_0;
-	else if (icon == PUD_ICON_HUMAN_SHIELD_0)
-		icon = PUD_ICON_ORC_SHIELD_0;
-	else {
-		// Unfortunately operator++ is not supported for enums...
-		int pos = static_cast<int>(icon) + 1;
-
-		// Special case...
-		if (icon == PUD_ICON_HUMAN_GUARD_TOWER || icon == PUD_ICON_HUMAN_CANNON_TOWER) {
-			++pos;
-		}
-
-		icon = static_cast<Pud_Icon>(pos);
-	}
-
-	return getIcon(icon, color);
-}
-
-
-Sprite ResourceManager_wartools::getIcon(Pud_Icon icon, PlayerColor color) {
-	int columns = 5; //, rows = 38;
-	int iconWidth_px = 46;
-	int iconHeight_px = 38;
-
-	int pos = static_cast<int>(icon);
-	int nCols = pos % columns; // Get column id
-	int nRows = pos / columns; // Get row id
-
-	Rect rect = { nCols * iconWidth_px, nRows * iconHeight_px, iconWidth_px, iconHeight_px };
-
-	if (color == PlayerColor::Neutral) {
-		// Neutral Icons do not have a color palette (red, blue, etc.)
-		// As it does not matter, simply take the icon texture colored for PlayerColor::Red
-		color = PlayerColor::Red;
-	}
-
-	return Sprite(&m_ActiveSeasonIcons[color], rect);
-}
-
-
-void ResourceManager_wartools::readCritters() {
-	m_mapCritters[Season::Summer] = new Texture("data/graphics/tilesets/summer/neutral/units/critter.png", m_pRenderer);
-	m_mapCritters[Season::Swamp] = new Texture("data/graphics/tilesets/swamp/neutral/units/critter.png", m_pRenderer);
-	m_mapCritters[Season::Winter] = new Texture("data/graphics/tilesets/winter/neutral/units/critter.png", m_pRenderer);
-	m_mapCritters[Season::Wasteland] = new Texture("data/graphics/tilesets/wasteland/neutral/units/critter.png", m_pRenderer);
-}
-
-
-void ResourceManager_wartools::readTileSetTextures() {
-	m_mapTileSets[Season::Summer] = new Texture("data/graphics/tilesets/summer/terrain/summer.png", m_pRenderer);
-	m_mapTileSets[Season::Swamp] = new Texture("data/graphics/tilesets/swamp/terrain/swamp.png", m_pRenderer);
-	m_mapTileSets[Season::Winter] = new Texture("data/graphics/tilesets/winter/terrain/winter.png", m_pRenderer);
-	m_mapTileSets[Season::Wasteland] = new Texture("data/graphics/tilesets/wasteland/terrain/wasteland.png", m_pRenderer);
+	return Sprite(&m_uiTextures[strPathToElement]);
 }

@@ -39,17 +39,9 @@ CompositeStateChopWood::CompositeStateChopWood(Peasant* pPeasant) : State(pPeasa
 
 
     // Transitions
-    f_PeasantCarriesResource = [this]() {
-        IResourceCollector* pPeasant = dynamic_cast<IResourceCollector*>(m_pOwner);
-        return (pPeasant->currentlyCarrying() == ResourceType::Wood);
-    };
-
-
     f_isdead = [this]() {
         return m_pOwner->isDead();
     };
-
-    // todo: work with f_PeasantCarriesResource
 
     m_movingToRessource->addTransition(new ConditionBoolean(f_isdead), pPeasant->m_pDead);
     m_returningRessource->addTransition(new ConditionBoolean(f_isdead), pPeasant->m_pDead);

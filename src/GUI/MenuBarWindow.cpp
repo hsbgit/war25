@@ -44,13 +44,10 @@ namespace gui {
 			}
 
 
-			// Todo: do it the right way
+			// Leave a small visual gap between menus and live resources.
 			ImGui::Spacing();
 			ImGui::Spacing();
 			ImGui::Spacing();
-
-			// Todo: icons für ressourcen
-
 
 			bool enoughFood = (m_pPlayer->getAvailableFood() >= m_pPlayer->getUsedFood());
 			std::string strFoodInfo("Food: " + std::to_string(m_pPlayer->getUsedFood()) + "/" + std::to_string(m_pPlayer->getAvailableFood()));

@@ -37,7 +37,6 @@ public:
     Point getLastWoodPosition() const;
 
 private:
-    std::function<bool()> f_PeasantCarriesResource;
     std::function<bool()> f_isdead;
 
     State* m_pCurrState = nullptr;
@@ -50,5 +49,4 @@ private:
     // Remember the last wood position to return to after delivery
     Point m_lastWoodPosition = {-1, -1};
 };
-
 

@@ -38,7 +38,7 @@ Critter::Critter(Player* pOwner, Map* pMap) : Unit(pOwner, Fraction::Neutral, pM
 	// The resource manager selects the tileset before map objects are created.
 	// Registering alone therefore did not initialise m_isSheep until a later
 	// season change, making the click/explosion easter egg unreachable.
-	notifySeasonChanged(g_pRessourceManager->m_currentSeason);
+	notifySeasonChanged(g_pRessourceManager->currentSeason());
 }
 
 

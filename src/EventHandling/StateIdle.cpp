@@ -35,6 +35,10 @@ void StateIdle::onExit() {
 
 
 State* StateIdle::process()  {
+	// Vessels and aircraft keep their commanded heading while idle. Their
+	// sprite animation provides movement (bob, rotor, wings) without random
+	// course changes.
+	if (!m_pOwner->isLandObject()) return this;
 	if (m_ticksUntilTurn > 0) {
 		--m_ticksUntilTurn;
 		return this;

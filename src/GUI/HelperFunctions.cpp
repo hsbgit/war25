@@ -100,9 +100,9 @@ namespace gui {
 		float progress_saturated = progress;
 		char buf[32];
 #ifdef _WIN32         
-		sprintf_s(buf, "%d/%d", (int)(progress_saturated * 1753), 1753); // Todo: hitpoints?
+		sprintf_s(buf, "%.0f%%", progress_saturated * 100.0f);
 #else
-		snprintf(buf, sizeof(buf), "%d/%d", (int)(progress_saturated * 1753), 1753);
+		snprintf(buf, sizeof(buf), "%.0f%%", progress_saturated * 100.0f);
 #endif
 
 		if (progress > 0.7) {

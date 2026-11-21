@@ -131,7 +131,6 @@ CompositeStateConstructBuilding::CompositeStateConstructBuilding(Peasant* pPeasa
 		return m_pOwner->isDead();
 	};
 
-	// todo: work with f_PeasantCarriesResource
 	m_movingToConstructionSite->addTransition(new ConditionBoolean(f_isdead), pPeasant->m_pDead);
 
 
@@ -169,14 +168,7 @@ void CompositeStateConstructBuilding::onEnter(const Event* pEvent) {
 
 
 State* CompositeStateConstructBuilding::process() {
-	// todo: maybe: remove callback 'onWorkDone', instead check whether state changed by evaluating the pointer?
 	State* pNextState = m_pCurrState->process();
-
-	// Moving to construction site finished
-	if (pNextState != m_pCurrState) {
-
-	}
-
 	m_pCurrState = pNextState;
 	return m_pCurrState;
 }

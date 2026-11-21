@@ -24,11 +24,9 @@
 class INode;
 class Object;
 
-#ifdef _DEBUG
 extern std::unordered_set<INode*> g_debugSetOpenList;
 extern std::unordered_set<INode*> g_debugSetClosedList;
 extern Path g_debugPath;
-#endif
 
 
 

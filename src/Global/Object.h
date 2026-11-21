@@ -91,7 +91,6 @@ public:
 		return m_pOwner;
 	}
 
-	// ToDo: Neutral, Allies,...
 	bool isEnemy(Object* pPlayer) const;
 
 
@@ -263,7 +262,7 @@ protected:
 	Map* m_pMap = nullptr;
 
 
-	Fraction m_fraction = Fraction::Neutral; // todo: protected? setter?
+	Fraction m_fraction = Fraction::Neutral;
 
 public:
 	void onClicked();

@@ -17,6 +17,7 @@
 #pragma once
 
 #include "Resources/resourcemanager_wartools.h" // SeasonObserver
+#include "Units/Unit.h"
 #include "EventHandling/StateMachine.h"
 #include "EventHandling/StateCondition.h"
 

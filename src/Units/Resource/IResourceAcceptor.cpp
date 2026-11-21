@@ -19,6 +19,7 @@
 #include "Units/Unit.h"
 #include "Player.h"
 #include <iostream>
+#include <limits>
 
 
 IResourceAcceptor* findNearestResourceAcceptor(Unit* pUnit, Player* pPlayer) {
@@ -26,7 +27,7 @@ IResourceAcceptor* findNearestResourceAcceptor(Unit* pUnit, Player* pPlayer) {
 	assert(pCollector);
 
 	IResourceAcceptor* pAcceptor = nullptr;
-	int distance = 99999; // todo: constant
+	int distance = std::numeric_limits<int>::max();
 
 	for (auto& unit : pPlayer->getObjects()) {
 		IResourceAcceptor* pPossibleAcceptor = dynamic_cast<IResourceAcceptor*>(unit);
@@ -45,7 +46,7 @@ IResourceAcceptor* findNearestResourceAcceptor(Unit* pUnit, Player* pPlayer) {
 		}
 		else if (newDistance < distance) {
 			distance = newDistance;
-			// location
+			pAcceptor = pPossibleAcceptor;
 		}
 
 	}
@@ -55,4 +56,3 @@ IResourceAcceptor* findNearestResourceAcceptor(Unit* pUnit, Player* pPlayer) {
 
 	return pAcceptor;
 }
-

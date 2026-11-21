@@ -4,6 +4,11 @@ set(RESOURCES_SOURCES
     Animation.h
     resourcemanager_wartools.cpp
     resourcemanager_wartools.h
+	ResourceManagerCursors.cpp
+	ResourceManagerIcons.cpp
+	ResourceManagerSeasons.cpp
+	ResourceManagerTiles.cpp
+	Season.h
     ResourceMappings.cpp
     ResourceMappings.h
     Sound.cpp

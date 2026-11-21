@@ -49,7 +49,6 @@ public:
         m_setResearchOngoing.insert(t);
     }
 
-    // Todo: Who gives resources back to the player who cancelled research?
     inline void cancelResearch(ProductionItem::ItemType t) {
         assert(isResearchOngoing(t));
         m_setResearchOngoing.erase(t);
@@ -59,7 +58,6 @@ public:
         return (m_setResearchOngoing.find(t) != m_setResearchOngoing.end());
     }
 
-    // ToDo: Special case weapons for orcs/humans
     inline bool isResearched(ProductionItem::ItemType t) const {
         return (m_setResearchedTechnologies.find(t) != m_setResearchedTechnologies.end());
     }
