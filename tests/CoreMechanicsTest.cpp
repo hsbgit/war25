@@ -5,6 +5,7 @@
 #include "Map/MovementRules.h"
 #include "Global/SimulationSettings.h"
 #include "Resources/Season.h"
+#include "Units/CombatRules.h"
 
 int g_tick_ms = 25;
 
@@ -34,26 +35,54 @@ TEST(MovementRulesTest, OpenWaterAndClearLandRemainTraversable) {
 		true, false, false, false, true, false));
 }
 
-TEST(NavigationProgressTest, DirectProgressKeepsCheapLocalMovement) {
-	MovementRules::NavigationProgress progress;
-	const TestPoint target{10, 0};
-	progress.reset({0, 0}, target);
-	progress.recordStep({1, 0}, target);
-	progress.recordStep({2, 0}, target);
-	progress.recordStep({3, 0}, target);
-	EXPECT_FALSE(progress.shouldUsePathfinding());
+TEST(MovementRulesTest, OnlyAirMovementKeepsSweptFootprintClearance) {
+	EXPECT_FALSE(MovementRules::requiresOrthogonalDiagonalClearance(false));
+	EXPECT_TRUE(MovementRules::requiresOrthogonalDiagonalClearance(true));
 }
 
-TEST(NavigationProgressTest, ThreeNonImprovingStepsEscalateToAStar) {
-	MovementRules::NavigationProgress progress;
-	const TestPoint target{10, 0};
-	progress.reset({0, 0}, target);
-	progress.recordStep({0, 1}, target);
-	progress.recordStep({0, 2}, target);
-	progress.recordStep({0, 3}, target);
-	EXPECT_TRUE(progress.shouldUsePathfinding());
-	progress.pathfindingStarted();
-	EXPECT_FALSE(progress.shouldUsePathfinding());
+TEST(MovementRulesTest, PixelStepStopsWhenItReachesOrCrossesZero) {
+	EXPECT_FALSE(MovementRules::reachedTilePixelOffset(-2, 6));
+	EXPECT_TRUE(MovementRules::reachedTilePixelOffset(4, 6));
+	EXPECT_FALSE(MovementRules::reachedTilePixelOffset(2, -6));
+	EXPECT_TRUE(MovementRules::reachedTilePixelOffset(-4, -6));
+	EXPECT_TRUE(MovementRules::reachedTilePixelOffset(0, 0));
+}
+
+TEST(CombatRulesTest, ShipsChooseTheNearestBroadsideFacing) {
+	EXPECT_EQ(CombatRules::broadsideFacing(0, 2), 2);
+	EXPECT_EQ(CombatRules::broadsideFacing(2, 0), 0);
+	EXPECT_EQ(CombatRules::broadsideFacing(5, 7), 7);
+}
+
+TEST(CombatRulesTest, ProjectileLaunchSidePointsTowardTarget) {
+	const auto east = CombatRules::directionVector(2);
+	const auto northWest = CombatRules::directionVector(7);
+	EXPECT_EQ(east.x, 1);
+	EXPECT_EQ(east.y, 0);
+	EXPECT_EQ(northWest.x, -1);
+	EXPECT_EQ(northWest.y, -1);
+}
+
+TEST(MovementRulesTest, PermanentOccupantsAreNeverTraversable) {
+	EXPECT_FALSE(MovementRules::occupancyTraversalCost(true, false, false).has_value());
+}
+
+TEST(MovementRulesTest, UnitsAreExpensiveButTemporaryObstacles) {
+	EXPECT_EQ(MovementRules::occupancyTraversalCost(true, false, true), 200);
+	EXPECT_FALSE(MovementRules::occupancyTraversalCost(
+		true, false, true, false).has_value());
+	EXPECT_EQ(MovementRules::occupancyTraversalCost(true, true, true), 0);
+	EXPECT_EQ(MovementRules::occupancyTraversalCost(false, false, false), 0);
+}
+
+TEST(CombatRulesTest, SiegeWeaponsUseOriginalEightTileRange) {
+	EXPECT_EQ(CombatRules::SiegeAttackRangeTiles, 8);
+}
+
+TEST(CombatRulesTest, RectangleDistanceMeasuresFootprintEdges) {
+	EXPECT_EQ(CombatRules::rectangleDistanceSquared(0, 0, 0, 0, 4, 0, 4, 0), 16);
+	EXPECT_EQ(CombatRules::rectangleDistanceSquared(0, 0, 1, 1, 2, 1, 3, 2), 1);
+	EXPECT_EQ(CombatRules::rectangleDistanceSquared(0, 0, 1, 1, 1, 1, 2, 2), 0);
 }
 
 TEST(MagicTest, FireballConsumesItsConfiguredMana) {

@@ -78,8 +78,8 @@ void StateExplode::onExit() {
 	}
 
 	m_pOwner->die(); // Job on earth is done, dwarfes...
-	m_pOwner->getMap()->addAnimation(m_pOwner->getTile(), g_pRessourceManager->getExplosionAnimation());
-	g_pSoundManager->playWAV(m_pOwner->getTile(), std::string("misc") + PATH_SEPARATOR + "explosion.wav");
+	// Unit::doHandleDeath owns the single explosion animation and sound. Adding
+	// both again here made the detonation restart/overlap visibly and audibly.
 }
 
 

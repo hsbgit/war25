@@ -116,11 +116,12 @@ std::optional<int> ObjectInfoWindow::selectedActionEvent() const {
 }
 
 void ObjectInfoWindow::playAcknowledgeDebounced(std::chrono::milliseconds minInterval) {
-    const auto now = std::chrono::steady_clock::now();
-    if (now - m_lastAcknowledgeTs >= minInterval) {
-        if (m_pCurrSelectedObject) m_pCurrSelectedObject->playSoundSelected();
-        m_lastAcknowledgeTs = now;
-    }
+	const auto now = std::chrono::steady_clock::now();
+	if (now - m_lastAcknowledgeTs >= minInterval) {
+		if (auto* unit = dynamic_cast<Unit*>(m_pCurrSelectedObject))
+			unit->playSoundAcknowledge();
+		m_lastAcknowledgeTs = now;
+	}
 }
 
 void ObjectInfoWindow::onRightClicked(const Point& tile_world) {
@@ -483,6 +484,20 @@ void ObjectInfoWindow::renderUnitInfo() {
     if (const auto* pUnit = dynamic_cast<const Unit*>(m_pCurrSelectedObject)) {
         ImGui::Text("Speed : %d", pUnit->getSpeed());
     }
+
+	if (const auto* transport = dynamic_cast<const Transport*>(m_pCurrSelectedObject)) {
+		const auto passengers = transport->loadedPassengers();
+		ImGui::Separator();
+		ImGui::Text("Loaded: %zu/6", passengers.size());
+		for (std::size_t i = 0; i < passengers.size(); ++i) {
+			if (i != 0) ImGui::SameLine();
+			ImGui::PushID(static_cast<int>(0x545200 + i));
+			renderImage(passengers[i]->icon());
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+				ImGui::SetTooltip("%s", passengers[i]->getName().c_str());
+			ImGui::PopID();
+		}
+	}
 
     if (const auto* pMagical = dynamic_cast<const IMagical*>(m_pCurrSelectedObject)) {
         ImGui::Separator();

@@ -55,10 +55,13 @@ public:
 	void process() override;
 	bool isMoving() const override;
 	bool isIdle() const { return m_stateMachine.isCurrentState(m_pIdle); }
+	bool hasCombatTarget() const;
 	std::vector<Action> getActions() const override;
+	void playSoundAcknowledge();
 
 
 	void takeDamage(const AttackerStats& stats, bool noRandomComponent = false) override;
+	void onAttackedBy(Object* attacker) override;
 
 	void handleEvent(const Event& event) override;
 

@@ -211,7 +211,9 @@ void Game::doEventHandling() {
 					*selectedAction == static_cast<int>(DwarfesActions::Explode);
 				const bool spell = *selectedAction >= static_cast<int>(MageActions::Fireball) &&
 					*selectedAction <= static_cast<int>(OgreActions::Runes);
-				g_pRessourceManager->setCursor((attackLike || spell)
+				const bool targetAction = spell ||
+					*selectedAction == static_cast<int>(TransportActions::Unload);
+				g_pRessourceManager->setCursor((attackLike || targetAction)
 					? combatCursor(attackLike) : (pObject ? CursorTypes::MagnifyingGlass : CursorTypes::HumanGauntlet));
 			} else if (enemyHover && armedSelection) {
 				g_pRessourceManager->setCursor(combatCursor(true));
@@ -341,6 +343,16 @@ void Game::doEventHandling() {
                         std::erase_if(userSelection, [](auto& pObject) {
                             return !pObject->isSelectable();
                             });
+
+						const bool draggedSelection = selectionRect.w > 2 || selectionRect.h > 2;
+						if (draggedSelection) {
+							const bool containsUnit = std::any_of(userSelection.begin(), userSelection.end(),
+								[](Object* object) { return dynamic_cast<Unit*>(object) != nullptr; });
+							if (containsUnit)
+								std::erase_if(userSelection, [](Object* object) {
+									return dynamic_cast<Unit*>(object) == nullptr;
+								});
+						}
 
 						// SDL supplies a stable click count for mouse double-clicks. If
 						// the clicked object is ours, expand the selection to every

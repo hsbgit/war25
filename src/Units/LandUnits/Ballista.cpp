@@ -20,10 +20,11 @@
 #include "Global/GlobalAttributes.h"
 #include "Map/Map.h"
 #include "Units/Projectile.h"
+#include "Units/CombatRules.h"
 #include <algorithm>
 
 
-Ballista::Ballista(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 110, 0, 9, 5), IArmed(80, 0, 8) {
+Ballista::Ballista(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 110, 0, 9, 5), IArmed(80, 0, CombatRules::SiegeAttackRangeTiles) {
 	if (m_fraction == Fraction::Alliance)
 		setName("Ballista");
 	else
@@ -140,6 +141,16 @@ void Ballista::updateAttack() {
 		} else {
 			// Hold a single spanning frame. Looping both attack frames during
 			// the delay made the ballista visibly jump before every shot.
+			setAttackFrame(0);
+			m_windupTicksRemaining = calculateRequiredTicksForGameAction(2 * 1000);
+		}
+		return;
+	}
+	if (m_windupTicksRemaining == 0) {
+		m_attackDirection = targetDirection(m_pActiveTarget);
+		if (getFraction() == Fraction::Orc) {
+			fireAtActiveTarget();
+		} else {
 			setAttackFrame(0);
 			m_windupTicksRemaining = calculateRequiredTicksForGameAction(2 * 1000);
 		}

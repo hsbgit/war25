@@ -18,6 +18,7 @@
 
 #include <vector>
 #include <unordered_set>
+#include <optional>
 
 #include "Path.h"
 
@@ -48,7 +49,8 @@ public:
 private:
 	int heuristic(const INode* pNode) const;
 	bool canVisit(const INode* from, const INode* to) const;
-	bool isDynamicallyBlocked(const INode* node) const;
+	std::optional<int> occupancyCost(const INode* node,
+		bool allowTemporaryUnits) const;
 
 	INode* m_pStartNode;
 	INode* m_pEndNode;

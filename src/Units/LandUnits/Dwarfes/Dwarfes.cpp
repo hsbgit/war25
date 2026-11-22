@@ -18,6 +18,7 @@
 #include "Player.h"
 #include "StateExplode.h"
 #include "Resources/resourcemanager_wartools.h"
+#include "Map/Map.h"
 
 
 Dwarfes::Dwarfes(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 40, 0, 4, 11), IArmed(4, 2, 1) {
@@ -29,6 +30,7 @@ Dwarfes::Dwarfes(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fr
 		setSoundBaseDirectory("orc/units/goblin_sappers/");
 		setName("Goblin Sappers");
 	}
+	setDyingSound("misc/explosion.wav");
 
 
 	addAllowedUpgrade(Upgrade::ItemType::Blacksmith_Armor_1);

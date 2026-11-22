@@ -66,8 +66,10 @@ private:
 
     Point m_tilePositionOffset_px;
 
-    Point m_targetPos_world;
-    Tile* m_pTargetTile = nullptr;
-	MovementRules::NavigationProgress m_navigationProgress;
-
+	Point m_targetPos_world;
+	Tile* m_pTargetTile = nullptr;
+	// Land A* may resolve an intrinsically blocked command target to the
+	// closest reachable tile. Sea and air movement continue to require the
+	// exact target and do not use this completion marker.
+	Tile* m_pPathEndpoint = nullptr;
 };

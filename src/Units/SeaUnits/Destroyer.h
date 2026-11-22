@@ -39,4 +39,6 @@ public:
 	int getAdditionalAttackRange() const override {
 		return m_upgradeStats.additionalRange();
 	}
+
+	bool canAttackAirUnits() const override { return true; }
 };

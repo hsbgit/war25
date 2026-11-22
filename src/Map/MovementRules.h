@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <optional>
 
 namespace MovementRules {
 
@@ -15,38 +16,38 @@ inline bool terrainAllows(bool isLandUnit, bool isSeaUnit, bool canDockOnCoast,
 	return true;
 }
 
+// Preserve the swept-footprint check used by the working 2x2 air movement.
+// Land and sea movement use the classic eight-way grid: when the destination
+// footprint is free, a diagonal step is valid. Requiring both orthogonal tiles
+// for 1x1 land units can split otherwise connected parts of a Warcraft II map.
+inline bool requiresOrthogonalDiagonalClearance(bool isAirUnit) {
+	return isAirUnit;
+}
+
+inline bool reachedTilePixelOffset(int offset, int speed) {
+	return speed == 0 || (speed > 0 ? offset >= 0 : offset <= 0);
+}
+
+inline std::optional<int> occupancyTraversalCost(bool occupied,
+	bool occupiedBySelf, bool occupantIsUnit,
+	bool allowTemporaryUnits = true) {
+	if (!occupied || occupiedBySelf)
+		return 0;
+	// Buildings and other stationary map objects can never vacate the tile.
+	if (!occupantIsUnit)
+		return std::nullopt;
+	if (!allowTemporaryUnits)
+		return std::nullopt;
+	// A large but finite penalty routes around idle units whenever possible,
+	// while retaining a route through temporarily busy one-tile chokepoints.
+	return 200;
+}
+
 template<typename Position>
 inline int octileDistance(const Position& from, const Position& to) {
 	const int dx = std::abs(from.x - to.x);
 	const int dy = std::abs(from.y - to.y);
 	return 10 * std::max(dx, dy) + 4 * std::min(dx, dy);
 }
-
-class NavigationProgress {
-public:
-	template<typename Position>
-	void reset(const Position& start, const Position& target) {
-		m_bestDistance = octileDistance(start, target);
-		m_stepsWithoutProgress = 0;
-	}
-
-	template<typename Position>
-	void recordStep(const Position& position, const Position& target) {
-		const int distance = octileDistance(position, target);
-		if (distance < m_bestDistance) {
-			m_bestDistance = distance;
-			m_stepsWithoutProgress = 0;
-		} else {
-			++m_stepsWithoutProgress;
-		}
-	}
-
-	bool shouldUsePathfinding() const { return m_stepsWithoutProgress >= 3; }
-	void pathfindingStarted() { m_stepsWithoutProgress = 0; }
-
-private:
-	int m_bestDistance = 0;
-	int m_stepsWithoutProgress = 0;
-};
 
 } // namespace MovementRules

@@ -20,33 +20,17 @@
 #include "Map/Tile.h"
 #include "Global/Object.h"
 #include "Map/MovementRules.h"
+#include "Map/PathSearch.h"
+#include "Units/Unit.h"
 
 #include <algorithm>
 #include <cmath>
-#include <queue>
-#include <unordered_map>
 
 std::unordered_set<INode*> g_debugSetOpenList;
 std::unordered_set<INode*> g_debugSetClosedList;
 Path g_debugPath;
 
 namespace {
-struct QueueEntry {
-	int f;
-	int h;
-	INode* node;
-};
-
-struct LowestScoreFirst {
-	bool operator()(const QueueEntry& lhs, const QueueEntry& rhs) const {
-		if (lhs.f != rhs.f) return lhs.f > rhs.f;
-		if (lhs.h != rhs.h) return lhs.h > rhs.h;
-		if (lhs.node->getY() != rhs.node->getY())
-			return lhs.node->getY() > rhs.node->getY();
-		return lhs.node->getX() > rhs.node->getX();
-	}
-};
-
 bool isDiagonal(Direction direction) {
 	return direction == Direction::NW || direction == Direction::NE ||
 		direction == Direction::SW || direction == Direction::SE;
@@ -93,9 +77,11 @@ bool AStar::canVisit(const INode* from, const INode* to) const {
 	if (!footprintFitsTerrain(to->getX(), to->getY()))
 		return false;
 
-	// Check both orthogonal positions for diagonal movement. This is essential
-	// for 2x2 hulls and also prevents 1x1 land units cutting solid corners.
-	if (from->getX() != to->getX() && from->getY() != to->getY()) {
+	// Keep the existing swept-footprint behavior for air units. Land and sea
+	// movement use the classic eight-way grid and only require the destination
+	// footprint to fit.
+	if (MovementRules::requiresOrthogonalDiagonalClearance(m_airPath) &&
+		from->getX() != to->getX() && from->getY() != to->getY()) {
 		if (!footprintFitsTerrain(to->getX(), from->getY()) ||
 			!footprintFitsTerrain(from->getX(), to->getY()))
 			return false;
@@ -103,19 +89,26 @@ bool AStar::canVisit(const INode* from, const INode* to) const {
 	return true;
 }
 
-bool AStar::isDynamicallyBlocked(const INode* node) const {
+std::optional<int> AStar::occupancyCost(const INode* node,
+	bool allowTemporaryUnits) const {
 	if (!m_pMovingObject)
-		return false;
+		return 0;
 	Map* map = m_pMovingObject->getMap();
+	int cost = 0;
 	for (int y = node->getY(); y < node->getY() + m_unitSize; ++y) {
 		for (int x = node->getX(); x < node->getX() + m_unitSize; ++x) {
 			Tile* tile = map->getTile({x, y});
 			Object* occupant = m_airPath ? tile->getAirUnit() : tile->getSeaOrLandUnit();
-			if (occupant && occupant != m_pMovingObject)
-				return true;
+			const auto tileCost = MovementRules::occupancyTraversalCost(
+				occupant != nullptr, occupant == m_pMovingObject,
+				dynamic_cast<Unit*>(occupant) != nullptr,
+				allowTemporaryUnits);
+			if (!tileCost)
+				return std::nullopt;
+			cost = std::max(cost, *tileCost);
 		}
 	}
-	return false;
+	return cost;
 }
 
 Path AStar::findPath() {
@@ -123,59 +116,47 @@ Path AStar::findPath() {
 	if (!m_pStartNode || !m_pEndNode || m_pStartNode == m_pEndNode)
 		return result;
 
-	std::priority_queue<QueueEntry, std::vector<QueueEntry>, LowestScoreFirst> open;
-	std::unordered_map<INode*, int> scores;
-	std::unordered_map<INode*, INode*> parents;
-	scores[m_pStartNode] = 0;
-	open.push({heuristic(m_pStartNode), heuristic(m_pStartNode), m_pStartNode});
-	m_setOpenList.insert(m_pStartNode);
-
-	while (!open.empty()) {
-		const QueueEntry entry = open.top();
-		open.pop();
-		INode* current = entry.node;
-		if (m_setClosedList.contains(current))
-			continue; // stale priority-queue entry
-		m_setOpenList.erase(current);
-		m_setClosedList.insert(current);
-
-		if (current == m_pEndNode) {
-			std::vector<INode*> nodes;
-			for (INode* node = current; node != m_pStartNode; node = parents.at(node))
-				nodes.push_back(node);
-			std::reverse(nodes.begin(), nodes.end());
-			result.m_vecPathNodes = std::move(nodes);
-			break;
-		}
-
-		NeighbourNodes availableNeighbours;
-		const NeighbourNodes* neighbours;
+	auto neighbourValues = [this](INode* current) {
 		if (m_pMovingObject) {
 			Tile* tile = static_cast<Tile*>(current);
-			neighbours = (m_airPath || m_pMovingObject->canDockOnCoast())
-				? &tile->neighbourTiles : &tile->neighbourTiles_SameType;
-		} else {
-			availableNeighbours = current->getFreeNeighbourNodes(m_unitSize, m_airPath);
-			neighbours = &availableNeighbours;
+			return (m_airPath || m_pMovingObject->canDockOnCoast())
+				? tile->neighbourTiles : tile->neighbourTiles_SameType;
 		}
-		for (const auto& [direction, neighbour] : *neighbours) {
-			if (m_setClosedList.contains(neighbour) || !canVisit(current, neighbour))
-				continue;
-			// Units are temporary obstacles. A finite penalty prefers a free detour,
-			// while still producing a route through a moving crowd or a chokepoint.
-			const int congestionPenalty = isDynamicallyBlocked(neighbour) ? 40 : 0;
-			const int tentative = scores[current] +
-				(isDiagonal(direction) ? 14 : 10) + congestionPenalty;
-			auto old = scores.find(neighbour);
-			if (old != scores.end() && tentative >= old->second)
-				continue;
-			scores[neighbour] = tentative;
-			parents[neighbour] = current;
-			const int h = heuristic(neighbour);
-			open.push({tentative + h, h, neighbour});
-			m_setOpenList.insert(neighbour);
-		}
+		return current->getFreeNeighbourNodes(m_unitSize, m_airPath);
+	};
+	auto runSearch = [this, &neighbourValues](bool allowTemporaryUnits,
+		bool returnClosestReachable) {
+		return PathSearch::find(m_pStartNode, m_pEndNode, neighbourValues,
+			[this, allowTemporaryUnits](INode* from, INode* to) {
+				return canVisit(from, to) &&
+					occupancyCost(to, allowTemporaryUnits).has_value();
+			},
+			[this, allowTemporaryUnits](Direction direction, INode* node) {
+				return (isDiagonal(direction) ? 14 : 10) +
+					occupancyCost(node, allowTemporaryUnits).value_or(0);
+			},
+			[this](INode* node) { return heuristic(node); },
+			returnClosestReachable);
+	};
+
+	PathSearch::Result<INode> search;
+	if (m_pMovingObject && m_pMovingObject->isLandObject()) {
+		// Prefer every free detour, regardless of its length. Only if no such
+		// route exists may A* plan through a temporarily occupied chokepoint.
+		search = runSearch(false, false);
+		if (!search.reachedGoal)
+			search = runSearch(true, false);
+		// A clicked tree, wall or building tile cannot be entered. Return the
+		// closest actually reachable land tile instead of abandoning the order.
+		if (!search.reachedGoal)
+			search = runSearch(false, true);
+	} else {
+		// Do not alter the established ship and air-unit routing behavior.
+		search = runSearch(true, false);
 	}
+	result.m_vecPathNodes = std::move(search.path);
+	m_setOpenList = std::move(search.open);
+	m_setClosedList = std::move(search.closed);
 
 	g_debugSetClosedList = m_setClosedList;
 	g_debugSetOpenList = m_setOpenList;

@@ -28,8 +28,9 @@ public:
 	void handleEvent(const Event& event) override;
 	void process() override;
 	void doHandleDeath() override;
-	bool requestBoard(Unit* passenger);
+	Tile* requestBoard(Unit* passenger);
 	std::size_t passengerCount() const { return m_passengers.size(); }
+	std::vector<Unit*> loadedPassengers() const;
 	bool isDocked() const;
 
 	Type getType() const override {
@@ -42,10 +43,16 @@ public:
 	}
 
 private:
-	void unloadAll();
+	struct PendingPassenger {
+		EventProcessorID id;
+		Point approach;
+	};
+	Tile* findBoardingApproach(const Unit* passenger,
+		EventProcessorID ignoredReservation = 0);
+	void unloadAll(const Point& preferredDestination);
 	static constexpr std::size_t Capacity = 6;
 	std::vector<EventProcessorID> m_passengers;
-	std::vector<EventProcessorID> m_pendingPassengers;
+	std::vector<PendingPassenger> m_pendingPassengers;
 	bool m_wasDocked = false;
 	bool m_dockStateInitialized = false;
 };

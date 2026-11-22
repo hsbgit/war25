@@ -50,7 +50,8 @@ std::set<Object*> IArmed::findTargetObject(Object* pAttacker) const {
 		[pAttacker, this](Object* pTarget) {
 			return !pTarget->isEnemy(pAttacker) ||
 				pTarget->getFraction() == Fraction::Neutral ||
-				pTarget->getOwner()->isNeutral() || !canAttackTarget(pTarget);
+				pTarget->getOwner()->isNeutral() || !canAttackTarget(pTarget) ||
+				!pAttacker->getOwner()->getMapInfo()->canCurrentlySee(pTarget);
 		});
 
 	return setObjectsInRange;

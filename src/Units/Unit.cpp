@@ -39,6 +39,7 @@
 #include "Units/SeaUnits/GnomishSubmarine.h"
 #include "Units/SeaUnits/Destroyer.h"
 #include "Units/SeaUnits/Transport.h"
+#include "Units/CombatRules.h"
 #include <iostream>
 #include <filesystem>
 
@@ -137,8 +138,8 @@ void Unit::handleEvent(const Event& event) {
 		isLandObject()) {
 		Object* clicked = getMap()->getObjectOnTile({event.tileX(), event.tileY()});
 		auto* transport = dynamic_cast<Transport*>(clicked);
-		if (transport && transport->getOwner() == getOwner() && transport->requestBoard(this)) {
-			if (Tile* approach = getMap()->getFreeTileAroundBuilding(transport, this))
+		if (transport && transport->getOwner() == getOwner()) {
+			if (Tile* approach = transport->requestBoard(this))
 				m_stateMachine.handleEvent(Event(getID(), GeneralActions::Move,
 					approach->getX(), approach->getY()));
 			return;
@@ -165,7 +166,8 @@ void Unit::handleEvent(const Event& event) {
 					m_stateMachine.handleEvent(Event(getID(), GeneralActions::Stop));
 					return;
 				}
-				if (Tile* approach = getMap()->getFreeTileAroundBuilding(target, this)) {
+				if (Tile* approach = getMap()->getClosestAttackTile(
+					target, this, armed->attackRange())) {
 					m_stateMachine.handleEvent(Event(getID(), GeneralActions::Attack,
 						approach->getX(), approach->getY()));
 					return;
@@ -196,7 +198,11 @@ std::vector<Action> Unit::getActions() const {
 
 	vecActions.push_back(Action(id, (EventID)GeneralActions::Move, g_pRessourceManager->getIcon(PUD_ICON_HUMAN_MOVE, getFraction(), color), Action::ActionType::WithWorldTile));
 	vecActions.push_back(Action(id, (EventID)GeneralActions::Stop, g_pRessourceManager->getIcon(PUD_ICON_HUMAN_SHIELD_0, getFraction(), color)));
-	vecActions.push_back(Action(id, (EventID)GeneralActions::Attack, g_pRessourceManager->getIcon(PUD_ICON_SWORD_0, getFraction(), color), Action::ActionType::WithWorldTile));
+	const Pud_Icon attackIcon = dynamic_cast<const GryphonRider*>(this)
+		? PUD_ICON_HUMAN_ATTACK_GROUND : PUD_ICON_SWORD_0;
+	vecActions.push_back(Action(id, (EventID)GeneralActions::Attack,
+		g_pRessourceManager->getIcon(attackIcon, getFraction(), color),
+		Action::ActionType::WithWorldTile));
 	vecActions.push_back(Action(id, (EventID)GeneralActions::Patrol, g_pRessourceManager->getIcon(PUD_ICON_HUMAN_PATROL, getFraction(), color), Action::ActionType::WithWorldTile));
 	vecActions.push_back(Action(id, (EventID)GeneralActions::StandGround, g_pRessourceManager->getIcon(PUD_ICON_HUMAN_STAND_GROUND, getFraction(), color)));
 	return vecActions;
@@ -213,7 +219,7 @@ void Unit::doHandleDeath() {
 			this, m_facingDirection, ResourceManager_wartools::AnimationType::Dying).playOnce());
 	}
 	if (isOrganic() && !isUnDead() && isLandObject() && isPlacedOnMap() &&
-		!dynamic_cast<Mage*>(this))
+		!dynamic_cast<Mage*>(this) && !dynamic_cast<Dwarfes*>(this))
 		getMap()->addAnimation(getTile(),
 			g_pRessourceManager->getCorpseAnimation(this, m_facingDirection));
 }
@@ -259,7 +265,13 @@ void Unit::process() {
 }
 
 Object* Unit::selectAutomaticTarget(IArmed* armed) const {
-	const std::set<Object*> targets = armed->findTargetObject(const_cast<Unit*>(this));
+	std::set<Object*> targets = getMap()->getVisibleObjectsWithinRange(
+		const_cast<Unit*>(this), getEffectiveSight(), armed->canAttackAirUnits());
+	std::erase_if(targets, [this, armed](Object* target) {
+		return !target->isEnemy(const_cast<Unit*>(this)) ||
+			target->getOwner()->isNeutral() || !armed->canAttackTarget(target) ||
+			!getOwner()->getMapInfo()->canCurrentlySee(target);
+	});
 	if (targets.empty()) return nullptr;
 	return *std::min_element(targets.begin(), targets.end(), [this](Object* lhs, Object* rhs) {
 		auto distance = [this](Object* object) {
@@ -273,6 +285,11 @@ Object* Unit::selectAutomaticTarget(IArmed* armed) const {
 		return dynamic_cast<EventProcessor*>(lhs)->getID() <
 			dynamic_cast<EventProcessor*>(rhs)->getID();
 	});
+}
+
+bool Unit::hasCombatTarget() const {
+	const auto* armed = dynamic_cast<const IArmed*>(this);
+	return armed && armed->activeTarget();
 }
 
 void Unit::updateCombat() {
@@ -316,8 +333,18 @@ void Unit::updateCombat() {
 
 	const Point ownPosition = getTileLocation();
 	const Point targetPosition = target->getTileLocation();
-	m_attackDirection = ownPosition == targetPosition ? Direction::N :
+	const Direction targetDirection = ownPosition == targetPosition ? Direction::N :
 		getTargetCardinalDirection(ownPosition, targetPosition);
+	m_attackDirection = targetDirection;
+	Point projectileOffset{0, 0};
+	if ((dynamic_cast<Battleship*>(this) || dynamic_cast<Destroyer*>(this)) &&
+		!dynamic_cast<GnomishSubmarine*>(this)) {
+		m_attackDirection = static_cast<Direction>(CombatRules::broadsideFacing(
+			static_cast<int>(m_attackDirection), static_cast<int>(m_facingDirection)));
+		const auto towardTarget = CombatRules::directionVector(
+			static_cast<int>(targetDirection));
+		projectileOffset = {towardTarget.x * 24, towardTarget.y * 24};
+	}
 	m_facingDirection = m_attackDirection;
 	setCurrentAnimation(g_pRessourceManager->getUnitAnimation(
 		this, m_attackDirection,
@@ -343,14 +370,16 @@ void Unit::updateCombat() {
 			missile = getFraction() == Fraction::Orc
 				? ResourceManager_wartools::MissileType::DragonBreath
 				: ResourceManager_wartools::MissileType::GryphonHammer;
-		else if (dynamic_cast<Battleship*>(this) || dynamic_cast<Destroyer*>(this))
+		else if (dynamic_cast<Battleship*>(this))
+			missile = ResourceManager_wartools::MissileType::BigCannon;
+		else if (dynamic_cast<Destroyer*>(this))
 			missile = ResourceManager_wartools::MissileType::Cannon;
 		else if (dynamic_cast<GnomishSubmarine*>(this))
 			missile = getFraction() == Fraction::Orc
 				? ResourceManager_wartools::MissileType::TurtleMissile
 				: ResourceManager_wartools::MissileType::SubmarineMissile;
 		getMap()->addMapObject(new Projectile(
-			missile, this, getMap(), target));
+			missile, this, getMap(), target, projectileOffset));
 	}
 	const int configured = armed->attackCooldownTicks();
 	m_attackCooldownRemaining = configured > 0 ? configured :
@@ -368,6 +397,33 @@ void Unit::takeDamage(const AttackerStats& stats, bool noRandomComponent) {
 	}
 
 	Object::takeDamage(stats, noRandomComponent);
+}
+
+void Unit::onAttackedBy(Object* attacker) {
+	if (!attacker || isDead() || !isPlacedOnMap() || !attacker->isPlacedOnMap())
+		return;
+	const auto* armed = dynamic_cast<const IArmed*>(this);
+	if (armed && armed->isArmed() && !dynamic_cast<Peasant*>(this))
+		return;
+
+	const Point own = getTileLocation();
+	const Point threat = attacker->getTileLocation();
+	const int dx = (own.x > threat.x) - (own.x < threat.x);
+	const int dy = (own.y > threat.y) - (own.y < threat.y);
+	if (dx == 0 && dy == 0) return;
+	const int edge = getMap()->sideLength() - 1;
+	const Point ideal{std::clamp(own.x + dx * 5, 0, edge),
+		std::clamp(own.y + dy * 5, 0, edge)};
+	for (int radius = 0; radius <= 5; ++radius) {
+		for (int y = ideal.y - radius; y <= ideal.y + radius; ++y) {
+			for (int x = ideal.x - radius; x <= ideal.x + radius; ++x) {
+				if (x < 0 || y < 0 || x > edge || y > edge ||
+					!getMap()->canBePlacedAtPosition(this, x, y)) continue;
+				handleEvent(Event(getID(), GeneralActions::Move, x, y));
+				return;
+			}
+		}
+	}
 }
 
 
@@ -388,6 +444,10 @@ void Unit::playRandomSound(const std::vector<std::string>& sounds) {
 
 void Unit::playSoundSelected() {
 	playRandomSound(m_vecSoundsSelected);
+}
+
+void Unit::playSoundAcknowledge() {
+	playRandomSound(m_vecSoundsAcknowledge);
 }
 
 

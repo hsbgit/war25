@@ -180,8 +180,8 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 		// interval_ms = 250;
 
 
-		if (correspondingType == typeid(Ballista)) {
-			// Catapults and Ballistas simply explode, they do not have additional sprites
+		if (correspondingType == typeid(Ballista) || correspondingType == typeid(Dwarfes)) {
+			// Siege engines and demolition squads explode and leave no body.
 			mapUnitDyingAnimations[correspondingType][direction] = getExplosionAnimation();
 			continue;
 		}
@@ -310,12 +310,20 @@ Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction dire
 	if (animType == AnimationType::Moving) {
 		// Get appropriate animation
 		Animation a(mapUnitMovementAnimations[typeid(*pUnit)][direction]);
+		// The Zeppelin sheet has a single living frame per direction. Row one
+		// belongs to the Flying Machine animation and must not be cycled for Orcs.
+		if (dynamic_cast<GnomishFlyingMaschine*>(pUnit) &&
+			pUnit->getFraction() == Fraction::Orc)
+			a = a.singleFrame(0);
 		// Update general animation with specific colored unit texture
 		a.setBaseTexture(pCorrectColorTexture);
 		return a;
 	}
 
 	if (animType == AnimationType::Dying) {
+		if (dynamic_cast<GnomishFlyingMaschine*>(pUnit) &&
+			pUnit->getFraction() == Fraction::Orc)
+			return getExplosionAnimation().playOnce();
 		// Get appropriate animation
 		Animation a(mapUnitDyingAnimations[typeid(*pUnit)][direction]);
 		// Update general animation with specific colored unit texture
@@ -420,6 +428,9 @@ Animation ResourceManager_wartools::getUnitIdleAnimation(Unit* pUnit, Direction 
 		direction = Direction::N;
 	}
 	Animation a(directional.at(direction));
+	if (dynamic_cast<GnomishFlyingMaschine*>(pUnit) &&
+		pUnit->getFraction() == Fraction::Orc)
+		a = a.singleFrame(0);
 
 	ResourceType carriedResource = ResourceType::Nothing;
 	if (auto* pCollector = dynamic_cast<IResourceCollector*>(pUnit))
@@ -1163,6 +1174,7 @@ void ResourceManager_wartools::readMissiles() {
 	m_mapMissiles[MissileType::Axe] = makeTexture(strToFolder + "axe.png", m_pRenderer);
 	m_mapMissiles[MissileType::BallistaBolt] = makeTexture(strToFolder + "ballista_bolt.png", m_pRenderer);
 	m_mapMissiles[MissileType::Cannon] = makeTexture(strToFolder + "cannon.png", m_pRenderer);
+	m_mapMissiles[MissileType::BigCannon] = makeTexture(strToFolder + "big_cannon.png", m_pRenderer);
 	m_mapMissiles[MissileType::CatapultRock] = makeTexture(strToFolder + "catapult_rock.png", m_pRenderer);
 	m_mapMissiles[MissileType::Fireball] = makeTexture(strToFolder + "fireball.png", m_pRenderer);
 	m_mapMissiles[MissileType::DragonBreath] = makeTexture(strToFolder + "dragon_breath.png", m_pRenderer);
@@ -1191,12 +1203,11 @@ void ResourceManager_wartools::readMissiles() {
 
 	m_pSmallFireTexture = makeTexture(strToFolder + "small_fire.png", m_pRenderer);
 	m_smallFireAnimation = Animation(m_pSmallFireTexture, 100);
-	// The looping flame consists of the five equally anchored frames in the
-	// first row. The isolated, much shorter image in row two is not part of
-	// this loop; including it made the flame visibly blink once per cycle.
-	for (int x = 0; x < 5 * 32; x += 32)
+	// Warcraft II stores six 32x48 frames horizontally. Reading only 32 pixels
+	// of height cut off the lower third of every small flame.
+	for (int x = 0; x < 6 * 32; x += 32)
 		m_smallFireAnimation.addSprite(Sprite(
-			m_smallFireAnimation.getBaseTexture(), {x, 0, 32, 32}));
+			m_smallFireAnimation.getBaseTexture(), {x, 0, 32, 48}));
 
 	m_pBigFireTexture = makeTexture(strToFolder + "big_fire.png", m_pRenderer);
 	m_bigFireAnimation = Animation(m_pBigFireTexture, 100);
@@ -1243,7 +1254,8 @@ Animation ResourceManager_wartools::getCorpseAnimation(
 }
 
 
-Sprite ResourceManager_wartools::getMissile(MissileType t, Direction direction) {
+Sprite ResourceManager_wartools::getMissile(MissileType t, Direction direction,
+	int animationStage) {
 	assert(m_mapMissiles.contains(t));
 	Texture* texture = m_mapMissiles.at(t);
 	const int frameWidth = texture->getWidth() / 5;
@@ -1260,7 +1272,10 @@ Sprite ResourceManager_wartools::getMissile(MissileType t, Direction direction) 
 	case Direction::W:  frame = 2; flipped = true; break;
 	case Direction::NW: frame = 1; flipped = true; break;
 	}
-	return Sprite(&m_mapMissiles.at(t), {frame * frameWidth, 0, frameWidth, frameHeight}, flipped);
+	const int rows = std::max(1, texture->getHeight() / frameHeight);
+	const int row = std::clamp(animationStage, 0, rows - 1);
+	return Sprite(&m_mapMissiles.at(t),
+		{frame * frameWidth, row * frameHeight, frameWidth, frameHeight}, flipped);
 }
 
 

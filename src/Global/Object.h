@@ -222,6 +222,9 @@ public:
 	inline Map* getMap() {
 		return m_pMap;
 	}
+	inline Map* getMap() const {
+		return m_pMap;
+	}
 
 	// If the unit size is bigger than 1x1 the first element will always be the top left tile,
 	// the last element will always be the lower right tile due to the implementation in

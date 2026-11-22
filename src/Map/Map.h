@@ -147,6 +147,9 @@ public:
 
 
     Tile* getFreeTileAroundBuilding(Object *pBuilding, const Object *pObject);    
+	Tile* getFreeTileAroundBuilding(Object* pBuilding, const Object* pObject,
+		const Point& preferredDestination);
+	Tile* getClosestAttackTile(Object* target, Object* attacker, int attackRange);
     Tile* getFreeTileAroundBuilding(Object* pBuilding, int unit_tilesize, Object::Type landSeaAir);
 
 

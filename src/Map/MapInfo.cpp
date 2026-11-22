@@ -18,6 +18,8 @@
 #include "Buildings/Building.h"
 #include "Player.h"
 #include "Global/GlobalAttributes.h"
+#include "Units/AirUnits/GnomishFlyingMachine.h"
+#include "Units/SeaUnits/GnomishSubmarine.h"
 
 #include <algorithm>
 #include <set>
@@ -42,7 +44,8 @@ void MapInfo::updateMapVisibility(const std::vector<Object*>& vecObjects) {
 	for (auto& row : m_mapCurrentlyVisible)
 		std::fill(row.begin(), row.end(), false);
 
-    for (auto& pObj : vecObjects) {
+	m_detectedSubmergedUnits.clear();
+	for (auto& pObj : vecObjects) {
         if (!pObj->isPlacedOnMap())
             continue;
 
@@ -53,9 +56,22 @@ void MapInfo::updateMapVisibility(const std::vector<Object*>& vecObjects) {
             m_mapExplored[pTile->getY()][pTile->getX()] = true;
             m_mapCurrentlyVisible[pTile->getY()][pTile->getX()] = true;
         }
+
+		if (dynamic_cast<GnomishFlyingMaschine*>(pObj)) {
+			const auto visibleObjects = m_map.getVisibleObjectsWithinRange(
+				pObj, pObj->getEffectiveSight());
+			for (Object* visible : visibleObjects)
+				if (dynamic_cast<GnomishSubmarine*>(visible))
+					m_detectedSubmergedUnits.insert(visible);
+		}
     }
 
 	updateRememberedBuildings();
+}
+
+bool MapInfo::canCurrentlySee(const Object* object) const {
+	return !dynamic_cast<const GnomishSubmarine*>(object) ||
+		m_detectedSubmergedUnits.contains(object);
 }
 
 bool MapInfo::isAreaCurrentlyVisible(const Point& topLeft, int tileSize) const {

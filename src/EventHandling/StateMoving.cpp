@@ -67,12 +67,14 @@ Tile* StateMoving::getNextPathTile(bool* pathTemporarilyBlocked) {
 			// so head-on traffic can select a free detour instead of waiting forever.
 			if (++m_blockedPathRetries >= 5) {
 				m_path.clear();
+				m_pPathEndpoint = nullptr;
 				m_blockedPathRetries = 0;
 			}
 			m_pathRetryTicks = calculateRequiredTicksForGameAction(100);
 		} else {
 			// Terrain may have changed since the route was calculated.
 			m_path.clear();
+			m_pPathEndpoint = nullptr;
 		}
 		return nullptr;
 	}
@@ -89,7 +91,8 @@ Tile* StateMoving::startPathfinding(bool* pathTemporarilyBlocked) {
 	AStar pathfinder(m_pOwner->getTileTopLeft(), m_pTargetTile, unitSize,
 		m_pOwner->isAirObject(), m_pOwner);
 	m_path = pathfinder.findPath();
-	m_navigationProgress.pathfindingStarted();
+	m_pPathEndpoint = m_path.isValid()
+		? dynamic_cast<Tile*>(m_path.m_vecPathNodes.back()) : nullptr;
 	return m_path.isValid() ? getNextPathTile(pathTemporarilyBlocked) : nullptr;
 }
 
@@ -100,8 +103,9 @@ bool StateMoving::canMoveTo(const Tile* tile) const {
 	const Tile* current = m_pOwner->getTileTopLeft();
 	if (current->getX() == tile->getX() || current->getY() == tile->getY())
 		return true;
-	// A diagonal move needs clearance at both orthogonal intermediate
-	// positions. This keeps 2x2 ships out of coast corners.
+	if (!MovementRules::requiresOrthogonalDiagonalClearance(m_pOwner->isAirObject()))
+		return true;
+	// Preserve the established swept-footprint check for 2x2 air units.
 	return map->canBePlacedAtPosition(m_pOwner, tile->getX(), current->getY()) &&
 		map->canBePlacedAtPosition(m_pOwner, current->getX(), tile->getY());
 }
@@ -126,6 +130,8 @@ bool StateMoving::isOccupiedByAnotherUnit(const Tile* topLeft) const {
 	const Tile* current = m_pOwner->getTileTopLeft();
 	if (current->getX() == topLeft->getX() || current->getY() == topLeft->getY())
 		return false;
+	if (!MovementRules::requiresOrthogonalDiagonalClearance(m_pOwner->isAirObject()))
+		return false;
 	return positionIsOccupied(topLeft->getX(), current->getY()) ||
 		positionIsOccupied(current->getX(), topLeft->getY());
 }
@@ -144,9 +150,10 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	Tile* pTargetTile = isTargetTileANeighbourTile();
 	if (pTargetTile) {
 		if (!canMoveTo(pTargetTile)) {
-			*pathTemporarilyBlocked = isOccupiedByAnotherUnit(pTargetTile);
-			if (*pathTemporarilyBlocked)
-				m_pathRetryTicks = calculateRequiredTicksForGameAction(100);
+			// The requested tile itself may be occupied (resource, friendly unit,
+			// building). Once adjacent, the command is complete; waiting here left
+			// the walk animation running forever despite an acceptable position.
+			*pathTemporarilyBlocked = false;
 			return nullptr;
 		}
 
@@ -159,57 +166,8 @@ Tile* StateMoving::getNextTile(bool* pathTemporarilyBlocked) {
 	// Is a path used?
 	if (m_path.isValid())
 		return getNextPathTile(pathTemporarilyBlocked);
-	// Multi-tile hulls need a globally consistent route. Greedy left/right
-	// choices make them oscillate at coast corners and narrow channels.
-	if (m_pOwner->isSeaObject())
-		return startPathfinding(pathTemporarilyBlocked);
-	// Preserve cheap direct movement on open ground. If three completed steps
-	// fail to improve the distance, the greedy approach is circling an obstacle.
-	if (m_navigationProgress.shouldUsePathfinding())
-		return startPathfinding(pathTemporarilyBlocked);
-
-
-	// Otherwise use a simple approach: Simply walk into the target direction and avoid 1x1 obstacles if possible
-	Point currPos_tile = m_pOwner->getTileLocation();
-	Direction targetDir = getTargetCardinalDirection(currPos_tile, m_targetPos_world);
-
-
-	const int unitSize_tile = gMapUnitTilesize.at(typeid(*m_pOwner));
-
-	auto mapFreeTiles = m_pOwner->canDockOnCoast()
-		? NeighbourNodes(neighbourTilesForOwner())
-		: m_pOwner->getTileTopLeft()->getFreeNeighbourNodes(unitSize_tile, m_pOwner->isAirObject());
-	if (mapFreeTiles.contains(targetDir) &&
-		canMoveTo(dynamic_cast<Tile*>(mapFreeTiles[targetDir]))) {
-		setDirection(targetDir);
-		return dynamic_cast<Tile*>(mapFreeTiles[targetDir]);
-	}
-
-	// Direct tile is blocked, maybe the left or right tile around it is free.
-	// Example: SE is not available but S or E may be.
-	int dir = static_cast<int>(targetDir) - 1;
-	if (dir < 0) { // targetDir was N(0) -> -1 -> must map to NW
-		dir = static_cast<int>(Direction::NW);
-	}
-
-	Direction left = static_cast<Direction>(dir);
-	if (mapFreeTiles.contains(left) && canMoveTo(dynamic_cast<Tile*>(mapFreeTiles[left]))) {
-		setDirection(left);
-		return dynamic_cast<Tile*>(mapFreeTiles[left]);
-	}
-
-
-	dir = static_cast<int>(targetDir) + 1;
-	if (dir > 7) { // targetDir was NW(7) -> +1 -> must map to N
-		dir = static_cast<int>(Direction::N);
-	}
-
-	Direction right = static_cast<Direction>(dir);
-	if (mapFreeTiles.contains(right) && canMoveTo(dynamic_cast<Tile*>(mapFreeTiles[right]))) {
-		setDirection(right);
-		return dynamic_cast<Tile*>(mapFreeTiles[right]);
-	}
-
+	// Always calculate a complete route. The former greedy left/right stepping
+	// could oscillate indefinitely and only escalated to A* after several moves.
 	return startPathfinding(pathTemporarilyBlocked);
 }
 
@@ -225,11 +183,10 @@ void StateMoving::setTargetTile(const Point& targetPos_world) {
 	m_targetPos_world = targetPos_world;
 	m_pTargetTile = m_pOwner->getMap()->getTile(m_targetPos_world);
 	m_path.clear();
+	m_pPathEndpoint = nullptr;
 	m_pathRetryTicks = 0;
 	m_blockedPathRetries = 0;
 	m_ticksUntilPathCheck = calculateRequiredTicksForGameAction(2 * 1000);
-	if (m_pOwner->isPlacedOnMap())
-		m_navigationProgress.reset(m_pOwner->getTileLocation(), targetPos_world);
 }
 
 
@@ -246,6 +203,7 @@ void StateMoving::onExit() {
 	m_animationNeedsUpdate = true;
 
 	m_path.clear();
+	m_pPathEndpoint = nullptr;
 	m_blockedPathRetries = 0;
 	m_pathRetryTicks = 0;
 
@@ -265,7 +223,11 @@ State* StateMoving::process() {
 	// It is important to check whether m_pTileToMove is a nullptr
 	// We set the next tile always in advance, so the last animation would not run to the end.
 	// Hence, we have to wait until 'm_pTileToMove' is nullptr -> see end of this method
-	if ((currPos_tile == m_targetPos_world) && !m_pNextTileToMove) {
+	const bool reachedResolvedLandTarget = m_pOwner->isLandObject() &&
+		m_pPathEndpoint && !m_path.isValid() &&
+		currPos_tile == m_pPathEndpoint->getPos();
+	if ((currPos_tile == m_targetPos_world || reachedResolvedLandTarget) &&
+		!m_pNextTileToMove) {
 		return transitionToNextState();
 	}
 
@@ -349,11 +311,11 @@ State* StateMoving::process() {
 	m_pOwner->setTilePositionOffset(m_tilePositionOffset_px);
 
 	// �berpr�fung, ob das Ziel erreicht wurde (�bergang des Vorzeichens)
-	if (sgn(m_tilePositionOffset_px.x) != sgn(speed_x) || sgn(m_tilePositionOffset_px.y) != sgn(speed_y)) {
+	if (MovementRules::reachedTilePixelOffset(m_tilePositionOffset_px.x, speed_x) &&
+		MovementRules::reachedTilePixelOffset(m_tilePositionOffset_px.y, speed_y)) {
 		m_tilePositionOffset_px = { 0, 0 };
 		m_pOwner->clearTilePositionOffset();
 		m_pNextTileToMove = nullptr;
-		m_navigationProgress.recordStep(m_pOwner->getTileLocation(), m_targetPos_world);
 	}
 
 	return this;

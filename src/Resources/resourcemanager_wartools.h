@@ -164,10 +164,11 @@ public:
 	}
 
 
-	enum class MissileType { Arrow, Axe, Cannon, BallistaBolt, CatapultRock,
+	enum class MissileType { Arrow, Axe, Cannon, BigCannon, BallistaBolt, CatapultRock,
 		Fireball, DragonBreath, GryphonHammer, SubmarineMissile, TurtleMissile,
 		NormalSpell, TouchOfDeath };
-	Sprite getMissile(MissileType t, Direction direction = Direction::N);
+	Sprite getMissile(MissileType t, Direction direction = Direction::N,
+		int animationStage = 0);
 	enum class SpellVisual { FlameShield, Blizzard, Whirlwind, DeathAndDecay };
 	Animation getSpellAnimation(SpellVisual visual) const;
 	const Sprite& getAirUnitShadow() const { return m_airUnitShadow; }

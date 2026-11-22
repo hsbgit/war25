@@ -55,7 +55,8 @@ Sprite ResourceManager_wartools::getIcon(Pud_Icon icon, Fraction fraction, Playe
 
 	// These are shared submenu buttons, not human/orc icon pairs.
 	if (icon == PUD_ICON_BUILD_STAGE_1 || icon == PUD_ICON_BUILD_STAGE_2 ||
-		icon == PUD_ICON_CANCEL)
+		icon == PUD_ICON_CANCEL || icon == PUD_ICON_SKELETON ||
+		icon == PUD_ICON_CRITTER)
 		return getIcon(icon, color);
 
 	// It is an Orc Icon:    
@@ -99,5 +100,4 @@ Sprite ResourceManager_wartools::getIcon(Pud_Icon icon, PlayerColor color) {
 
 	return Sprite(&m_ActiveSeasonIcons[color], rect);
 }
-
 

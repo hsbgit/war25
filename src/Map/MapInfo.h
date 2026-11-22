@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <unordered_set>
 
 
 // Owned by each player
@@ -53,9 +54,11 @@ public:
 		return m_rememberedBuildings;
 	}
 	bool isAreaCurrentlyVisible(const Point& topLeft, int tileSize) const;
+	bool canCurrentlySee(const Object* object) const;
 
 private:
 	void updateRememberedBuildings();
 	const Map& m_map;
 	std::map<EventProcessorID, RememberedBuilding> m_rememberedBuildings;
+	std::unordered_set<const Object*> m_detectedSubmergedUnits;
 };

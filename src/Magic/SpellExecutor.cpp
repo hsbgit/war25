@@ -24,6 +24,7 @@
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
 #include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Skeleton.h"
+#include "Units/Projectile.h"
 #include <iostream>
 #include <set>
 #include <algorithm>
@@ -209,16 +210,12 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
 		const int dx = (m_targetPos_world.x > origin.x) - (m_targetPos_world.x < origin.x);
 		const int dy = (m_targetPos_world.y > origin.y) - (m_targetPos_world.y < origin.y);
 		if (dx == 0 && dy == 0) break;
-		std::set<Object*> hit;
-		for (int distance = 1; distance <= 8; ++distance) {
-			Tile* tile = m_pMap->getTile({origin.x + dx * distance, origin.y + dy * distance});
-			if (!tile) break;
-			if (tile->getSeaOrLandUnit()) hit.insert(tile->getSeaOrLandUnit());
-			if (tile->getAirUnit()) hit.insert(tile->getAirUnit());
-		}
-		for (Object* object : hit)
-			if (object != caster) object->takeDamage(AttackerStats(0, 34), true);
-		g_pSoundManager->playWAV("missiles/fireball_throw.wav");
+		Point destination{origin.x + dx * 8, origin.y + dy * 8};
+		destination.x = std::clamp(destination.x, 0, m_pMap->sideLength() - 1);
+		destination.y = std::clamp(destination.y, 0, m_pMap->sideLength() - 1);
+		m_pMap->addMapObject(new Projectile(
+			ResourceManager_wartools::MissileType::Fireball, caster, m_pMap,
+			destination, AttackerStats(0, 34), true));
 	}
 	break;
 

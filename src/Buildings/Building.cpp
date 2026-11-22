@@ -216,7 +216,9 @@ void Building::handleEvent(const Event& event) {
 
 
 void Building::playSoundSelected() {
-	if (isUnderConstruction())
+	if (m_fireLevel != FireLevel::None)
+		g_pSoundManager->playSelectionWAV(this, "misc/burning.wav");
+	else if (isUnderConstruction())
 		g_pSoundManager->playSelectionWAV(this, "misc/building_construction.wav");
 	else if (m_strSoundSelected.size()) {
 		g_pSoundManager->playSelectionWAV(m_strSoundSelected);

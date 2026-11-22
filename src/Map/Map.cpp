@@ -51,6 +51,7 @@
 #include "Units/SeaUnits/Battleship.h"
 #include "Units/SeaUnits/Destroyer.h"
 #include "Units/SeaUnits/GnomishSubmarine.h"
+#include "Units/CombatRules.h"
 #include "Units/SeaUnits/Tanker.h"
 #include "Units/SeaUnits/Transport.h"
 #include "Player.h"
@@ -71,6 +72,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <random>
 
 #include <iostream>
@@ -284,6 +286,10 @@ void Map::renderMiniMapOverlay(Viewport* pViewPort) {
 
 		for (auto& pObject : vecObjects) {
 			if (!pObject->isPlacedOnMap())
+				continue;
+			if (dynamic_cast<GnomishSubmarine*>(pObject) &&
+				pObject->getOwner() != humanControlledPlayer() &&
+				!humanMapInfo->canCurrentlySee(pObject))
 				continue;
 			if (gDebugManager.m_minimap_useExplorationAndFogOfWar) {
 				const Point objectTopLeft = pObject->getTileLocation();
@@ -603,8 +609,13 @@ Object* Map::getObjectOnTile(int tile_x_world, int tile_y_world) {
 	if (pTile->getAirUnit())
 		return pTile->getAirUnit();
 
-	if (pTile->getSeaOrLandUnit())
-		return pTile->getSeaOrLandUnit();
+	if (Object* object = pTile->getSeaOrLandUnit()) {
+		if (dynamic_cast<GnomishSubmarine*>(object) &&
+			object->getOwner() != humanControlledPlayer() &&
+			!humanControlledPlayer()->getMapInfo()->canCurrentlySee(object))
+			return nullptr;
+		return object;
+	}
 
 	return nullptr;
 }
@@ -814,6 +825,69 @@ Tile* Map::getBuilderApproachTile(PeasantActions action, const Point& topLeft,
 Tile* Map::getFreeTileAroundBuilding(Object* pBuilding, const Object* pObject) {
 	int unit_tilesize = gMapUnitTilesize[typeid(*pObject)];
 	return getFreeTileAroundBuilding(pBuilding, unit_tilesize, pObject->getType());
+}
+
+Tile* Map::getFreeTileAroundBuilding(Object* pBuilding, const Object* pObject,
+	const Point& preferredDestination) {
+	const int unitSize = gMapUnitTilesize[typeid(*pObject)];
+	const int minX = std::max(0, pBuilding->getTileTopLeft()->getPos().x - unitSize);
+	const int minY = std::max(0, pBuilding->getTileTopLeft()->getPos().y - unitSize);
+	const int maxX = std::min(sideLength() - 1,
+		pBuilding->getTileLowerRight()->getPos().x + unitSize);
+	const int maxY = std::min(sideLength() - 1,
+		pBuilding->getTileLowerRight()->getPos().y + unitSize);
+	Tile* best = nullptr;
+	int bestDistance = std::numeric_limits<int>::max();
+	for (int y = minY; y <= maxY; ++y) {
+		for (int x = minX; x <= maxX; ++x) {
+			if (!isSpaceAvailableForUnit(y, x, unitSize, pObject->getType())) continue;
+			const int dx = x - preferredDestination.x;
+			const int dy = y - preferredDestination.y;
+			const int distance = dx * dx + dy * dy;
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				best = m_arrTileMap[y][x];
+			}
+		}
+	}
+	return best;
+}
+
+Tile* Map::getClosestAttackTile(Object* target, Object* attacker, int attackRange) {
+	if (!target || !attacker || !target->isPlacedOnMap() || !attacker->isPlacedOnMap())
+		return nullptr;
+	const int attackerSize = gMapUnitTilesize.at(typeid(*attacker));
+	const Point targetTopLeft = target->getTileTopLeft()->getPos();
+	const Point targetLowerRight = target->getTileLowerRight()->getPos();
+	const Point start = attacker->getTileLocation();
+	const int margin = attackRange + attackerSize;
+	const int minX = std::max(0, targetTopLeft.x - margin);
+	const int minY = std::max(0, targetTopLeft.y - margin);
+	const int maxX = std::min(sideLength() - attackerSize,
+		targetLowerRight.x + attackRange);
+	const int maxY = std::min(sideLength() - attackerSize,
+		targetLowerRight.y + attackRange);
+
+	Tile* best = nullptr;
+	int bestTravelDistance = std::numeric_limits<int>::max();
+	for (int y = minY; y <= maxY; ++y) {
+		for (int x = minX; x <= maxX; ++x) {
+			if (!canBePlacedAtPosition(attacker, x, y)) continue;
+			const int distanceToTarget = CombatRules::rectangleDistanceSquared(
+				x, y, x + attackerSize - 1, y + attackerSize - 1,
+				targetTopLeft.x, targetTopLeft.y,
+				targetLowerRight.x, targetLowerRight.y);
+			if (distanceToTarget > attackRange * attackRange) continue;
+			const int dx = x - start.x;
+			const int dy = y - start.y;
+			const int travelDistance = dx * dx + dy * dy;
+			if (travelDistance < bestTravelDistance) {
+				bestTravelDistance = travelDistance;
+				best = m_arrTileMap[y][x];
+			}
+		}
+	}
+	return best;
 }
 
 
@@ -1867,6 +1941,10 @@ void Map::draw(Renderer* pRenderer, Viewport* pViewPort) {
 
 		for (auto& unit : pPlayer->getObjects()) {
 			if (pViewPort->isObjectVisible(unit)) {
+				if (dynamic_cast<GnomishSubmarine*>(unit) &&
+					pPlayer != pHumanPlayer &&
+					!pHumanPlayer->getMapInfo()->canCurrentlySee(unit))
+					continue;
 				const Point& location = unit->getTileLocation();
 				bool explored = mapExplored[location.y][location.x];
 				bool visible = mapCurrentlyVisible[location.y][location.x];
