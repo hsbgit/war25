@@ -66,7 +66,28 @@ void MapInfo::updateMapVisibility(const std::vector<Object*>& vecObjects) {
 		}
     }
 
+	for (TimedReveal& reveal : m_timedReveals) {
+		for (int y = reveal.center.y - reveal.radius; y <= reveal.center.y + reveal.radius; ++y) {
+			for (int x = reveal.center.x - reveal.radius; x <= reveal.center.x + reveal.radius; ++x) {
+				if (y < 0 || x < 0 || y >= static_cast<int>(m_mapCurrentlyVisible.size()) ||
+					x >= static_cast<int>(m_mapCurrentlyVisible[y].size())) continue;
+				m_mapExplored[y][x] = true;
+				m_mapCurrentlyVisible[y][x] = true;
+			}
+		}
+		--reveal.remainingTicks;
+	}
+	std::erase_if(m_timedReveals, [](const TimedReveal& reveal) {
+		return reveal.remainingTicks <= 0;
+	});
+
 	updateRememberedBuildings();
+}
+
+void MapInfo::revealArea(const Point& center, int radius, int durationMs) {
+	if (radius < 0 || durationMs <= 0) return;
+	m_timedReveals.push_back({center, radius,
+		calculateRequiredTicksForGameAction(durationMs)});
 }
 
 bool MapInfo::canCurrentlySee(const Object* object) const {

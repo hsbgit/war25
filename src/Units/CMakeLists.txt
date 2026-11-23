@@ -12,11 +12,12 @@ set(UNITS_SOURCES
     IArmed.h
     Projectile.cpp
     Projectile.h
+	ProjectileRules.h
     Unit.cpp
     Unit.h
     UnitActions.h
+	UnitPresentationRules.h
 )
 
 add_library(war25_units OBJECT ${UNITS_SOURCES})
 target_link_libraries(war25_units PUBLIC war25_common)
-

@@ -17,6 +17,7 @@
 #pragma once
 
 #include "Units/Unit.h"
+#include "Magic/SpellRules.h"
 
 
 class Skeleton : public Unit, public IArmed {
@@ -39,6 +40,5 @@ public:
 	}
 
 private:
-	int m_lifespan_ms = 10 * 1000 * 60; // 10 Minutes
+	int m_lifespan_ms = SpellRules::RaisedSkeletonLifetimeMs;
 };
-

@@ -43,6 +43,11 @@ inline std::optional<int> occupancyTraversalCost(bool occupied,
 	return 200;
 }
 
+inline bool occupantBlocksMovement(bool occupied, bool occupiedBySelf,
+	bool walkableGroundOverlay) {
+	return occupied && !occupiedBySelf && !walkableGroundOverlay;
+}
+
 template<typename Position>
 inline int octileDistance(const Position& from, const Position& to) {
 	const int dx = std::abs(from.x - to.x);

@@ -89,7 +89,9 @@ const Sprite* ResourceManager_wartools::getBuffIcon(BuffType type) const {
 #include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
 #include "Units/LandUnits/Skeleton.h"
+#include "Units/LandUnits/Daemon.h"
 #include "Units/AirUnits/GnomishFlyingMachine.h"
+#include "Units/AirUnits/EyeOfKillrogg.h"
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
 #include "Units/SeaUnits/Destroyer.h"
@@ -114,14 +116,27 @@ const Sprite* ResourceManager_wartools::getBuffIcon(BuffType type) const {
 #include "Buildings/LumberMill.h"
 #include "Buildings/MageTower.h"
 #include "Buildings/DarkPortal.h"
+#include "Buildings/Runestone.h"
 #include "Buildings/Goldmine.h"
+#include "Buildings/CircleOfPower.h"
+#include "Buildings/Wall.h"
 #include "Global/BuildingPlacement.h"
+#include "Resources/AnimationRules.h"
 
 void ResourceManager_wartools::createUnitAnimations(std::type_index correspondingType, int iconSquareWidth_px, int spriteCountMoving, int spriteCountAttacking, int spriteCountDying) {
-	TextureMap& textMap = m_mapUnitTexturesHuman; // Does not matter whether orc or human, will be changed individually, e.g., in getUnitIdleAnimation
 	PlayerColor color = PlayerColor::Red; // Color does not matter, will be changed individually, e.g., in getUnitIdleAnimation
-
-	Texture* pTexture = textMap[correspondingType][color];
+	// Animation geometry is faction-independent, but a few legal unit types
+	// (Eye of Killrogg, Skeleton) only have a sheet in one faction directory.
+	// Select an actually loaded sheet instead of mutating the Human map with a
+	// null entry through operator[].
+	TextureMap* textMap = &m_mapUnitTexturesHuman;
+	if (!textMap->contains(correspondingType) ||
+		!textMap->at(correspondingType).contains(color))
+		textMap = &m_mapUnitTexturesOrc;
+	if (!textMap->contains(correspondingType) ||
+		!textMap->at(correspondingType).contains(color))
+		textMap = &m_mapUnitTexturesNeutral;
+	Texture* pTexture = textMap->at(correspondingType).at(color);
 	assert(pTexture);
 
 
@@ -146,7 +161,7 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 
 		// Movement animations
 		unsigned int interval_ms = 100;
-		Animation anim(textMap[correspondingType][color], interval_ms);
+		Animation anim((*textMap)[correspondingType][color], interval_ms);
 
 		int startOffset = 0;
 		for (int rowOffset = startOffset; rowOffset < startOffset + spriteCountMoving; ++rowOffset) {
@@ -156,7 +171,7 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 
 		mapUnitMovementAnimations[correspondingType][direction] = anim;
 		if (spriteCountMoving > 0) {
-			Animation idle(textMap[correspondingType][color], interval_ms);
+			Animation idle((*textMap)[correspondingType][color], interval_ms);
 			const Rect standingFrame = {colOffset * iconSquareWidth_px, 0,
 				iconSquareWidth_px, iconSquareWidth_px};
 			idle.addSprite(Sprite(idle.getBaseTexture(), standingFrame, posOffset, flip));
@@ -167,7 +182,7 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 
 		// Attack animations
 		startOffset += spriteCountMoving;
-		Animation animAttacking(textMap[correspondingType][color], interval_ms);
+		Animation animAttacking((*textMap)[correspondingType][color], interval_ms);
 		for (int rowOffset = startOffset; rowOffset < startOffset + spriteCountAttacking; ++rowOffset) {
 			Rect r = { colOffset * iconSquareWidth_px, rowOffset * iconSquareWidth_px, iconSquareWidth_px, iconSquareWidth_px };
 			animAttacking.addSprite(Sprite(animAttacking.getBaseTexture(), r, posOffset, flip));
@@ -180,7 +195,8 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 		// interval_ms = 250;
 
 
-		if (correspondingType == typeid(Ballista) || correspondingType == typeid(Dwarfes)) {
+		if (correspondingType == typeid(Ballista) || correspondingType == typeid(Dwarfes) ||
+			correspondingType == typeid(EyeOfKillrogg)) {
 			// Siege engines and demolition squads explode and leave no body.
 			mapUnitDyingAnimations[correspondingType][direction] = getExplosionAnimation();
 			continue;
@@ -188,7 +204,7 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 
 		// Add unit specific sprites
 		startOffset += spriteCountAttacking;
-		Animation animDying(textMap[correspondingType][color], interval_ms, true);
+		Animation animDying((*textMap)[correspondingType][color], interval_ms, true);
 
 		// startOffset = 9;
 
@@ -216,10 +232,15 @@ void ResourceManager_wartools::createUnitAnimations(std::type_index correspondin
 
 
 void ResourceManager_wartools::createVesselAnimations(std::type_index correspondingType, int iconSquareWidth_px) {
-	TextureMap& textMap = m_mapUnitTexturesHuman; // Does not matter whether orc or human, will be changed individually, e.g., in getUnitIdleAnimation
 	PlayerColor color = PlayerColor::Red; // Color does not matter, will be changed individually, e.g., in getUnitIdleAnimation
-
-	Texture* pTexture = textMap[correspondingType][color];
+	TextureMap* textMap = &m_mapUnitTexturesHuman;
+	if (!textMap->contains(correspondingType) ||
+		!textMap->at(correspondingType).contains(color))
+		textMap = &m_mapUnitTexturesOrc;
+	if (!textMap->contains(correspondingType) ||
+		!textMap->at(correspondingType).contains(color))
+		textMap = &m_mapUnitTexturesNeutral;
+	Texture* pTexture = textMap->at(correspondingType).at(color);
 	assert(pTexture);
 
 
@@ -245,7 +266,7 @@ void ResourceManager_wartools::createVesselAnimations(std::type_index correspond
 
 		// Movement animations
 		unsigned int interval_ms = VESSEL_ANIMATION_INTERVAL;
-		Animation anim(textMap[correspondingType][color], interval_ms);
+		Animation anim((*textMap)[correspondingType][color], interval_ms);
 
 		Rect r = { colOffset * iconSquareWidth_px, 0, iconSquareWidth_px, iconSquareWidth_px };
 		anim.addSprite(Sprite(anim.getBaseTexture(), r, posOffset, flip));
@@ -260,7 +281,7 @@ void ResourceManager_wartools::createVesselAnimations(std::type_index correspond
 		// Sinking animations
 		posOffset.x = 0;
 		posOffset.y = 0;
-		Animation animSinking(textMap[correspondingType][color], interval_ms, true);
+		Animation animSinking((*textMap)[correspondingType][color], interval_ms, true);
 
 		// Turtle and GnomishSubmarine just have bubbles when sinking
 		if (correspondingType != typeid(GnomishSubmarine)) {
@@ -356,8 +377,8 @@ Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction dire
 
 
 Texture* ResourceManager_wartools::getUnitTexture(Unit* pUnit, ResourceType carriedResource) {
-	if (typeid(*pUnit) == typeid(Skeleton))
-		return m_mapUnitTexturesNeutral[typeid(Skeleton)][PlayerColor::Red];
+	if (typeid(*pUnit) == typeid(Skeleton) || typeid(*pUnit) == typeid(Daemon))
+		return m_mapUnitTexturesNeutral[typeid(*pUnit)][PlayerColor::Red];
 
 	TextureMap& baseTextures = (pUnit->getFraction() == Fraction::Orc)
 		? m_mapUnitTexturesOrc : m_mapUnitTexturesHuman;
@@ -480,10 +501,15 @@ void ResourceManager_wartools::createidleAnimation(std::type_index corresponding
 	assert(rows > 0);
 	assert(cols > 0);
 
-	TextureMap& textMap = m_mapUnitTexturesHuman; // Does not matter whether orc or human, will be changed individually, e.g., in getUnitIdleAnimation
 	PlayerColor color = PlayerColor::Red; // Color does not matter, will be changed individually, e.g., in getUnitIdleAnimation
-
-	Texture* pTexture = textMap[correspondingType][color];
+	TextureMap* textMap = &m_mapUnitTexturesHuman;
+	if (!textMap->contains(correspondingType) ||
+		!textMap->at(correspondingType).contains(color))
+		textMap = &m_mapUnitTexturesOrc;
+	if (!textMap->contains(correspondingType) ||
+		!textMap->at(correspondingType).contains(color))
+		textMap = &m_mapUnitTexturesNeutral;
+	Texture* pTexture = textMap->at(correspondingType).at(color);
 	assert(pTexture);
 
 
@@ -505,7 +531,7 @@ void ResourceManager_wartools::createidleAnimation(std::type_index corresponding
 
 	Rect rect = { 0, 0, squareWidth_px, squareWidth_px };
 
-	Animation anim(textMap[correspondingType][color], interval_ms);
+	Animation anim((*textMap)[correspondingType][color], interval_ms);
 
 	for (int r = 0; r < rows; ++r) {
 		for (int c = 0; c < cols; ++c) {
@@ -673,10 +699,12 @@ void ResourceManager_wartools::createidleAnimations() {
 	createidleAnimation(typeid(Archer), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 	createidleAnimation(typeid(Footman), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 	createidleAnimation(typeid(GnomishFlyingMaschine), 400 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(EyeOfKillrogg), 160 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 	createidleAnimation(typeid(GryphonRider), 400 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 	createidleAnimation(typeid(Knight), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 	createidleAnimation(typeid(Mage), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 	createidleAnimation(typeid(Peasant), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	createidleAnimation(typeid(Daemon), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
 
 
 
@@ -695,11 +723,15 @@ void ResourceManager_wartools::createidleAnimations() {
 
 	createUnitAnimations(typeid(Ballista), 320 / 5, 2, 2, 0);
 	createUnitAnimations(typeid(GnomishFlyingMaschine), 400 / 5, 2, 0, 2);
+	// Wargus extracts the eye as a single 5-direction row. Reusing that row for
+	// movement gives the engine directional frames without inventing assets.
+	createUnitAnimations(typeid(EyeOfKillrogg), 160 / 5, 1, 0, 0);
 	createUnitAnimations(typeid(GryphonRider), 400 / 5, 4, 3, 5);
 	createUnitAnimations(typeid(Footman), 360 / 5, 5, 4, 3);
 	createUnitAnimations(typeid(Knight), 360 / 5, 5, 4, 5);
 	createUnitAnimations(typeid(Mage), 360 / 5, 5, 4, 7);
 	createUnitAnimations(typeid(Peasant), 360 / 5, 5, 5, 3);
+	createUnitAnimations(typeid(Daemon), 360 / 5, 5, 5, 5);
 
 	// Skeletons use five frames horizontally and a living/death row pair per
 	// direction, unlike the regular unit sheets.
@@ -795,13 +827,19 @@ void ResourceManager_wartools::createidleAnimations() {
 
 Sprite ResourceManager_wartools::getNeutralBuildingSprite(Building* pBuilding, int index) {
 	auto& type = typeid(*pBuilding);
-	assert(m_mapNeutralBuildingTextures.contains(type));
-	assert(m_mapNeutralBuildingTextures[type].contains(m_currentSeason));
+	const auto typeTextures = m_mapNeutralBuildingTextures.find(type);
+	if (typeTextures == m_mapNeutralBuildingTextures.end())
+		throw std::runtime_error("No neutral-building texture registered for " + std::string(type.name()));
+	const auto season = resolveAvailableSeason(m_currentSeason, [&typeTextures](Season candidate) {
+		return typeTextures->second.contains(candidate);
+	});
+	if (!season)
+		throw std::runtime_error("No neutral-building texture loaded for " + std::string(type.name()));
 
 	// getNeutralBuildingSprite & getBuildingSprite -> funktion draus machen
 
 	// Get side length for building (e.g., 64, 96, 128, ...)
-	Texture* pTexture = m_mapNeutralBuildingTextures[type][m_currentSeason];
+	Texture* pTexture = typeTextures->second.at(*season);
 	Rect texDim = { 0,0,0,0 };
 	SDL_QueryTexture(pTexture->getSDLTexture(), nullptr, nullptr, &texDim.w, &texDim.h);
 
@@ -814,7 +852,22 @@ Sprite ResourceManager_wartools::getNeutralBuildingSprite(Building* pBuilding, i
 		assert(rect.y <= texDim.h);
 	}
 
-	return Sprite(&m_mapNeutralBuildingTextures[type][m_currentSeason], rect);
+	return Sprite(&m_mapNeutralBuildingTextures[type][*season], rect);
+}
+
+Animation ResourceManager_wartools::getNeutralBuildingAnimation(Building* pBuilding) {
+	const auto type = std::type_index(typeid(*pBuilding));
+	const auto animations = m_mapNeutralBuildingAnimations.find(type);
+	if (animations == m_mapNeutralBuildingAnimations.end())
+		throw std::runtime_error("No neutral-building animation registered for " +
+			std::string(type.name()));
+	const auto season = resolveAvailableSeason(m_currentSeason, [&animations](Season candidate) {
+		return animations->second.contains(candidate);
+	});
+	if (!season)
+		throw std::runtime_error("No neutral-building animation loaded for " +
+			std::string(type.name()));
+	return animations->second.at(*season);
 }
 
 
@@ -983,6 +1036,47 @@ void ResourceManager_wartools::readBuildings() {
 
 			std::type_index correspondingType = ResourceMappings::getNeutralBuildingMap().at(pngPath);
 			m_mapNeutralBuildingTextures[correspondingType][season] = makeTexture(pSurface, m_pRenderer, false);
+
+			// The original game animates these blue details through palette
+			// cycling. Bake the five relevant palette phases into a sprite sheet.
+			if ((correspondingType == typeid(Runestone) ||
+				 correspondingType == typeid(DarkPortal)) && pSurface->format->palette) {
+				SDL_Surface* sheet = SDL_CreateRGBSurfaceWithFormat(0, pSurface->w,
+					pSurface->h * AnimationRules::PaletteCycleFrames, 32,
+					SDL_PIXELFORMAT_RGBA32);
+				if (!sheet) {
+					SDL_FreeSurface(pSurface);
+					throw std::runtime_error("Could not allocate neutral-building animation sheet");
+				}
+				SDL_FillRect(sheet, nullptr, SDL_MapRGBA(sheet->format, 0, 0, 0, 0));
+				SDL_Color original[AnimationRules::PaletteCycleColorCount];
+				for (int i = 0; i < AnimationRules::PaletteCycleColorCount; ++i)
+					original[i] = pSurface->format->palette->colors[
+						AnimationRules::PaletteCycleFirstIndex + i];
+				for (int frame = 0; frame < AnimationRules::PaletteCycleFrames; ++frame) {
+					SDL_Color phase[AnimationRules::PaletteCycleColorCount];
+					for (int i = 0; i < AnimationRules::PaletteCycleColorCount; ++i) {
+						const int source = AnimationRules::paletteCycleSourceIndex(
+							AnimationRules::PaletteCycleFirstIndex + i, frame) -
+							AnimationRules::PaletteCycleFirstIndex;
+						phase[i] = original[source];
+					}
+					SDL_SetPaletteColors(pSurface->format->palette, phase,
+						AnimationRules::PaletteCycleFirstIndex,
+						AnimationRules::PaletteCycleColorCount);
+					SDL_Rect destination{0, frame * pSurface->h, pSurface->w, pSurface->h};
+					SDL_BlitSurface(pSurface, nullptr, sheet, &destination);
+				}
+				SDL_SetPaletteColors(pSurface->format->palette, original,
+					AnimationRules::PaletteCycleFirstIndex,
+					AnimationRules::PaletteCycleColorCount);
+				Texture* texture = makeTexture(sheet, m_pRenderer);
+				Animation animation(texture, 120);
+				for (int frame = 0; frame < AnimationRules::PaletteCycleFrames; ++frame)
+					animation.addSprite(Sprite(animation.getBaseTexture(),
+						{0, frame * pSurface->h, pSurface->w, pSurface->h}));
+				m_mapNeutralBuildingAnimations[correspondingType][season] = animation;
+			}
 			SDL_FreeSurface(pSurface);
 		}
 	}
@@ -1079,13 +1173,6 @@ void ResourceManager_wartools::createUnitSprites(Fraction fraction) {
 			assert(pSurface);
 
 			TextureMap* targetMap = textMap;
-			// Eye of Kilrogg has no implementation yet and historically shared
-			// Ballista's type id, which made filesystem iteration replace the
-			// actual Orc catapult texture with the flying eye.
-			if (pngPath == "eye_of_kilrogg.png") {
-				SDL_FreeSurface(pSurface);
-				continue;
-			}
 			if (fraction == Fraction::Alliance && pngPath == "peasant_with_gold.png")
 				targetMap = &m_mapWorkerResourceTexturesHuman[ResourceType::Gold];
 			else if (fraction == Fraction::Alliance && pngPath == "peasant_with_wood.png")
@@ -1182,22 +1269,35 @@ void ResourceManager_wartools::readMissiles() {
 	m_mapMissiles[MissileType::SubmarineMissile] = makeTexture(strToFolder + "submarine_missile.png", m_pRenderer);
 	m_mapMissiles[MissileType::TurtleMissile] = makeTexture(strToFolder + "turtle_missile.png", m_pRenderer);
 	m_mapMissiles[MissileType::NormalSpell] = makeTexture(strToFolder + "normal_spell.png", m_pRenderer);
+	m_mapMissiles[MissileType::Lightning] = makeTexture(strToFolder + "lightning.png", m_pRenderer);
 	m_mapMissiles[MissileType::TouchOfDeath] = makeTexture(strToFolder + "touch_of_death.png", m_pRenderer);
+	m_mapMissiles[MissileType::DaemonFire] = makeTexture(strToFolder + "daemon_fire.png", m_pRenderer);
 
 	auto loadGridAnimation = [this, &strToFolder](SpellVisual visual,
-		const std::string& file, int frameSize, int interval) {
+		const std::string& file, int frameWidth, int frameHeight,
+		int interval, int maximumFrames = -1) {
 		Texture* texture = makeTexture(strToFolder + file, m_pRenderer);
 		Animation animation(texture, interval);
-		for (int y = 0; y + frameSize <= texture->getHeight(); y += frameSize)
-			for (int x = 0; x + frameSize <= texture->getWidth(); x += frameSize)
+		const int frameCount = AnimationRules::gridFrameCount(texture->getWidth(),
+			texture->getHeight(), frameWidth, frameHeight, maximumFrames);
+		int added = 0;
+		for (int y = 0; y + frameHeight <= texture->getHeight() && added < frameCount; y += frameHeight)
+			for (int x = 0; x + frameWidth <= texture->getWidth() && added < frameCount; x += frameWidth) {
 				animation.addSprite(Sprite(animation.getBaseTexture(),
-					{x, y, frameSize, frameSize}));
+					{x, y, frameWidth, frameHeight}));
+				++added;
+			}
 		m_spellAnimations[visual] = animation;
 	};
-	loadGridAnimation(SpellVisual::FlameShield, "flame_shield.png", 32, 100);
-	loadGridAnimation(SpellVisual::Blizzard, "blizzard.png", 32, 120);
-	loadGridAnimation(SpellVisual::Whirlwind, "tornado.png", 56, 120);
-	loadGridAnimation(SpellVisual::DeathAndDecay, "death_and_decay.png", 32, 120);
+	loadGridAnimation(SpellVisual::Normal, "normal_spell.png", 32, 32, 100, 6);
+	loadGridAnimation(SpellVisual::Healing, "heal_effect.png", 48, 48, 100, 10);
+	loadGridAnimation(SpellVisual::Exorcism, "exorcism.png", 48, 48, 100, 10);
+	loadGridAnimation(SpellVisual::FlameShield, "flame_shield.png", 32, 48, 100, 6);
+	loadGridAnimation(SpellVisual::Blizzard, "blizzard.png", 32, 32, 120, 4);
+	loadGridAnimation(SpellVisual::Whirlwind, "tornado.png", 56, 56, 120, 4);
+	loadGridAnimation(SpellVisual::DeathAndDecay, "death_and_decay.png", 32, 32, 120, 8);
+	loadGridAnimation(SpellVisual::SiegeImpact, "ballista-catapult_impact.png", 48, 48, 80, 10);
+	loadGridAnimation(SpellVisual::CannonImpact, "cannon-tower_explosion.png", 32, 32, 100, 4);
 	m_pAirUnitShadowTexture = makeTexture(strToFolder + "unit_shadow.png", m_pRenderer);
 	m_airUnitShadow = Sprite(&m_pAirUnitShadowTexture, {0, 64, 32, 32});
 
@@ -1276,6 +1376,13 @@ Sprite ResourceManager_wartools::getMissile(MissileType t, Direction direction,
 	const int row = std::clamp(animationStage, 0, rows - 1);
 	return Sprite(&m_mapMissiles.at(t),
 		{frame * frameWidth, row * frameHeight, frameWidth, frameHeight}, flipped);
+}
+
+int ResourceManager_wartools::missileAnimationStages(MissileType t) const {
+	const Texture* texture = m_mapMissiles.at(t);
+	const int frameWidth = texture->getWidth() / 5;
+	const int frameHeight = std::min(frameWidth, texture->getHeight());
+	return std::max(1, texture->getHeight() / frameHeight);
 }
 
 

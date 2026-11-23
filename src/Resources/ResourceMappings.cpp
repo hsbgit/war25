@@ -24,7 +24,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
 #include "Units/LandUnits/Skeleton.h"
+#include "Units/LandUnits/Daemon.h"
 #include "Units/AirUnits/GnomishFlyingMachine.h"
+#include "Units/AirUnits/EyeOfKillrogg.h"
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
 #include "Units/SeaUnits/Destroyer.h"
@@ -49,6 +51,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Buildings/MageTower.h"
 #include "Buildings/DarkPortal.h"
 #include "Buildings/Goldmine.h"
+#include "Buildings/Runestone.h"
+#include "Buildings/CircleOfPower.h"
+#include "Buildings/Wall.h"
 
 namespace ResourceMappings {
 
@@ -104,8 +109,11 @@ const MapFileNameToTypeID& getOrcBuildingMap() {
 
 const MapFileNameToTypeID& getNeutralBuildingMap() {
     static const MapFileNameToTypeID neutralBuildings{
+		{"circle_of_power.png", typeid(CircleOfPower)},
         {"dark_portal.png", typeid(DarkPortal)},
-        {"gold_mine.png", typeid(GoldMine)}
+		{"gold_mine.png", typeid(GoldMine)},
+		{"runestone.png", typeid(Runestone)}
+		,{"wall.png", typeid(Wall)}
     };
     return neutralBuildings;
 }
@@ -114,7 +122,7 @@ const MapFileNameToTypeID& getUnitTypeMap() {
     static const MapFileNameToTypeID unitTypes{
         // Neutral
         {"corpses.png", typeid(Peasant)},
-        {"daemon.png", typeid(Ballista)},
+        {"daemon.png", typeid(Daemon)},
         {"skeleton.png", typeid(Skeleton)},
 
         // Human
@@ -151,7 +159,7 @@ const MapFileNameToTypeID& getUnitTypeMap() {
         {"peon.png", typeid(Peasant)},
         {"peon_with_gold.png", typeid(Peasant)},
         {"peon_with_wood.png", typeid(Peasant)},
-        {"eye_of_kilrogg.png", typeid(Ballista)}
+        {"eye_of_kilrogg.png", typeid(EyeOfKillrogg)}
     };
     return unitTypes;
 }

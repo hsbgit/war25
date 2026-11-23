@@ -29,6 +29,9 @@
 #include "Buildings/ScoutTower.h"
 #include "Buildings/OilRefinery.h"
 #include "Buildings/OilRig.h"
+#include "Buildings/Runestone.h"
+#include "Buildings/CircleOfPower.h"
+#include "Buildings/Wall.h"
 
 
 #include "Buildings/DarkPortal.h"
@@ -38,6 +41,7 @@
 #include "Buildings/Townhall.h"
 #include "Units/Critter.h"
 #include "Units/AirUnits/GnomishFlyingMachine.h"
+#include "Units/AirUnits/EyeOfKillrogg.h"
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
 #include "Units/SeaUnits/Destroyer.h"
@@ -54,6 +58,7 @@
 #include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
 #include "Units/LandUnits/Skeleton.h"
+#include "Units/LandUnits/Daemon.h"
 
 
 
@@ -266,7 +271,9 @@ std::unordered_map<std::type_index, int> gMapUnitTilesize = {
 	{typeid(Mage), 1},
 	{typeid(Dwarfes), 1},
 	{typeid(Skeleton), 1},
+	{typeid(Daemon), 1},
 	{typeid(GnomishFlyingMaschine), 2},
+	{typeid(EyeOfKillrogg), 1},
 	{typeid(GryphonRider), 2},
 	{typeid(Tanker), 2},
 	{typeid(Transport), 2},
@@ -277,6 +284,9 @@ std::unordered_map<std::type_index, int> gMapUnitTilesize = {
 	// Buildings
 	{typeid(GoldMine), 3},
 	{typeid(DarkPortal), 4},
+	{typeid(Runestone), 2},
+	{typeid(CircleOfPower), 2},
+	{typeid(Wall), 1},
 
 	{typeid(Barracks), 3},
 	{typeid(Blacksmith), 3},

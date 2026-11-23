@@ -166,10 +166,12 @@ public:
 
 	enum class MissileType { Arrow, Axe, Cannon, BigCannon, BallistaBolt, CatapultRock,
 		Fireball, DragonBreath, GryphonHammer, SubmarineMissile, TurtleMissile,
-		NormalSpell, TouchOfDeath };
+		NormalSpell, Lightning, TouchOfDeath, DaemonFire };
 	Sprite getMissile(MissileType t, Direction direction = Direction::N,
 		int animationStage = 0);
-	enum class SpellVisual { FlameShield, Blizzard, Whirlwind, DeathAndDecay };
+	int missileAnimationStages(MissileType t) const;
+	enum class SpellVisual { Normal, Healing, Exorcism, FlameShield, Blizzard,
+		Whirlwind, DeathAndDecay, SiegeImpact, CannonImpact };
 	Animation getSpellAnimation(SpellVisual visual) const;
 	const Sprite& getAirUnitShadow() const { return m_airUnitShadow; }
 
@@ -336,11 +338,14 @@ private:
 	MultiBuildingActiveSeason<ScoutTower::UpgradeLevel> m_ActiveSeasonScoutTowerTexturesHuman, m_ActiveSeasonScoutTowerTexturesOrc;
 
 	NeutralBuildingTextureMap m_mapNeutralBuildingTextures, m_mapActiveNeutralBuildingTextures;
+	std::unordered_map<std::type_index, std::unordered_map<Season, Animation>>
+		m_mapNeutralBuildingAnimations;
 	void switchBuildingSprites(Season season);
 public:
 	Sprite getBuildingSprite(Building* pBuilding, Fraction fraction, PlayerColor color, bool underConstruction = false);
 	Sprite getBuildingPlacementSprite(PeasantActions action, Fraction fraction, PlayerColor color);
 	Sprite getNeutralBuildingSprite(Building* pBuilding, int index = 0);
+	Animation getNeutralBuildingAnimation(Building* pBuilding);
 private:
 
 	// Buildings -----------------------------------------------------

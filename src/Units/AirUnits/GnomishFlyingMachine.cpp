@@ -19,7 +19,7 @@
 #include "Resources/resourcemanager_wartools.h"
 
 
-GnomishFlyingMaschine::GnomishFlyingMaschine(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 150, 0, 9, 17) {
+GnomishFlyingMaschine::GnomishFlyingMaschine(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 150, 2, 9, 17) {
 	m_currentAnimation = g_pRessourceManager->getUnitIdleAnimation(this, Direction::N);
 	m_icon = g_pRessourceManager->getIcon(PUD_ICON_GNOMISH_FLYING_MACHINE, this->getFraction(), getOwner()->getColor());
 

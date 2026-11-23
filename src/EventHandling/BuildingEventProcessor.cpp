@@ -17,6 +17,7 @@
 
 #include "BuildingEventProcessor.h"
 #include "EventBroker.h"
+#include "Global/ProductionRules.h"
 
 #include "Player.h"
 #include "Map/Map.h"
@@ -262,18 +263,13 @@ Object* BuildingEventProcessor::createUnitObject(ProductionItem::ItemType unitTy
 
     case ProductionItem::ItemType::Knight:
     {
-        bool isPaladinOrOgreMage = pTechManager->isResearched(ProductionItem::ItemType::Church_Paladin);
+        const bool isPaladinOrOgreMage = ProductionRules::cavalryUpgradeResearched(
+            m_buildingFraction,
+            pTechManager->isResearched(ProductionItem::ItemType::Church_Paladin),
+            pTechManager->isResearched(ProductionItem::ItemType::AltarOfStorms_OgreMage));
         pObject = new Knight(m_pObjectOwner, m_buildingFraction, m_pMap, isPaladinOrOgreMage);
-
-        std::string soundPath;
-        if (m_buildingFraction == Fraction::Alliance) {
-            soundPath = isPaladinOrOgreMage ? "human/units/paladin/ready.wav" : "human/units/knight/ready.wav";
-        }
-        else {
-            soundPath = isPaladinOrOgreMage ? "orc/units/ogre-magre/ready.wav" : "orc/units/ogre/ready.wav";
-        }
-
-        g_pSoundManager->playWAV(soundPath);
+        g_pSoundManager->playWAV(std::string(
+            ProductionRules::cavalryReadySound(m_buildingFraction, isPaladinOrOgreMage)));
     }
     break;
 

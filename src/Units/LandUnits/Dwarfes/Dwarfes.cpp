@@ -70,3 +70,7 @@ std::vector<Action> Dwarfes::getActions() const {
 	vecActions.push_back(Action(id, (EventID)DwarfesActions::Explode, g_pRessourceManager->getIcon(PUD_ICON_EXPLOSIVE, getFraction(), color), Action::ActionType::WithWorldTile));
 	return vecActions;
 }
+
+void Dwarfes::detonateWithoutAreaDamage() {
+	if (!isDead()) die();
+}

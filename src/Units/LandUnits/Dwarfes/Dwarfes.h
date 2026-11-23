@@ -40,6 +40,10 @@ public:
 
 	std::vector<Action> getActions() const override;
 
+	// Spell/rune-triggered demolition: show the normal death explosion but do
+	// not execute StateExplode::onExit and therefore deal no surrounding damage.
+	void detonateWithoutAreaDamage();
+
 private:
 	State* m_pStateExplode = nullptr;
 };

@@ -1,5 +1,7 @@
 # war25 Buildings component library
 set(BUILDINGS_SOURCES
+	CircleOfPower.cpp
+	CircleOfPower.h
     Barracks.cpp
     Barracks.h
     Blacksmith.cpp
@@ -28,6 +30,8 @@ set(BUILDINGS_SOURCES
     OilRefinery.h
     OilRig.cpp
     OilRig.h
+	Runestone.cpp
+	Runestone.h
     ScoutTower.cpp
     ScoutTower.h
     Shipyard.cpp
@@ -36,6 +40,8 @@ set(BUILDINGS_SOURCES
     Stables.h
     Townhall.cpp
     Townhall.h
+	Wall.cpp
+	Wall.h
 )
 
 add_library(war25_buildings OBJECT ${BUILDINGS_SOURCES})

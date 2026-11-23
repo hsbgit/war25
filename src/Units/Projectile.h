@@ -19,6 +19,7 @@
 #include "Map/MapObject.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "EventHandling/EventBroker.h"
+#include "Units/ProjectileRules.h"
 #include <unordered_set>
 
 class Object;
@@ -28,6 +29,8 @@ class Player;
 class Projectile : public MapObject {
 public:
 	Projectile(ResourceManager_wartools::MissileType type, Object* pSource, Map* pMap, Object* pTarget, const Point& spriteOffset_px = { 0, 0 });
+	Projectile(ResourceManager_wartools::MissileType type, Object* pSource, Map* pMap,
+		Object* pTarget, const AttackerStats& damage);
 	Projectile(ResourceManager_wartools::MissileType type, Object* pSource, Map* pMap,
 		const Point& targetTile, const AttackerStats& damage, bool lineSplash);
 
@@ -49,12 +52,13 @@ private:
 	void initializeMissile(Object* pSource, Object* pTarget);
 	void initializeMissile(Object* pSource, const Point& targetTile);
 	void initializeTrajectory(Object* pSource, const Point& targetCenter);
-	void playLaunchSound();
+	void playLaunchSound(Object* source);
 
 	void updatePosition();
 	void checkCollision();
 	void handleCollision();
-	void handleCatapultSplash(Object* primaryTarget);
+	void handleSplash(Object* primaryTarget);
+	ProjectileRules::SplashProfile splashProfile() const;
 	void handleLineImpact();
 	void damageAreaAt(const Point& centerTile);
 	void playCollisionSound();

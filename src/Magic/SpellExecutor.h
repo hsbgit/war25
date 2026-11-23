@@ -20,7 +20,7 @@
 #include "EventHandling/EventProcessor.h"
 #include "Types.h"
 
-class Mage;
+class Unit;
 
 class SpellExecutor : public EventProcessor {
 public:
@@ -30,7 +30,10 @@ public:
 	void process();
 
 	void handleEvent(const Event& event);
-	void castSpell(Mage* caster, EventID spell, const Point& targetPos_world);
+	// Returns true only if the target/range was valid, mana was paid and the
+	// effect was created. A null caster is reserved for the debug spell window.
+	bool castSpell(Unit* caster, EventID spell, const Point& targetPos_world);
+	bool castDebugSpell(EventID spell, const Point& targetPos_world);
 	void setMap(Map* pMap);
 
 	inline const std::vector<Runes>& getRunes() const {
@@ -40,6 +43,8 @@ public:
 
 private:
 	void placeRunes(Runes& r, const Point& targetPos_world);
+	bool castSpellInternal(Unit* caster, EventID spell,
+		const Point& targetPos_world, bool debugCast);
 
 	std::vector<Runes> vecRunes;
 	Map* m_pMap = nullptr;

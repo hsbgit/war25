@@ -38,15 +38,21 @@
 #include "Buildings/OilRefinery.h"
 #include "Buildings/OilRig.h"
 #include "Global/BuildingPlacement.h"
+#include "Magic/SpellRules.h"
 
 #include "Buildings/ScoutTower.h"
 #include "Buildings/Shipyard.h"
 #include "Buildings/Stables.h"
 #include "Buildings/Townhall.h"
 #include "Buildings/DarkPortal.h"
+#include "Buildings/Runestone.h"
+#include "Buildings/CircleOfPower.h"
+#include "Buildings/Wall.h"
 #include "Units/Critter.h"
 #include "Units/LandUnits/Skeleton.h"
+#include "Units/LandUnits/Daemon.h"
 #include "Units/AirUnits/GnomishFlyingMachine.h"
+#include "Units/AirUnits/EyeOfKillrogg.h"
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
 #include "Units/SeaUnits/Destroyer.h"
@@ -223,6 +229,13 @@ Tile* Map::getNeighbourTileWithWood(Tile* pTile, int distance) {
 
 
 void Map::processMapObjects() {
+	for (auto it = m_corpseAgeMs.begin(); it != m_corpseAgeMs.end();) {
+		it->second += g_tick_ms;
+		if (it->second >= SpellRules::CorpseTotalDurationMs)
+			it = m_corpseAgeMs.erase(it);
+		else
+			++it;
+	}
 	m_vecMapObjects.erase(std::remove_if(m_vecMapObjects.begin(),
 		m_vecMapObjects.end(),
 		[](const MapObject* pObject) {
@@ -252,6 +265,22 @@ void Map::processMapObjects() {
 		if (animations.empty()) it = m_mapAnimations.erase(it);
 		else ++it;
 	}
+}
+
+void Map::registerCorpse(Tile* tile) {
+	if (tile) m_corpseAgeMs[tile] = 0;
+}
+
+bool Map::isRaiseableCorpse(Tile* tile) const {
+	const auto it = m_corpseAgeMs.find(tile);
+	return it != m_corpseAgeMs.end() && SpellRules::corpseIsRaiseable(it->second);
+}
+
+bool Map::consumeRaiseableCorpse(Tile* tile) {
+	if (!isRaiseableCorpse(tile)) return false;
+	m_corpseAgeMs.erase(tile);
+	m_mapAnimations.erase(tile);
+	return true;
 }
 
 
@@ -617,6 +646,9 @@ Object* Map::getObjectOnTile(int tile_x_world, int tile_y_world) {
 		return object;
 	}
 
+	if (pTile->getGroundOverlay())
+		return pTile->getGroundOverlay();
+
 	return nullptr;
 }
 
@@ -877,7 +909,10 @@ Tile* Map::getClosestAttackTile(Object* target, Object* attacker, int attackRang
 				x, y, x + attackerSize - 1, y + attackerSize - 1,
 				targetTopLeft.x, targetTopLeft.y,
 				targetLowerRight.x, targetLowerRight.y);
-			if (distanceToTarget > attackRange * attackRange) continue;
+			// Wargus/Stratagus uses floor(sqrt(distanceSquared)) for map
+			// distance, not an exact-radius comparison.
+			const int nextDistance = attackRange + 1;
+			if (distanceToTarget >= nextDistance * nextDistance) continue;
 			const int dx = x - start.x;
 			const int dy = y - start.y;
 			const int travelDistance = dx * dx + dy * dy;
@@ -1450,6 +1485,21 @@ void Map::addUnitsToMap(Pud* pPud) {
 			placeUnit(m_arrTileMap[ui.y][ui.x], new DarkPortal(m_mapPlayer[PlayerColor::Neutral], this));
 			break;
 
+		case PUD_UNIT_RUNESTONE:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Runestone(pOwner, this));
+			break;
+
+		case PUD_UNIT_CIRCLE_OF_POWER:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new CircleOfPower(m_mapPlayer[PlayerColor::Neutral], this));
+			break;
+
+		case PUD_UNIT_HUMAN_WALL:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Wall(pOwner, Fraction::Alliance, this));
+			break;
+		case PUD_UNIT_ORC_WALL:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Wall(pOwner, Fraction::Orc, this));
+			break;
+
 
 		case PUD_UNIT_OIL_PATCH:
 			m_oilPatchPositions.push_back({ui.x, ui.y});
@@ -1463,6 +1513,61 @@ void Map::addUnitsToMap(Pud* pPud) {
 
 		case PUD_UNIT_SKELETON:
 			placeUnit(m_arrTileMap[ui.y][ui.x], new Skeleton(pOwner, this));
+			break;
+
+		case PUD_UNIT_DAEMON:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Daemon(pOwner, this));
+			break;
+
+		case PUD_UNIT_EYE_OF_KILROGG:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new EyeOfKillrogg(pOwner, this));
+			break;
+
+		// Warcraft II heroes reuse the animation sheets and behavior of their
+		// corresponding regular unit. Their scenario-specific attributes live in
+		// the PUD; until those optional overrides are present, never drop the unit.
+		case PUD_UNIT_ALLERIA:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Archer(pOwner, Fraction::Alliance, this, true));
+			break;
+		case PUD_UNIT_TERON_GOREFIEND:
+		case PUD_UNIT_GUL_DAN:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Mage(pOwner, Fraction::Orc, this));
+			break;
+		case PUD_UNIT_KURDRAN_AND_SKY_REE:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new GryphonRider(pOwner, Fraction::Alliance, this));
+			break;
+		case PUD_UNIT_DEATHWING:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new GryphonRider(pOwner, Fraction::Orc, this));
+			break;
+		case PUD_UNIT_DENTARG:
+		case PUD_UNIT_CHO_GALL:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Knight(pOwner, Fraction::Orc, this, true));
+			break;
+		case PUD_UNIT_KHADGAR:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Mage(pOwner, Fraction::Alliance, this));
+			break;
+		case PUD_UNIT_GROM_HELLSCREAM:
+		case PUD_UNIT_KARGATH_BLADEFIST:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Footman(pOwner, Fraction::Orc, this));
+			break;
+		case PUD_UNIT_TURALYON:
+		case PUD_UNIT_UTHER_LIGHTBRINGER:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Knight(pOwner, Fraction::Alliance, this, true));
+			break;
+		case PUD_UNIT_DANATH:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Footman(pOwner, Fraction::Alliance, this));
+			break;
+		case PUD_UNIT_LOTHAR:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Knight(pOwner, Fraction::Alliance, this));
+			break;
+		case PUD_UNIT_ZUL_JIN:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Archer(pOwner, Fraction::Orc, this, true));
+			break;
+		case PUD_UNIT_ATTACK_PEASANT:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Peasant(pOwner, Fraction::Alliance, this));
+			break;
+		case PUD_UNIT_ATTACK_PEON:
+			placeUnit(m_arrTileMap[ui.y][ui.x], new Peasant(pOwner, Fraction::Orc, this));
 			break;
 
 
@@ -1800,7 +1905,8 @@ void Map::addUnitsToMap(Pud* pPud) {
 
 
 		default:
-			std::cout << "Unit not yet implemented: " << std::hex << ui.type << std::dec << std::endl;
+			throw std::runtime_error("Unsupported PUD unit type: " +
+				std::to_string(static_cast<unsigned int>(ui.type)));
 		}
 
 

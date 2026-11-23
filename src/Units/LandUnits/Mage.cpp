@@ -50,10 +50,7 @@ void Mage::handleEvent(const Event& event) {
 	const EventID spell = event.getEventID();
 	const int manaCost = SpellCosts::manaCost(static_cast<int>(spell));
 	if (manaCost >= 0) {
-		if (reduceMana(manaCost)) {
-			removeBuff(BuffType::Invisibility);
-			gSpellExecutor.castSpell(this, spell, {event.tileX(), event.tileY()});
-		}
+		gSpellExecutor.castSpell(this, spell, {event.tileX(), event.tileY()});
 		return;
 	}
 	Unit::handleEvent(event);

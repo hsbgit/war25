@@ -29,7 +29,7 @@
  *  - Is neutral -> PlayerColor::Neutral
  *  - No animation, just a single sprite for each direction
  */
-Critter::Critter(Player* pOwner, Map* pMap) : Unit(pOwner, Fraction::Neutral, pMap, 5, 0, 2, 3), m_sprite(g_pRessourceManager->getCritterSprite(Direction::N)) {
+Critter::Critter(Player* pOwner, Map* pMap) : Unit(pOwner, Fraction::Neutral, pMap, 5, 0, 2, 10, false), m_sprite(g_pRessourceManager->getCritterSprite(Direction::N)) {
 	int adjustedTime_ms = (PseudoRandom::rnd(800, 2000) / g_tick_ms) * g_tick_ms; // Ensure that the random number can be divided by g_tick_ms without reminder
 	m_requiredTicksPerMove = calculateRequiredTicksForGameAction(adjustedTime_ms);
 
@@ -86,6 +86,7 @@ void Critter::notifySeasonChanged(Season newSeason) {
 		m_isSheep = true;
 		setName("Sheep");
 		m_vecSoundsSelected.push_back("neutral/units/sheep/selected/1.wav");
+		m_vecSoundsAnnoyed.push_back("neutral/units/sheep/annoyed/1.wav");
 		setDyingSound("neutral/units/sheep/selected/1.wav");
 		break;
 
@@ -93,6 +94,7 @@ void Critter::notifySeasonChanged(Season newSeason) {
 		m_isSheep = false;
 		setName("Seal");
 		m_vecSoundsSelected.push_back("neutral/units/seal/selected/1.wav");
+		m_vecSoundsAnnoyed.push_back("neutral/units/seal/annoyed/1.wav");
 		setDyingSound("neutral/units/seal/annoyed/1.wav");
 		break;
 
@@ -100,6 +102,7 @@ void Critter::notifySeasonChanged(Season newSeason) {
 		m_isSheep = false;
 		setName("Pig");
 		m_vecSoundsSelected.push_back("neutral/units/pig/selected/1.wav");
+		m_vecSoundsAnnoyed.push_back("neutral/units/pig/annoyed/1.wav");
 		setDyingSound("neutral/units/pig/annoyed/1.wav");
 		break;
 
@@ -107,6 +110,7 @@ void Critter::notifySeasonChanged(Season newSeason) {
 		m_isSheep = false;
 		setName("Warthog");
 		m_vecSoundsSelected.push_back("neutral/units/warthog/selected/1.wav");
+		m_vecSoundsAnnoyed.push_back("neutral/units/warthog/annoyed/1.wav");
 		setDyingSound("neutral/units/warthog/annoyed/1.wav");
 		break;
 

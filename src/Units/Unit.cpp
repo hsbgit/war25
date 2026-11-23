@@ -32,7 +32,9 @@
 #include "Units/LandUnits/Archer.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
 #include "Units/LandUnits/Footman.h"
+#include "Units/LandUnits/Knight.h"
 #include "Units/LandUnits/Mage.h"
+#include "Units/LandUnits/Daemon.h"
 #include "Units/LandUnits/Peasant/Peasant.h"
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
@@ -40,6 +42,7 @@
 #include "Units/SeaUnits/Destroyer.h"
 #include "Units/SeaUnits/Transport.h"
 #include "Units/CombatRules.h"
+#include "Units/UnitPresentationRules.h"
 #include <iostream>
 #include <filesystem>
 
@@ -49,11 +52,19 @@
 
 
 // Fraction may differ from the fraction of pOwner. E.g., an alliance player owning a DeathKnight
-Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, int armor, int sight, int speed) : Object(pOwner, pMap, healthPointsMax, armor, sight), EventProcessor(), m_speed(speed) {
+Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, int armor,
+	int sight, int speed, bool countsTowardFood)
+	: Object(pOwner, pMap, healthPointsMax, armor, sight), EventProcessor(),
+	  m_speed(speed), m_countsTowardFood(countsTowardFood) {
 	m_fraction = fraction;
+	// Spread the half-second auto-target checks across simulation ticks so a
+	// large army does not perform every visibility scan in the same frame.
+	const int targetScanInterval = calculateRequiredTicksForGameAction(500);
+	m_autoTargetScanRemaining = static_cast<int>(getID() % targetScanInterval);
 
 	 // currentAnimation = pResManager->getUnitIdleAnimation(this, Direction::N); Does not work at this point since the object is currently created and unitidle works with virtual (typeid)
-	getOwner()->increaseUsedFood();
+	if (m_countsTowardFood && !getOwner()->isNeutral())
+		getOwner()->increaseUsedFood();
 
 	// Setup StateMachine
 	m_pIdle = new StateIdle(this);
@@ -176,6 +187,29 @@ void Unit::handleEvent(const Event& event) {
 			} else {
 				return;
 			}
+		} else if (action == GeneralActions::AttackGround) {
+			if (!UnitPresentationRules::supportsAttackGround(
+				dynamic_cast<GryphonRider*>(this) != nullptr) ||
+				m_attackCooldownRemaining > 0 || isMoving()) return;
+			const Point target{event.tileX(), event.tileY()};
+			if (!CombatRules::rectanglesWithinMapRange(
+				getTileTopLeft()->getX(), getTileTopLeft()->getY(),
+				getTileLowerRight()->getX(), getTileLowerRight()->getY(),
+				target.x, target.y, target.x, target.y, armed->attackRange())) return;
+			m_attackDirection = getTileLocation() == target ? Direction::N :
+				getTargetCardinalDirection(getTileLocation(), target);
+			m_facingDirection = m_attackDirection;
+			setCurrentAnimation(g_pRessourceManager->getUnitAnimation(this,
+				m_attackDirection, ResourceManager_wartools::AnimationType::Attacking).playOnce());
+			m_attackAnimationActive = true;
+			removeBuff(BuffType::Invisibility);
+			const auto missile = getFraction() == Fraction::Orc
+				? ResourceManager_wartools::MissileType::DragonBreath
+				: ResourceManager_wartools::MissileType::GryphonHammer;
+			getMap()->addMapObject(new Projectile(missile, this, getMap(), target,
+				armed->getAttackerStats(), true));
+			m_attackCooldownRemaining = std::max(1, armed->attackCooldownTicks());
+			return;
 		} else if (action == GeneralActions::Move || action == GeneralActions::Stop) {
 			if (action == GeneralActions::Move) m_standGround = false;
 			armed->clearActiveTarget();
@@ -198,20 +232,23 @@ std::vector<Action> Unit::getActions() const {
 
 	vecActions.push_back(Action(id, (EventID)GeneralActions::Move, g_pRessourceManager->getIcon(PUD_ICON_HUMAN_MOVE, getFraction(), color), Action::ActionType::WithWorldTile));
 	vecActions.push_back(Action(id, (EventID)GeneralActions::Stop, g_pRessourceManager->getIcon(PUD_ICON_HUMAN_SHIELD_0, getFraction(), color)));
-	const Pud_Icon attackIcon = dynamic_cast<const GryphonRider*>(this)
-		? PUD_ICON_HUMAN_ATTACK_GROUND : PUD_ICON_SWORD_0;
 	vecActions.push_back(Action(id, (EventID)GeneralActions::Attack,
-		g_pRessourceManager->getIcon(attackIcon, getFraction(), color),
+		g_pRessourceManager->getIcon(PUD_ICON_SWORD_0, getFraction(), color),
 		Action::ActionType::WithWorldTile));
 	vecActions.push_back(Action(id, (EventID)GeneralActions::Patrol, g_pRessourceManager->getIcon(PUD_ICON_HUMAN_PATROL, getFraction(), color), Action::ActionType::WithWorldTile));
 	vecActions.push_back(Action(id, (EventID)GeneralActions::StandGround, g_pRessourceManager->getIcon(PUD_ICON_HUMAN_STAND_GROUND, getFraction(), color)));
+	if (UnitPresentationRules::supportsAttackGround(
+		dynamic_cast<const GryphonRider*>(this) != nullptr))
+		vecActions.push_back(Action(id, (EventID)GeneralActions::AttackGround,
+			g_pRessourceManager->getIcon(PUD_ICON_HUMAN_ATTACK_GROUND, getFraction(), color),
+			Action::ActionType::WithWorldTile));
 	return vecActions;
 }
 
 
 void Unit::doHandleDeath() {
 	// Only decrease food for player-controlled units, not for neutral creatures like sheep
-	if (getOwner() && getOwner() != getMap()->getNeutralPlayer()) {
+	if (m_countsTowardFood && getOwner() && getOwner() != getMap()->getNeutralPlayer()) {
 		getOwner()->decreaseUsedFood();
 	}
 	if (isPlacedOnMap()) {
@@ -219,13 +256,16 @@ void Unit::doHandleDeath() {
 			this, m_facingDirection, ResourceManager_wartools::AnimationType::Dying).playOnce());
 	}
 	if (isOrganic() && !isUnDead() && isLandObject() && isPlacedOnMap() &&
-		!dynamic_cast<Mage*>(this) && !dynamic_cast<Dwarfes*>(this))
+		!dynamic_cast<Mage*>(this) && !dynamic_cast<Dwarfes*>(this)) {
+		getMap()->registerCorpse(getTile());
 		getMap()->addAnimation(getTile(),
 			g_pRessourceManager->getCorpseAnimation(this, m_facingDirection));
+	}
 }
 
 
 void Unit::setIdleAnimation(Direction direction) {
+	m_attackAnimationActive = false;
 	m_facingDirection = direction;
 	m_currentAnimation = g_pRessourceManager->getUnitIdleAnimation(this, direction);
 }
@@ -246,6 +286,9 @@ Unit::~Unit() {
 
 void Unit::process() {
 	m_currentAnimation.process();
+	if (UnitPresentationRules::shouldReturnToIdle(
+		m_attackAnimationActive, m_attackAnimationActive && m_currentAnimation.isComplete()))
+		setIdleAnimation(m_attackDirection);
 	m_stateMachine.process();
 	updateCombat();
 
@@ -273,17 +316,30 @@ Object* Unit::selectAutomaticTarget(IArmed* armed) const {
 			!getOwner()->getMapInfo()->canCurrentlySee(target);
 	});
 	if (targets.empty()) return nullptr;
-	return *std::min_element(targets.begin(), targets.end(), [this](Object* lhs, Object* rhs) {
-		auto distance = [this](Object* object) {
-			const Point a = getTileLocation();
-			const Point b = object->getTileLocation();
-			return std::max(std::abs(a.x - b.x), std::abs(a.y - b.y));
-		};
-		const int lhsDistance = distance(lhs);
-		const int rhsDistance = distance(rhs);
-		if (lhsDistance != rhsDistance) return lhsDistance < rhsDistance;
-		return dynamic_cast<EventProcessor*>(lhs)->getID() <
-			dynamic_cast<EventProcessor*>(rhs)->getID();
+	auto priority = [this, armed](Object* target) {
+		const auto* targetArmed = dynamic_cast<const IArmed*>(target);
+		const Point ownTopLeft = getTileTopLeft()->getPos();
+		const Point ownLowerRight = getTileLowerRight()->getPos();
+		const Point targetTopLeft = target->getTileTopLeft()->getPos();
+		const Point targetLowerRight = target->getTileLowerRight()->getPos();
+		const int distanceSquared = CombatRules::rectangleDistanceSquared(
+			ownTopLeft.x, ownTopLeft.y, ownLowerRight.x, ownLowerRight.y,
+			targetTopLeft.x, targetTopLeft.y,
+			targetLowerRight.x, targetLowerRight.y);
+		return CombatRules::AutoTargetPriority{
+			targetArmed && targetArmed->activeTarget() == this,
+			targetArmed && targetArmed->isArmed() &&
+				targetArmed->canAttackTarget(this),
+			dynamic_cast<Unit*>(target) != nullptr,
+			CombatRules::rectanglesWithinMapRange(
+				ownTopLeft.x, ownTopLeft.y, ownLowerRight.x, ownLowerRight.y,
+				targetTopLeft.x, targetTopLeft.y,
+				targetLowerRight.x, targetLowerRight.y, armed->attackRange()),
+			distanceSquared,
+			dynamic_cast<EventProcessor*>(target)->getID()};
+	};
+	return *std::min_element(targets.begin(), targets.end(), [&](Object* lhs, Object* rhs) {
+		return CombatRules::isBetterAutoTarget(priority(lhs), priority(rhs));
 	});
 }
 
@@ -312,8 +368,16 @@ void Unit::updateCombat() {
 	// Workers may defend themselves when explicitly ordered, but never acquire
 	// targets autonomously while idle.
 	if (!target && !dynamic_cast<Peasant*>(this) && isIdle()) {
-		target = selectAutomaticTarget(armed);
-		if (target) armed->assignTarget(target);
+		// Stratagus deliberately throttles automatic target selection. Scanning
+		// every unit's complete sight area every simulation tick caused severe
+		// frame stalls on populated maps.
+		if (m_autoTargetScanRemaining > 0) {
+			--m_autoTargetScanRemaining;
+		} else {
+			target = selectAutomaticTarget(armed);
+			m_autoTargetScanRemaining = calculateRequiredTicksForGameAction(500);
+			if (target) armed->assignTarget(target);
+		}
 	}
 	if (!target)
 		return;
@@ -349,8 +413,19 @@ void Unit::updateCombat() {
 	setCurrentAnimation(g_pRessourceManager->getUnitAnimation(
 		this, m_attackDirection,
 		ResourceManager_wartools::AnimationType::Attacking).playOnce());
+	m_attackAnimationActive = true;
 	removeBuff(BuffType::Invisibility);
 	if (armed->isCloseRangeUnit()) {
+		if (dynamic_cast<Footman*>(this) ||
+			(dynamic_cast<Knight*>(this) && getFraction() == Fraction::Alliance)) {
+			const int variant = PseudoRandom::cosmeticRnd(1, 3);
+			g_pSoundManager->playWAV(this,
+				UnitPresentationRules::swordAttackSound(variant));
+		} else if (dynamic_cast<Knight*>(this) && getFraction() == Fraction::Orc) {
+			g_pSoundManager->playWAV(this,
+				std::string(UnitPresentationRules::fixedAttackSound(
+					UnitPresentationRules::AttackSound::Punch)));
+		}
 		AttackerStats damage = armed->getAttackerStats();
 		if (hasBuff(BuffType::Bloodlust)) {
 			damage.setBasicDamage(damage.getBasicDamage() * 2);
@@ -365,7 +440,9 @@ void Unit::updateCombat() {
 		else if (dynamic_cast<Mage*>(this))
 			missile = getFraction() == Fraction::Orc
 				? ResourceManager_wartools::MissileType::TouchOfDeath
-				: ResourceManager_wartools::MissileType::NormalSpell;
+				: ResourceManager_wartools::MissileType::Lightning;
+		else if (dynamic_cast<Daemon*>(this))
+			missile = ResourceManager_wartools::MissileType::DaemonFire;
 		else if (dynamic_cast<GryphonRider*>(this))
 			missile = getFraction() == Fraction::Orc
 				? ResourceManager_wartools::MissileType::DragonBreath
@@ -402,9 +479,39 @@ void Unit::takeDamage(const AttackerStats& stats, bool noRandomComponent) {
 void Unit::onAttackedBy(Object* attacker) {
 	if (!attacker || isDead() || !isPlacedOnMap() || !attacker->isPlacedOnMap())
 		return;
-	const auto* armed = dynamic_cast<const IArmed*>(this);
-	if (armed && armed->isArmed() && !dynamic_cast<Peasant*>(this))
+	auto* armed = dynamic_cast<IArmed*>(this);
+	if (armed && armed->isArmed() && !dynamic_cast<Peasant*>(this)) {
+		// Keep fighting a current target that is already actionable. Otherwise
+		// retaliate against the visible attacker, just like Stratagus' offered
+		// target/attack-back handling. Stand-ground units never pursue.
+		if (Object* current = armed->activeTarget();
+			current && armed->activeTargetInRange(this)) {
+			const auto* currentArmed = dynamic_cast<const IArmed*>(current);
+			// Do not abandon an immediate combat threat, but switch away from a
+			// building or harmless unit when somebody is actively hurting us.
+			if (currentArmed && currentArmed->isArmed() &&
+				currentArmed->canAttackTarget(this)) return;
+		}
+		if (!armed->canAttackTarget(attacker) ||
+			!getOwner()->getMapInfo()->canCurrentlySee(attacker)) return;
+		if (m_standGround && !CombatRules::rectanglesWithinMapRange(
+			getTileTopLeft()->getX(), getTileTopLeft()->getY(),
+			getTileLowerRight()->getX(), getTileLowerRight()->getY(),
+			attacker->getTileTopLeft()->getX(), attacker->getTileTopLeft()->getY(),
+			attacker->getTileLowerRight()->getX(), attacker->getTileLowerRight()->getY(),
+			armed->attackRange())) return;
+		armed->assignTarget(attacker);
+		if (armed->activeTargetInRange(this)) {
+			m_stateMachine.handleEvent(Event(getID(), GeneralActions::Stop));
+			return;
+		}
+		if (Tile* approach = getMap()->getClosestAttackTile(
+			attacker, this, armed->attackRange())) {
+			m_stateMachine.handleEvent(Event(getID(), GeneralActions::Attack,
+				approach->getX(), approach->getY()));
+		}
 		return;
+	}
 
 	const Point own = getTileLocation();
 	const Point threat = attacker->getTileLocation();
@@ -443,7 +550,22 @@ void Unit::playRandomSound(const std::vector<std::string>& sounds) {
 
 
 void Unit::playSoundSelected() {
-	playRandomSound(m_vecSoundsSelected);
+	++m_selectionClicks;
+	const bool useAnnoyed = UnitPresentationRules::selectionSoundForClick(
+		m_selectionClicks, true) == UnitPresentationRules::SelectionSound::Annoyed;
+	if (!useAnnoyed) {
+		playRandomSound(m_vecSoundsSelected);
+	} else if (!m_vecSoundsAnnoyed.empty()) {
+		playRandomSound(m_vecSoundsAnnoyed);
+	} else {
+		// A few extracted units (notably the base dragon and gryphon) have no
+		// unit-specific annoyed directory. They still participate in the easter
+		// egg by falling back to their faction's voice set.
+		const char* faction = getFraction() == Fraction::Alliance ? "human" : "orc";
+		const int variant = PseudoRandom::cosmeticRnd(1, 7);
+		g_pSoundManager->playSelectionWAV(std::string(faction) +
+			"/basic_voices/annoyed/" + std::to_string(variant) + ".wav");
+	}
 }
 
 void Unit::playSoundAcknowledge() {
@@ -481,6 +603,7 @@ void Unit::setSoundBaseDirectory(const std::string& strPathToSoundFolder) {
 	m_vecSoundsSelected.clear();
 	m_vecSoundsAnnoyed.clear();
 	m_vecSoundsAcknowledge.clear();
+	m_selectionClicks = 0;
 
 	// Load sounds using the new helper function
 	const std::string fullBasePath = SoundManager::strFolderPrefix + strPathToSoundFolder;

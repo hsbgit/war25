@@ -20,6 +20,7 @@
 #include "Map/Map.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "Resources/SoundManager.h"
+#include "Units/LandUnits/Dwarfes/Dwarfes.h"
 
 
 Runes::Runes(Map* pMap) : m_pMap(pMap) {
@@ -37,7 +38,12 @@ void Runes::process() {
     auto it = std::remove_if(vecRuneTiles.begin(), vecRuneTiles.end(),
         [this](Tile* pTile) {
             if (pTile->hasObject() && pTile->getSeaOrLandUnit()) {
-                pTile->getSeaOrLandUnit()->takeDamage(AttackerStats(0, 50), true);
+				Object* victim = pTile->getSeaOrLandUnit();
+				if (auto* demolition = dynamic_cast<Dwarfes*>(victim);
+					demolition && demolition->getHealthPoints() <= 50)
+					demolition->detonateWithoutAreaDamage();
+				else
+					victim->takeDamage(AttackerStats(0, 50), true);
                 g_pSoundManager->playWAV(pTile, std::string("misc") + PATH_SEPARATOR + "explosion.wav");
                 m_pMap->addAnimation(pTile, g_pRessourceManager->getExplosionAnimation());
                 return true;
@@ -47,4 +53,3 @@ void Runes::process() {
 
     vecRuneTiles.erase(it, vecRuneTiles.end());
 }
-

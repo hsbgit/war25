@@ -21,6 +21,7 @@
 #include "EventHandling/EventProcessor.h"
 #include "EventHandling/StateMachine.h"
 #include "Magic/Buff.h"
+#include "Magic/BuffRules.h"
 #include "UnitActions.h"
 
 class Path;
@@ -37,7 +38,8 @@ class Path;
  */
 class Unit : public Object, public EventProcessor {
 public:
-	Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, int armor, int sight, int speed);
+	Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, int armor,
+		int sight, int speed, bool countsTowardFood = true);
 	virtual ~Unit();
 
 	int getSpeed() const;
@@ -74,6 +76,7 @@ public:
 	}
 
 	inline void setCurrentAnimation(const Animation& animation) {
+		m_attackAnimationActive = false;
 		m_currentAnimation = animation;
 	}
 
@@ -82,6 +85,8 @@ public:
 	Direction getFacingDirection() const { return m_facingDirection; }
 
 	void addBuff(const Buff& buff) {
+		if (const auto cancelled = BuffRules::cancelledBy(buff.getType()))
+			m_activeBuffs.erase(*cancelled);
 		auto it = m_activeBuffs.find(buff.getType());
 		if (it != m_activeBuffs.end()) {
 			it->second.reset();
@@ -129,7 +134,11 @@ private:
 	Object* selectAutomaticTarget(IArmed* armed) const;
 	int m_speed;
 	int m_attackCooldownRemaining = 0;
+	int m_autoTargetScanRemaining = 0;
 	Direction m_attackDirection = Direction::N;
 	Direction m_facingDirection = Direction::N;
 	bool m_standGround = false;
+	bool m_attackAnimationActive = false;
+	int m_selectionClicks = 0;
+	bool m_countsTowardFood = true;
 };

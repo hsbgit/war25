@@ -20,7 +20,7 @@
 
 DarkPortal::DarkPortal(Player* pOwner, Map* pMap) : Building(pOwner, Fraction::Neutral, pMap, 5000, 0, 0) {
 	m_icon = g_pRessourceManager->getIcon(PUD_ICON_DARK_PORTAL);
-	m_sprite = g_pRessourceManager->getNeutralBuildingSprite(this);
+	setAmbientAnimation(g_pRessourceManager->getNeutralBuildingAnimation(this));
 
 	setName("Dark Portal");
 }

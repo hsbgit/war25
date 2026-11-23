@@ -160,6 +160,16 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 #   cmake --build <build-directory> --target smoke_test_maps
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
+    add_custom_target(startup_smoke_test
+        COMMAND ${CMAKE_COMMAND} -E env SDL_AUDIODRIVER=dummy
+            "$<TARGET_FILE:${PROJECT_NAME}>"
+            --smoke-test-map
+            "${CMAKE_CURRENT_BINARY_DIR}/data/maps/Islands in the stream modified.pud"
+            80
+        DEPENDS ${PROJECT_NAME}
+        USES_TERMINAL
+        VERBATIM
+    )
     add_custom_target(smoke_test_maps
         COMMAND ${Python3_EXECUTABLE}
             "${CMAKE_CURRENT_SOURCE_DIR}/../tests/smoke_test_maps.py"

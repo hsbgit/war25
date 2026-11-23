@@ -18,6 +18,7 @@
 #include "Global/Object.h"
 #include "Map/Map.h"
 #include "Player.h"
+#include "Units/CombatRules.h"
 
 
 IArmed::IArmed() : m_basicDamage(0), m_piercingDamage(0), m_range(0) {
@@ -44,14 +45,26 @@ void IArmed::setArmedProperties(int basicDamage, int piercingDamage, int range, 
 
 
 std::set<Object*> IArmed::findTargetObject(Object* pAttacker) const {
-	std::set<Object*> setObjectsInRange = pAttacker->getMap()->getVisibleObjectsWithinRange(pAttacker, attackRange(), canAttackAirUnits());
+	// Ask for one extra tile, then apply the same floored footprint distance as
+	// Stratagus. The broader query is needed for diagonal fringe tiles.
+	std::set<Object*> setObjectsInRange = pAttacker->getMap()->getVisibleObjectsWithinRange(
+		pAttacker, attackRange() + 1, canAttackAirUnits());
 
 	std::erase_if(setObjectsInRange,
 		[pAttacker, this](Object* pTarget) {
+			const Point attackerTopLeft = pAttacker->getTileTopLeft()->getPos();
+			const Point attackerLowerRight = pAttacker->getTileLowerRight()->getPos();
+			const Point targetTopLeft = pTarget->getTileTopLeft()->getPos();
+			const Point targetLowerRight = pTarget->getTileLowerRight()->getPos();
 			return !pTarget->isEnemy(pAttacker) ||
 				pTarget->getFraction() == Fraction::Neutral ||
 				pTarget->getOwner()->isNeutral() || !canAttackTarget(pTarget) ||
-				!pAttacker->getOwner()->getMapInfo()->canCurrentlySee(pTarget);
+				!pAttacker->getOwner()->getMapInfo()->canCurrentlySee(pTarget) ||
+				!CombatRules::rectanglesWithinMapRange(
+					attackerTopLeft.x, attackerTopLeft.y,
+					attackerLowerRight.x, attackerLowerRight.y,
+					targetTopLeft.x, targetTopLeft.y,
+					targetLowerRight.x, targetLowerRight.y, attackRange());
 		});
 
 	return setObjectsInRange;

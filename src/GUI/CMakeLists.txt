@@ -3,6 +3,7 @@ set(GUI_SOURCES
     # Main GUI components
     DebugSpellWindow.cpp
     DebugSpellWindow.h
+	DebugSpellRules.h
     DebugWindow.cpp
     DebugWindow.h
     DisplaySettingsWindow.cpp

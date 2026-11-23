@@ -23,6 +23,7 @@ set(GLOBAL_SOURCES
 	SimulationSettings.h
     ProductionItem.cpp
     ProductionItem.h
+	ProductionRules.h
     TechnologyManager.cpp
     TechnologyManager.h
     UpgradeEffect.cpp

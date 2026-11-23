@@ -299,14 +299,23 @@ bool Tile::isBlockedForUnit(const Object* pObj, Object** pBlockingObject) const 
 		return true;
 
 	if (pObj->isLandObject() || pObj->isSeaObject())
-		return m_pUnit && m_pUnit != pObj;
+		return MovementRules::occupantBlocksMovement(
+			m_pUnit != nullptr, m_pUnit == pObj, false);
 
 	return false;
 }
 
 
 void Tile::assign(Object* pObj) {
-	if (pObj->isAirObject()) {
+	if (pObj->isWalkableGroundOverlay()) {
+		if (m_pGroundOverlay && m_pGroundOverlay != pObj) {
+			std::cerr << "ERROR: Trying to assign a second ground overlay to tile ("
+			          << m_pos_tile.x << "," << m_pos_tile.y << ")" << std::endl;
+			return;
+		}
+		m_pGroundOverlay = pObj;
+	}
+	else if (pObj->isAirObject()) {
 		if (m_pAirUnit && m_pAirUnit != pObj) {
 			std::cerr << "ERROR: Trying to assign air unit " << pObj << " to tile ("
 			          << m_pos_tile.x << "," << m_pos_tile.y << ") already occupied by " << m_pAirUnit << std::endl;
@@ -335,10 +344,14 @@ void Tile::release(Object* pObj) {
 	else if (pObj == m_pAirUnit) {
 		m_pAirUnit = nullptr;
 	}
+	else if (pObj == m_pGroundOverlay) {
+		m_pGroundOverlay = nullptr;
+	}
 	else {
 		// Object is trying to release a tile it doesn't own - this shouldn't happen
 		std::cerr << "WARNING: Object " << pObj << " trying to release tile ("
 		          << m_pos_tile.x << "," << m_pos_tile.y << ") it doesn't own!" << std::endl;
-		std::cerr << "Tile's m_pUnit: " << m_pUnit << ", m_pAirUnit: " << m_pAirUnit << std::endl;
+		std::cerr << "Tile's m_pUnit: " << m_pUnit << ", m_pAirUnit: " << m_pAirUnit
+		          << ", m_pGroundOverlay: " << m_pGroundOverlay << std::endl;
 	}
 }

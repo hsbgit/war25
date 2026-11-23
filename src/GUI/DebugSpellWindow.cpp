@@ -20,51 +20,14 @@
 #include "Magic/SpellExecutor.h"
 #include "EventHandling/EventBroker.h"
 #include "Resources/SoundManager.h"
+#include "DebugSpellRules.h"
 
 
 namespace gui {
     void DebugSpellWindow::onLeftClicked(const Point& tile_world) {
         assert(m_pMap);
-        // mana -= 200; 
-
-        // A bit hacked but I think it's okay for a debug spell window...
-        // Just do not change the button ordering ;-)
-        switch (m_selectedSpell) {
-        case 1:
-            g_pEventBroker.addEvent(Event(gSpellExecutor.getID(), BuffType::Slow, tile_world.x, tile_world.y));
-            break;
-
-        case 3:
-            g_pEventBroker.addEvent(Event(gSpellExecutor.getID(), BuffType::Invisibility, tile_world.x, tile_world.y));
-            break;
-
-        case 4:
-            g_pEventBroker.addEvent(Event(gSpellExecutor.getID(), MageActions::Polymorph, tile_world.x, tile_world.y));
-            break;
-
-        case 7:
-            g_pEventBroker.addEvent(Event(gSpellExecutor.getID(), BuffType::Haste, tile_world.x, tile_world.y));
-            break;
-
-        case 10:
-            g_pEventBroker.addEvent(Event(gSpellExecutor.getID(), BuffType::UnholyArmor, tile_world.x, tile_world.y));
-            break;
-
-        case 15:
-            g_pEventBroker.addEvent(Event(gSpellExecutor.getID(), PaladinActions::Heal, tile_world.x, tile_world.y));
-            break;
-
-        case 16:
-            g_pEventBroker.addEvent(Event(gSpellExecutor.getID(), BuffType::Bloodlust, tile_world.x, tile_world.y));
-            break;
-
-        case 17:
-            g_pEventBroker.addEvent(Event(gSpellExecutor.getID(), OgreActions::Runes, tile_world.x, tile_world.y));
-            break;
-
-        default:
-            break;
-        }
+		if (const auto spell = DebugSpellRules::spellForButton(m_selectedSpell))
+			gSpellExecutor.castDebugSpell(*spell, tile_world);
 
         m_selectedSpell = -1;
     }
@@ -111,19 +74,6 @@ namespace gui {
         vecSpellIcons.push_back(g_pRessourceManager->getIcon(PUD_ICON_BLOODLUST, c));
         vecSpellIcons.push_back(g_pRessourceManager->getIcon(PUD_ICON_RUNES, c));
 
-
-
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.204f, 0.443f, 0.651f, 1.0f));
-        char buf[32];
-#ifdef _WIN32        
-        sprintf_s(buf, "%i", mana);
-#else
-        snprintf(buf, sizeof(buf), "%i", mana);
-#endif
-        ImGui::ProgressBar((float)mana / (float)maxMana, ImVec2(0.0f, 0.0f), buf);
-        ImGui::PopStyleColor();
-
-
         for (int i = 0; i < vecSpellIcons.size(); ++i) {
             if (i % 3 != 0)
                 ImGui::SameLine();
@@ -152,11 +102,8 @@ namespace gui {
 
 
         ImGui::NewLine();
-        if (ImGui::Button("Reset Mana")) {
-            mana = maxMana;
-        }
-        ImGui::SameLine();
-        ImGui::Button("Close");
+		if (ImGui::Button("Close"))
+			m_visible = false;
         ImGui::End();
     }
 }

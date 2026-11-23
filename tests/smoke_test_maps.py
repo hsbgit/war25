@@ -68,6 +68,8 @@ def main() -> int:
                 check=False,
             )
             status, output = result.returncode, result.stdout
+            if status == 0 and "Unit not yet implemented:" in output:
+                status = 3
         except subprocess.TimeoutExpired as error:
             status = 124
             partial_output = error.stdout or ""

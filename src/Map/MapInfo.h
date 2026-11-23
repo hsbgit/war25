@@ -28,6 +28,11 @@
 // Owned by each player
 class MapInfo {
 public:
+	struct TimedReveal {
+		Point center{0, 0};
+		int radius = 0;
+		int remainingTicks = 0;
+	};
 	struct RememberedBuilding {
 		EventProcessorID id = 0;
 		Point topLeft{0, 0};
@@ -38,6 +43,7 @@ public:
     MapInfo(const Map& map);
 
     void updateMapVisibility(const std::vector<Object*>& vecObjects);
+	void revealArea(const Point& center, int radius, int durationMs);
 
     double exploredAreaInPercent() const {
 		std::size_t explored = 0;
@@ -61,4 +67,5 @@ private:
 	const Map& m_map;
 	std::map<EventProcessorID, RememberedBuilding> m_rememberedBuildings;
 	std::unordered_set<const Object*> m_detectedSubmergedUnits;
+	std::vector<TimedReveal> m_timedReveals;
 };

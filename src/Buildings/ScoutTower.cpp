@@ -102,7 +102,8 @@ void ScoutTower::process() {
 			if (m_tickCnt++ == m_AttackCooldownTime_ticks) {
 				ResourceManager_wartools::MissileType type = (m_upgradeLevel == UpgradeLevel::GuardTower) ? ResourceManager_wartools::MissileType::Arrow : ResourceManager_wartools::MissileType::Cannon;
 
-				getMap()->addMapObject(new Projectile(type, this, getMap(), m_pActiveTarget, { 16, 16 })); // 16,16 offset as we have a 2x2 building and want to start the arrow from center
+				getMap()->addMapObject(new Projectile(type, this, getMap(), m_pActiveTarget,
+					Point{16, 16})); // Start at the center of the 2x2 tower.
 				m_tickCnt = 0;
 			}
 		}

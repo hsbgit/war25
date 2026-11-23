@@ -39,6 +39,5 @@ namespace gui {
 		Map* m_pMap = nullptr;
 
 		int m_selectedSpell = -1;
-		int mana = 255, maxMana = 255;
 	};
 }

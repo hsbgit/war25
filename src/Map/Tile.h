@@ -70,7 +70,7 @@ public:
 
 
 	inline bool hasObject() const {
-		return (m_pUnit || m_pAirUnit) ? true : false;
+		return (m_pUnit || m_pAirUnit || m_pGroundOverlay) ? true : false;
 	}
 
 	bool isBlockedForUnit(const Object* pObj, Object** pBlockingObject = nullptr) const;
@@ -81,6 +81,10 @@ public:
 
 	inline Object* getAirUnit() const {
 		return m_pAirUnit;
+	}
+
+	inline Object* getGroundOverlay() const {
+		return m_pGroundOverlay;
 	}
 
 	inline const Sprite& getSprite() const {
@@ -140,6 +144,7 @@ private:
 
 	Object* m_pUnit = nullptr; // Can be LandUnit or SeaUnit
 	Object* m_pAirUnit = nullptr;
+	Object* m_pGroundOverlay = nullptr;
 
 	Point m_pos_tile;
 	Sprite* m_tileSprite = nullptr;

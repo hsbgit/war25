@@ -1,7 +1,10 @@
 # war25 Magic component library
 set(MAGIC_SOURCES
+	BombardmentEffect.cpp
+	BombardmentEffect.h
     Buff.cpp
     Buff.h
+	BuffRules.h
     IMagical.cpp
     IMagical.h
     Runes.cpp
@@ -9,6 +12,7 @@ set(MAGIC_SOURCES
     SpellExecutor.cpp
     SpellExecutor.h
 	SpellCosts.h
+	SpellRules.h
 	SpellEffect.cpp
 	SpellEffect.h
 )

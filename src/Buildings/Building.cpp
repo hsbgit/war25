@@ -111,6 +111,8 @@ void Building::process() {
 	if (m_pErecter) releaseErecter();
 
 	BuildingEventProcessor::doEventHandling();
+	if (m_ambientAnimation)
+		m_ambientAnimation->process();
 	updateFireAnimation();
 }
 

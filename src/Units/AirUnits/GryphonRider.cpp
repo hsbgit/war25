@@ -19,7 +19,7 @@
 #include "Resources/resourcemanager_wartools.h"
 
 
-GryphonRider::GryphonRider(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 100, 0, 6, 14), IArmed(0, 16, 4) {
+GryphonRider::GryphonRider(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 100, 5, 6, 14), IArmed(0, 16, 4) {
 	m_currentAnimation = g_pRessourceManager->getUnitIdleAnimation(this, Direction::N);
 	m_icon = g_pRessourceManager->getIcon(PUD_ICON_GRYPHON_RIDER, this->getFraction(), getOwner()->getColor());
 

@@ -28,7 +28,7 @@ std::unordered_map<ProductionItem::ItemType, ProductionItem> gMapProductionItems
 	{ProductionItem::ItemType::Ballista,  ProductionItem(ProductionItem::ItemType::Ballista, Resources(900,300), 250 * factor_s, UpgradeEffect(), PUD_ICON_BALLISTA, PUD_ICON_CATAPULT)},
 
 	// Misc
-	{ProductionItem::ItemType::Peasant,  ProductionItem(ProductionItem::ItemType::Peasant, Resources(400), 50 * factor_s, UpgradeEffect(), PUD_ICON_PEASANT, PUD_ICON_PEON)},
+	{ProductionItem::ItemType::Peasant,  ProductionItem(ProductionItem::ItemType::Peasant, Resources(400), 45 * factor_s, UpgradeEffect(), PUD_ICON_PEASANT, PUD_ICON_PEON)},
 	{ProductionItem::ItemType::Mage,  ProductionItem(ProductionItem::ItemType::Mage, Resources(1200), 120 * factor_s, UpgradeEffect(), PUD_ICON_MAGE, PUD_ICON_DEATH_KNIGHT)},
 	{ProductionItem::ItemType::Dwarfes,  ProductionItem(ProductionItem::ItemType::Dwarfes, Resources(750,250), 200 * factor_s, UpgradeEffect(), PUD_ICON_DWARVES, PUD_ICON_GOBLIN_SAPPER)},
 	{ProductionItem::ItemType::GnomishFlyingMaschine,  ProductionItem(ProductionItem::ItemType::GnomishFlyingMaschine, Resources(500,100), 65 * factor_s, UpgradeEffect(), PUD_ICON_GNOMISH_FLYING_MACHINE, PUD_ICON_GOBLIN_ZEPPLIN)},
@@ -64,8 +64,8 @@ std::unordered_map<ProductionItem::ItemType, ProductionItem> gMapProductionItems
 	{ProductionItem::ItemType::Church_Exorcism, ProductionItem(ProductionItem::ItemType::Church_Exorcism, Resources(2000), 200 * factor_s, UpgradeEffect(), PUD_ICON_EXORCISM)},
 	// Altar of Storms (Church)
 	{ProductionItem::ItemType::AltarOfStorms_OgreMage,  ProductionItem(ProductionItem::ItemType::AltarOfStorms_OgreMage, Resources(1000), 250 * factor_s, UpgradeEffect(), PUD_ICON_OGRE_MAGE)},
-	{ProductionItem::ItemType::AltarOfStorms_Bloodlust, ProductionItem(ProductionItem::ItemType::AltarOfStorms_Bloodlust, Resources(1000), 200 * factor_s, UpgradeEffect(), PUD_ICON_BLOODLUST)},
-	{ProductionItem::ItemType::AltarOfStorms_Runes,     ProductionItem(ProductionItem::ItemType::AltarOfStorms_Runes, Resources(1000), 150 * factor_s, UpgradeEffect(), PUD_ICON_RUNES)},
+	{ProductionItem::ItemType::AltarOfStorms_Bloodlust, ProductionItem(ProductionItem::ItemType::AltarOfStorms_Bloodlust, Resources(1000), 100 * factor_s, UpgradeEffect(), PUD_ICON_BLOODLUST)},
+	{ProductionItem::ItemType::AltarOfStorms_Runes,     ProductionItem(ProductionItem::ItemType::AltarOfStorms_Runes, Resources(2000), 250 * factor_s, UpgradeEffect(), PUD_ICON_RUNES)},
 
 
 	//ProductionItem(ItemType t = ItemType::Invalid, const Resources& costs = Resources(), int researchTime_ms = 0, const Foo& f = Foo(), Pud_Icon iconID_human = PUD_ICON_BURN, Pud_Icon iconID_orc = PUD_ICON_BURN)

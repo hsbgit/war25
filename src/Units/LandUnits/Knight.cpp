@@ -22,6 +22,7 @@
 #include "Magic/SpellCosts.h"
 #include "Resources/SoundManager.h"
 #include "Map/Map.h"
+#include "Units/CombatRules.h"
 
 
 Knight::Knight(Player* pOwner, Fraction fraction, Map* pMap, bool isUpgraded) : Unit(pOwner, fraction, pMap, 90, 4, 5, 13), IArmed(8, 4, 1) {
@@ -83,16 +84,32 @@ void Knight::process() {
 }
 
 void Knight::handleEvent(const Event& event) {
+	if (event == PaladinActions::HolyVision || event == PaladinActions::Heal ||
+		event == OgreActions::EyeOfKillrogg || event == BuffType::Bloodlust ||
+		event == OgreActions::Runes) {
+		gSpellExecutor.castSpell(this, event.getEventID(),
+			{event.tileX(), event.tileY()});
+		return;
+	}
 	if (event == PaladinActions::Excorcism) {
 		auto* target = dynamic_cast<Unit*>(getMap()->getObjectOnTile(
 			{event.tileX(), event.tileY()}));
 		if (!target || !target->isUnDead() || !target->isOrganic() ||
 			!target->isEnemy(this) || target->hasBuff(BuffType::UnholyArmor))
 			return;
+		if (!CombatRules::rectanglesWithinMapRange(
+			getTileTopLeft()->getX(), getTileTopLeft()->getY(),
+			getTileLowerRight()->getX(), getTileLowerRight()->getY(),
+			target->getTileTopLeft()->getX(), target->getTileTopLeft()->getY(),
+			target->getTileLowerRight()->getX(), target->getTileLowerRight()->getY(),
+			SpellCosts::range(static_cast<int>(PaladinActions::Excorcism))))
+			return;
 		const auto result = SpellCosts::exorcism(getMana(), target->getHealthPoints());
 		if (result.damage == 0 || !reduceMana(result.mana)) return;
 		removeBuff(BuffType::Invisibility);
 		target->takeDamage(AttackerStats(0, result.damage), true);
+		getMap()->addAnimation(target->getTile(), g_pRessourceManager->getSpellAnimation(
+			ResourceManager_wartools::SpellVisual::Exorcism).playOnce());
 		g_pSoundManager->playWAV("spells/exorcism.wav");
 		return;
 	}
@@ -122,13 +139,11 @@ std::vector<Action> Knight::getActions() const {
 	PlayerColor color = getOwner()->getColor();
 	TechnologyManager* pTC = getOwner()->getTechnologyCoordinator();
 
-	const EventProcessorID spellExecutor = gSpellExecutor.getID();
-
 	if (hasUpgrade(Upgrade::ItemType::Church_Paladin)) {
-		vecActions.push_back(Action(spellExecutor, (EventID)PaladinActions::HolyVision, g_pRessourceManager->getIcon(PUD_ICON_HOLY_VISION, color), Action::ActionType::WithWorldTile));
+		vecActions.push_back(Action(getID(), (EventID)PaladinActions::HolyVision, g_pRessourceManager->getIcon(PUD_ICON_HOLY_VISION, color), Action::ActionType::WithWorldTile));
 
 		if (pTC->isResearched(Upgrade::ItemType::Church_Healing))
-			vecActions.push_back(Action(spellExecutor, (EventID)PaladinActions::Heal, g_pRessourceManager->getIcon(PUD_ICON_HEALING, color), Action::ActionType::WithWorldTile));
+			vecActions.push_back(Action(getID(), (EventID)PaladinActions::Heal, g_pRessourceManager->getIcon(PUD_ICON_HEALING, color), Action::ActionType::WithWorldTile));
 
 		if (pTC->isResearched(Upgrade::ItemType::Church_Exorcism))
 			vecActions.push_back(Action(getID(), (EventID)PaladinActions::Excorcism, g_pRessourceManager->getIcon(PUD_ICON_EXORCISM, color), Action::ActionType::WithWorldTile));
@@ -136,13 +151,13 @@ std::vector<Action> Knight::getActions() const {
 
 
 	if (hasUpgrade(Upgrade::ItemType::AltarOfStorms_OgreMage)) {
-		vecActions.push_back(Action(spellExecutor, (EventID)OgreActions::EyeOfKillrogg, g_pRessourceManager->getIcon(PUD_ICON_EYE_OF_KILROGG, color)));
+		vecActions.push_back(Action(getID(), (EventID)OgreActions::EyeOfKillrogg, g_pRessourceManager->getIcon(PUD_ICON_EYE_OF_KILROGG, color)));
 
 		if (pTC->isResearched(Upgrade::ItemType::AltarOfStorms_Bloodlust))
-			vecActions.push_back(Action(spellExecutor, (EventID)BuffType::Bloodlust, g_pRessourceManager->getIcon(PUD_ICON_BLOODLUST, color), Action::ActionType::WithWorldTile));
+			vecActions.push_back(Action(getID(), (EventID)BuffType::Bloodlust, g_pRessourceManager->getIcon(PUD_ICON_BLOODLUST, color), Action::ActionType::WithWorldTile));
 
 		if (pTC->isResearched(Upgrade::ItemType::AltarOfStorms_Runes))
-			vecActions.push_back(Action(spellExecutor, (EventID)OgreActions::Runes, g_pRessourceManager->getIcon(PUD_ICON_RUNES, color), Action::ActionType::WithWorldTile));
+			vecActions.push_back(Action(getID(), (EventID)OgreActions::Runes, g_pRessourceManager->getIcon(PUD_ICON_RUNES, color), Action::ActionType::WithWorldTile));
 	}
 
 	return vecActions;

@@ -21,7 +21,7 @@
 
 
 // Hm... has no fraction, neither human nor orc
-Skeleton::Skeleton(Player* pOwner, Map* pMap) : Unit(pOwner, Fraction::Orc, pMap, 40, 0, 3, 8), IArmed(6, 3, 1) {
+Skeleton::Skeleton(Player* pOwner, Map* pMap) : Unit(pOwner, Fraction::Orc, pMap, 40, 0, 3, 8, false), IArmed(6, 3, 1) {
 	// neutral\units\skeleton\acknowledgement 1 wav
 	// oger punching?
 

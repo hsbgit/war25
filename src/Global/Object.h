@@ -116,6 +116,9 @@ public:
 	// Other ships remain restricted to open water.
 	virtual bool canDockOnCoast() const { return false; }
 
+	// Rendered and selectable, but not part of the land/sea occupancy layer.
+	virtual bool isWalkableGroundOverlay() const { return false; }
+
 	virtual bool isSelectable() const {
 		return !isDead();
 	}

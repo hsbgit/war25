@@ -18,6 +18,7 @@
 #include "Global/Object.h"
 #include "Resources/Animation.h"
 #include <cassert>
+#include <optional>
 
 class Peasant;
 
@@ -48,6 +49,8 @@ public:
 	}
 
 	inline const Sprite& sprite() const override {
+		if (m_ambientAnimation)
+			return m_ambientAnimation->getCurrentFrame();
 		assert(m_sprite.getTexture());
 		return m_sprite;
 	}
@@ -65,7 +68,12 @@ public:
 
 
 	inline void setSprite(const Sprite& sprite) {
+		m_ambientAnimation.reset();
 		m_sprite = sprite;
+	}
+
+	void setAmbientAnimation(const Animation& animation) {
+		m_ambientAnimation = animation;
 	}
 
 	const Sprite* fireSprite() const;
@@ -108,6 +116,7 @@ private:
 	enum class FireLevel { None, Small, Large };
 	FireLevel m_fireLevel = FireLevel::None;
 	Animation m_fireAnimation;
+	std::optional<Animation> m_ambientAnimation;
 	int m_constructionTotalTicks = -1;
 	int m_constructionElapsedTicks = 0;
 	bool m_constructionSpriteInitialized = false;

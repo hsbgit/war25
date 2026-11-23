@@ -32,6 +32,7 @@
 #include <typeinfo>
 #include <cstdint>
 #include <array>
+#include <unordered_map>
 
 #include "Tile.h"
 #include "Resources/resourcemanager_wartools.h"
@@ -131,6 +132,10 @@ public:
     }
     std::unordered_map<Tile*, std::deque<Animation>> m_mapAnimations;
 
+	void registerCorpse(Tile* tile);
+	bool isRaiseableCorpse(Tile* tile) const;
+	bool consumeRaiseableCorpse(Tile* tile);
+
 
     /*
      * Added objects which exist only for a pre defined lifespan and which are not controlled by any fraction.
@@ -179,6 +184,7 @@ public:
     std::map<PlayerColor, Player*> m_mapPlayer;
 
 private:
+	std::unordered_map<Tile*, int> m_corpseAgeMs;
     Texture* m_pTextureMiniMap = nullptr, * m_pTextureMiniMapWithOverlay = nullptr;
 
     void identifyNeighbourTiles();

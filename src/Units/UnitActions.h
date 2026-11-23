@@ -17,7 +17,7 @@
 #pragma once
 
 
-enum class GeneralActions { Move, Stop, Attack, Patrol, StandGround };
+enum class GeneralActions { Move, Stop, Attack, Patrol, StandGround, AttackGround };
 
 
 enum class PeasantActions {

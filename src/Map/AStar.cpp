@@ -22,9 +22,11 @@
 #include "Map/MovementRules.h"
 #include "Map/PathSearch.h"
 #include "Units/Unit.h"
+#include "Global/DebugManager.h"
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 std::unordered_set<INode*> g_debugSetOpenList;
 std::unordered_set<INode*> g_debugSetClosedList;
@@ -115,6 +117,11 @@ Path AStar::findPath() {
 	Path result;
 	if (!m_pStartNode || !m_pEndNode || m_pStartNode == m_pEndNode)
 		return result;
+	// A ship can never enter land/coast. Reject such clicks immediately instead
+	// of exhaustively searching the entire connected ocean first.
+	if (m_pMovingObject && m_pMovingObject->isSeaObject() &&
+		!canVisit(m_pEndNode, m_pEndNode))
+		return result;
 
 	auto neighbourValues = [this](INode* current) {
 		if (m_pMovingObject) {
@@ -126,14 +133,22 @@ Path AStar::findPath() {
 	};
 	auto runSearch = [this, &neighbourValues](bool allowTemporaryUnits,
 		bool returnClosestReachable) {
+		std::unordered_map<const INode*, std::optional<int>> occupancyCache;
+		auto cachedOccupancy = [this, allowTemporaryUnits, &occupancyCache](
+			const INode* node) -> std::optional<int> {
+			auto [it, inserted] = occupancyCache.try_emplace(node);
+			if (inserted)
+				it->second = occupancyCost(node, allowTemporaryUnits);
+			return it->second;
+		};
 		return PathSearch::find(m_pStartNode, m_pEndNode, neighbourValues,
-			[this, allowTemporaryUnits](INode* from, INode* to) {
+			[this, &cachedOccupancy](INode* from, INode* to) {
 				return canVisit(from, to) &&
-					occupancyCost(to, allowTemporaryUnits).has_value();
+					cachedOccupancy(to).has_value();
 			},
-			[this, allowTemporaryUnits](Direction direction, INode* node) {
+			[&cachedOccupancy](Direction direction, INode* node) {
 				return (isDiagonal(direction) ? 14 : 10) +
-					occupancyCost(node, allowTemporaryUnits).value_or(0);
+					cachedOccupancy(node).value_or(0);
 			},
 			[this](INode* node) { return heuristic(node); },
 			returnClosestReachable);
@@ -158,8 +173,13 @@ Path AStar::findPath() {
 	m_setOpenList = std::move(search.open);
 	m_setClosedList = std::move(search.closed);
 
-	g_debugSetClosedList = m_setClosedList;
-	g_debugSetOpenList = m_setOpenList;
-	g_debugPath = result;
+	// These copies can contain tens of thousands of nodes. Keep them only when
+	// the corresponding debug overlay is actually requested.
+	if (gDebugManager.m_astar_showClosedList)
+		g_debugSetClosedList = m_setClosedList;
+	if (gDebugManager.m_astar_showOpenList)
+		g_debugSetOpenList = m_setOpenList;
+	if (gDebugManager.m_astar_showPath)
+		g_debugPath = result;
 	return result;
 }

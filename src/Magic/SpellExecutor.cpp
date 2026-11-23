@@ -19,11 +19,17 @@
 #include "Map/Map.h"
 #include "Magic/Runes.h"
 #include "Magic/SpellEffect.h"
+#include "Magic/BombardmentEffect.h"
+#include "Magic/IMagical.h"
+#include "Magic/SpellCosts.h"
+#include "Magic/SpellRules.h"
 #include "Resources/SoundManager.h"
 #include "Units/Critter.h"
 #include "Units/LandUnits/Dwarfes/Dwarfes.h"
 #include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Skeleton.h"
+#include "Units/AirUnits/EyeOfKillrogg.h"
+#include "Units/CombatRules.h"
 #include "Units/Projectile.h"
 #include <iostream>
 #include <set>
@@ -66,33 +72,125 @@ void SpellExecutor::process() {
 
 
 void SpellExecutor::handleEvent(const Event& event) {
-	castSpell(nullptr, event.getEventID(), {event.tileX(), event.tileY()});
+	castDebugSpell(event.getEventID(), {event.tileX(), event.tileY()});
 }
 
-void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPos_world) {
+bool SpellExecutor::castSpell(Unit* caster, EventID spell, const Point& targetPos_world) {
+	return castSpellInternal(caster, spell, targetPos_world, false);
+}
+
+bool SpellExecutor::castDebugSpell(EventID spell, const Point& targetPos_world) {
+	if (!m_pMap) return false;
+	Unit* caster = nullptr;
+	for (Object* object : m_pMap->humanControlledPlayer()->getObjects()) {
+		auto* unit = dynamic_cast<Unit*>(object);
+		if (!unit || unit->isDead() || !unit->isPlacedOnMap()) continue;
+		if (!caster) caster = unit;
+		if (dynamic_cast<IMagical*>(unit)) {
+			caster = unit;
+			break;
+		}
+	}
+	if (!caster) {
+		if (Tile* target = m_pMap->getTile(targetPos_world))
+			caster = dynamic_cast<Unit*>(target->getAirUnit()
+				? target->getAirUnit() : target->getSeaOrLandUnit());
+	}
+	if (!caster) return false;
+	return castSpellInternal(caster, spell, targetPos_world, true);
+}
+
+bool SpellExecutor::castSpellInternal(Unit* caster, EventID spell,
+	const Point& targetPos_world, bool debugCast) {
     assert(m_pMap);
     std::cerr << "SpellExecutor called with event id " << std::dec << (int)spell << std::endl;
 
     Point m_targetPos_world = targetPos_world;
     Tile* pTargetTile = m_pMap->getTile(m_targetPos_world);
-	if (!pTargetTile) return;
+	if (!pTargetTile) return false;
 	auto unitOnTarget = [pTargetTile]() -> Unit* {
 		Object* object = pTargetTile->getAirUnit()
 			? pTargetTile->getAirUnit() : pTargetTile->getSeaOrLandUnit();
 		return dynamic_cast<Unit*>(object);
 	};
 
+	auto* mana = caster ? dynamic_cast<IMagical*>(caster) : nullptr;
+	const int fixedCost = SpellCosts::manaCost(static_cast<int>(spell));
+	if (caster && !debugCast) {
+		const bool variableCost = spell == static_cast<EventID>(PaladinActions::Heal);
+		if (!caster->isPlacedOnMap() || !mana ||
+			(!variableCost && (fixedCost < 0 || mana->getMana() < fixedCost))) return false;
+		const int range = SpellCosts::range(static_cast<int>(spell));
+		if (range >= 0) {
+			const Point topLeft = caster->getTileTopLeft()->getPos();
+			const Point lowerRight = caster->getTileLowerRight()->getPos();
+			if (!CombatRules::rectanglesWithinMapRange(
+				topLeft.x, topLeft.y, lowerRight.x, lowerRight.y,
+				targetPos_world.x, targetPos_world.y,
+				targetPos_world.x, targetPos_world.y, range)) return false;
+		}
+	}
+	bool applied = false;
+
     // Very good literature: http://classic.battle.net/war2/advanced/statistics.shtml 
 
 
     switch ((int)spell) {
+	case (int)PaladinActions::HolyVision:
+		if (!caster) return false;
+		caster->getOwner()->getMapInfo()->revealArea(targetPos_world, 4, 2000);
+		g_pSoundManager->playWAV("spells/holy_vision.wav");
+		m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+			ResourceManager_wartools::SpellVisual::Normal).playOnce());
+		applied = true;
+		break;
+
+	case (int)PaladinActions::Heal:
+	{
+		if (!caster || (!debugCast && !mana)) return false;
+		Unit* target = unitOnTarget();
+		if (!target || target->isDead() || !target->isOrganic() ||
+			target->isEnemy(caster)) return false;
+		const int missingHealth = target->getMaxHealthPoints() - target->getHealthPoints();
+		if (missingHealth <= 0) return false;
+		if (debugCast) {
+			target->increaseHealth(missingHealth);
+		} else {
+			const auto result = SpellCosts::healing(mana->getMana(), missingHealth);
+			if (result.health <= 0 || !mana->reduceMana(result.mana)) return false;
+			target->increaseHealth(result.health);
+		}
+		m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+			ResourceManager_wartools::SpellVisual::Healing).playOnce());
+		caster->removeBuff(BuffType::Invisibility);
+		g_pSoundManager->playWAV("spells/healing.wav");
+		return true;
+	}
+
+	case (int)OgreActions::EyeOfKillrogg:
+	{
+		if (!caster) return false;
+		Tile* spawnTile = m_pMap->getNextFreeTile(caster->getTile(), 2);
+		if (!spawnTile) return false;
+		auto* eye = new EyeOfKillrogg(caster->getOwner(), m_pMap);
+		m_pMap->placeUnit(spawnTile, eye);
+		g_pSoundManager->playWAV("spells/eye_of_kilrogg.wav");
+		m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+			ResourceManager_wartools::SpellVisual::Normal).playOnce());
+		applied = true;
+	}
+	break;
+
     case (int)BuffType::Bloodlust:
     {
         Unit* pUnit = unitOnTarget();
 
         if (pUnit && pUnit->isOrganic()) {
-            pUnit->addBuff(Buff(BuffType::Bloodlust));
+			pUnit->addBuff(Buff(BuffType::Bloodlust));
+			m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::Normal).playOnce());
             g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "bloodlust.wav");
+			applied = true;
         }
     }
     break;
@@ -106,8 +204,11 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
         Unit* pUnit = unitOnTarget();
 
         if (pUnit) {
-            pUnit->addBuff(Buff(BuffType::Slow));
+			pUnit->addBuff(Buff(BuffType::Slow));
+			m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::Normal).playOnce());
             g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "slow.wav");
+			applied = true;
         }
     }
     break;
@@ -117,8 +218,11 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
         Unit* pUnit = unitOnTarget();
 
         if (pUnit) {
-            pUnit->addBuff(Buff(BuffType::Haste));
+			pUnit->addBuff(Buff(BuffType::Haste));
+			m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::Normal).playOnce());
             g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "haste.wav");
+			applied = true;
         }
     }
     break;
@@ -137,13 +241,16 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
         if (pUnit) {
 
             if (typeid(*pUnit) == typeid(Dwarfes)) {
-                pUnit->die();
+				dynamic_cast<Dwarfes*>(pUnit)->detonateWithoutAreaDamage();
             }
             else {
                 pUnit->addBuff(Buff(BuffType::Invisibility));
             }
 
-            g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "invisibility.wav");
+			g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "invisibility.wav");
+			m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::Normal).playOnce());
+			applied = true;
         }
     }
     break;
@@ -159,6 +266,7 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
             if (typeid(*pUnit) == typeid(Mage) && pUnit->getFraction() == Fraction::Orc) {
                 pUnit->die();
                 g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "exorcism.wav");
+				applied = true;
             }
         }
     }
@@ -183,7 +291,10 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
                 pUnit->addBuff(Buff(BuffType::UnholyArmor));
             }
 
-            g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "unholy_armor.wav");
+			g_pSoundManager->playWAV(std::string("spells") + PATH_SEPARATOR + "unholy_armor.wav");
+			m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::Normal).playOnce());
+			applied = true;
         }
     }
     break;
@@ -199,6 +310,7 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
 
         if (r.vecRuneTiles.size()) {
             vecRunes.push_back(r);
+			applied = true;
         }
     }
     break;
@@ -210,12 +322,14 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
 		const int dx = (m_targetPos_world.x > origin.x) - (m_targetPos_world.x < origin.x);
 		const int dy = (m_targetPos_world.y > origin.y) - (m_targetPos_world.y < origin.y);
 		if (dx == 0 && dy == 0) break;
-		Point destination{origin.x + dx * 8, origin.y + dy * 8};
+		const int travelRange = SpellCosts::range(static_cast<int>(MageActions::Fireball));
+		Point destination{origin.x + dx * travelRange, origin.y + dy * travelRange};
 		destination.x = std::clamp(destination.x, 0, m_pMap->sideLength() - 1);
 		destination.y = std::clamp(destination.y, 0, m_pMap->sideLength() - 1);
 		m_pMap->addMapObject(new Projectile(
 			ResourceManager_wartools::MissileType::Fireball, caster, m_pMap,
-			destination, AttackerStats(0, 34), true));
+			destination, AttackerStats(0, SpellRules::FireballDamage), true));
+		applied = true;
 	}
 	break;
 
@@ -223,72 +337,96 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
 	{
 		Unit* target = unitOnTarget();
 		if (target && !target->isAirObject()) {
-			m_pMap->addMapObject(new SpellEffect(caster, m_pMap, target->getTileLocation(),
-				g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::FlameShield),
-				12000, 8, 1, SpellEffect::Motion::FollowTarget, target));
+			const Animation flames = g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::FlameShield);
+			for (int flame = 0; flame < SpellRules::FlameShieldFlames; ++flame) {
+				m_pMap->addMapObject(new SpellEffect(caster, m_pMap, target->getTileLocation(),
+					flames.singleFrame(static_cast<std::size_t>(flame) % flames.frameCount()),
+					SpellRules::FlameShieldDurationMs,
+					flame == 0 ? SpellRules::FlameShieldDamagePerPulse : 0,
+					1, SpellEffect::Motion::OrbitTarget, target, false, 1000, flame));
+			}
 			g_pSoundManager->playWAV("spells/flame_shield.wav");
+			applied = true;
 		}
 	}
 	break;
 
 	case (int)MageActions::Blizzard:
-		m_pMap->addMapObject(new SpellEffect(caster, m_pMap, m_targetPos_world,
-			g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::Blizzard),
-			10000, 7, 2, SpellEffect::Motion::Fixed, nullptr, true));
+		for (int cycle = 0; cycle < SpellRules::blizzardCycles(debugCast); ++cycle)
+		for (int shard = 0; shard < SpellRules::BombardmentShards; ++shard) {
+			const auto impact = SpellRules::bombardmentTile(
+				m_targetPos_world, shard, m_pMap->sideLength());
+			m_pMap->addMapObject(new BombardmentEffect(caster, m_pMap,
+				{impact.x, impact.y},
+				g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::Blizzard),
+				SpellRules::bombardmentDamage(shard, m_targetPos_world),
+				cycle * SpellRules::BlizzardCycleDelayMs +
+					shard * SpellRules::BombardmentShardDelayMs,
+				SpellRules::BlizzardFallDurationMs,
+				SpellRules::BlizzardFallHeightTiles));
+		}
 		g_pSoundManager->playWAV("spells/blizzard.wav");
+		applied = true;
 		break;
 
 	case (int)DeathKnightActions::DeathCoil:
 	{
-		std::vector<Unit*> victims;
-		for (const auto& [color, player] : m_pMap->m_mapPlayer) {
-			(void)color;
-			for (Object* object : player->getObjects()) {
-				auto* unit = dynamic_cast<Unit*>(object);
-				if (!unit || unit->isDead() || !unit->isPlacedOnMap() || !unit->isOrganic()) continue;
-				if (caster && !unit->isEnemy(caster)) continue;
-				const Point position = unit->getTileLocation();
-				if (std::max(std::abs(position.x - m_targetPos_world.x),
-					std::abs(position.y - m_targetPos_world.y)) <= 1)
-					victims.push_back(unit);
-			}
-		}
-		const int damage = victims.empty() ? 0 : 50 / static_cast<int>(victims.size());
-		int drained = 0;
-		for (Unit* victim : victims) {
-			const int healthBefore = victim->getHealthPoints();
-			victim->takeDamage(AttackerStats(0, damage), true);
-			drained += healthBefore - victim->getHealthPoints();
-		}
-		if (caster && drained > 0 && !caster->isDead()) caster->increaseHealth(drained);
+		Unit* victim = unitOnTarget();
+		if (!caster || !victim || victim->isDead() || !victim->isOrganic() ||
+			!victim->isEnemy(caster)) break;
+		m_pMap->addMapObject(new Projectile(
+			ResourceManager_wartools::MissileType::TouchOfDeath, caster, m_pMap,
+			victim, AttackerStats(0, 50)));
 		g_pSoundManager->playWAV("spells/death_coil.wav");
+		applied = true;
 	}
 	break;
 
 	case (int)DeathKnightActions::Whirlwind:
 		m_pMap->addMapObject(new SpellEffect(caster, m_pMap, m_targetPos_world,
 			g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::Whirlwind),
-			20000, 5, 0, SpellEffect::Motion::Whirlwind));
+			SpellRules::WhirlwindDurationMs, SpellRules::WhirlwindDamagePerPulse, 0,
+			SpellEffect::Motion::Whirlwind, nullptr, false,
+			SpellRules::WhirlwindDamageIntervalMs, 0,
+			SpellRules::WhirlwindSoundIntervalMs, "spells/whirlwind.wav"));
 		g_pSoundManager->playWAV("spells/whirlwind.wav");
+		applied = true;
 		break;
 
 	case (int)DeathKnightActions::RaiseTheDead:
 	{
-		Object* corpse = pTargetTile->getSeaOrLandUnit();
-		if (caster && corpse && corpse->isDead() && corpse->isLandObject()) {
-			m_pMap->releaseObjectFromTile(corpse);
-			auto* skeleton = new Skeleton(caster->getOwner(), m_pMap);
-			m_pMap->placeUnit(pTargetTile, skeleton);
+		Tile* secondTile = nullptr;
+		for (Tile* candidate : m_pMap->getNeighbourTiles(pTargetTile, 2)) {
+			if (m_pMap->isSpaceAvailableForUnit(candidate->getY(), candidate->getX(),
+				1, Object::Type::Land)) {
+				secondTile = candidate;
+				break;
+			}
+		}
+		if (caster && !pTargetTile->getSeaOrLandUnit() && secondTile &&
+			m_pMap->consumeRaiseableCorpse(pTargetTile)) {
+			m_pMap->placeUnit(pTargetTile, new Skeleton(caster->getOwner(), m_pMap));
+			m_pMap->placeUnit(secondTile, new Skeleton(caster->getOwner(), m_pMap));
 			g_pSoundManager->playWAV("spells/touch_of_darkness.wav");
+			applied = true;
 		}
 	}
 	break;
 
 	case (int)DeathKnightActions::DeathAndDecay:
-		m_pMap->addMapObject(new SpellEffect(caster, m_pMap, m_targetPos_world,
-			g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::DeathAndDecay),
-			10000, 7, 2, SpellEffect::Motion::Fixed, nullptr, true));
+		for (int shard = 0; shard < SpellRules::BombardmentShards; ++shard) {
+			const auto impact = SpellRules::decayTile(
+				m_targetPos_world, shard, m_pMap->sideLength());
+			m_pMap->addMapObject(new BombardmentEffect(caster, m_pMap,
+				{impact.x, impact.y},
+				g_pRessourceManager->getSpellAnimation(ResourceManager_wartools::SpellVisual::DeathAndDecay),
+				SpellRules::bombardmentDamage(shard, m_targetPos_world),
+				SpellRules::decayDelayMs(shard),
+				900, 0));
+		}
 		g_pSoundManager->playWAV("spells/death_and_decay.wav");
+		applied = true;
 		break;
 
     case (int)MageActions::Polymorph:
@@ -305,13 +443,22 @@ void SpellExecutor::castSpell(Mage* caster, EventID spell, const Point& targetPo
             Critter* critter = new Critter(m_pMap->getNeutralPlayer(), m_pMap);
             m_pMap->placeUnit(pTargetTile, critter);
             g_pSoundManager->playWAV("spells/polymorph.wav");
+			m_pMap->addAnimation(pTargetTile, g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::Normal).playOnce());
+			applied = true;
         }
     }
     break;
 
     default:
-        assert(0);
+		return false;
     }
+	if (!applied) return false;
+	if (caster && !debugCast) {
+		if (!mana->reduceMana(fixedCost)) return false;
+		caster->removeBuff(BuffType::Invisibility);
+	}
+	return true;
 }
 
 

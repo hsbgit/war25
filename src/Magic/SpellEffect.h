@@ -8,12 +8,14 @@ class Unit;
 
 class SpellEffect final : public MapObject {
 public:
-	enum class Motion { Fixed, FollowTarget, Whirlwind };
+	enum class Motion { Fixed, FollowTarget, OrbitTarget, Whirlwind };
 
 	SpellEffect(Object* caster, Map* map, const Point& centerTile,
 		const Animation& animation, int durationMs, int damagePerPulse,
 		int radiusTiles, Motion motion = Motion::Fixed, Unit* target = nullptr,
-		bool casterImmune = false);
+		bool casterImmune = false, int pulseIntervalMs = 1000,
+		int orbitPhase = 0, int periodicSoundIntervalMs = 0,
+		const char* periodicSound = nullptr);
 
 	void process() override;
 	bool isExpired() const override { return m_remainingTicks <= 0; }
@@ -28,6 +30,7 @@ private:
 	Unit* m_target;
 	Animation m_animation;
 	Point m_centerTile;
+	Point m_originTile;
 	Point m_positionWorldPx;
 	Motion m_motion;
 	int m_remainingTicks;
@@ -36,5 +39,8 @@ private:
 	int m_damagePerPulse;
 	int m_radiusTiles;
 	bool m_casterImmune;
-	int m_motionStep = 0;
+	int m_elapsedTicks = 0;
+	int m_orbitPhase = 0;
+	int m_periodicSoundTicks = 0;
+	const char* m_periodicSound = nullptr;
 };

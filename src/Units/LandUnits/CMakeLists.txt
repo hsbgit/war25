@@ -6,7 +6,9 @@ set(LAND_UNITS_SOURCES
     Archer.cpp
     Archer.h
     Ballista.cpp
-    Ballista.h
+	Ballista.h
+	Daemon.cpp
+	Daemon.h
     Footman.cpp
     Footman.h
     Knight.cpp
@@ -19,5 +21,4 @@ set(LAND_UNITS_SOURCES
 
 add_library(war25_units_land OBJECT ${LAND_UNITS_SOURCES})
 target_link_libraries(war25_units_land PUBLIC war25_common)
-
 

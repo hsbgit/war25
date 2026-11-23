@@ -21,6 +21,9 @@
 #include "Map/Map.h"
 #include "Player.h"
 #include "Units/Unit.h"
+#include "Units/LandUnits/Archer.h"
+#include "Units/LandUnits/Mage.h"
+#include "Units/ProjectileRules.h"
 
 #include <algorithm>
 #include <cmath>
@@ -56,6 +59,15 @@ Projectile::Projectile(ResourceManager_wartools::MissileType type, Object* pSour
 	initializeMissile(pSource, targetTile);
 }
 
+Projectile::Projectile(ResourceManager_wartools::MissileType type, Object* pSource,
+	Map* pMap, Object* pTarget, const AttackerStats& damage)
+	: MapObject(pSource), m_type(type),
+	  m_sprite(g_pRessourceManager->getMissile(type)), m_attackerStats(damage),
+	  m_pMap(pMap), m_pAttackerOwner(pSource->getOwner()),
+	  m_exactDamage(true), m_expired(false) {
+	initializeMissile(pSource, pTarget);
+}
+
 
 void Projectile::process() {
 	if (m_expired) return;
@@ -68,7 +80,7 @@ void Projectile::process() {
 
 
 void Projectile::initializeMissile(Object* pSource, Object* pTarget) {
-	playLaunchSound();
+	playLaunchSound(pSource);
 
 	m_attackedID = dynamic_cast<EventProcessor*>(pTarget)->getID();
 	m_attackerID = dynamic_cast<EventProcessor*>(pSource)->getID();
@@ -91,8 +103,14 @@ void Projectile::initializeMissile(Object* pSource, Object* pTarget) {
 	initializeTrajectory(pSource, targetCenter);
 }
 
-void Projectile::playLaunchSound() {
-	if (m_type == ResourceManager_wartools::MissileType::Arrow) {
+void Projectile::playLaunchSound(Object* source) {
+	if (auto* archer = dynamic_cast<Archer*>(source)) {
+		g_pSoundManager->playWAV(this, archer->getFraction() == Fraction::Orc
+			? "missiles/axe_throw.wav" : "missiles/bow_throw.wav");
+	} else if (auto* mage = dynamic_cast<Mage*>(source)) {
+		g_pSoundManager->playWAV(this, mage->getFraction() == Fraction::Alliance
+			? "missiles/fireball_hit.wav" : "spells/touch_of_darkness.wav");
+	} else if (m_type == ResourceManager_wartools::MissileType::Arrow) {
 		g_pSoundManager->playWAV(this, "missiles/bow_throw.wav");
 	} else if (m_type == ResourceManager_wartools::MissileType::GryphonHammer ||
 		m_type == ResourceManager_wartools::MissileType::Fireball ||
@@ -102,15 +120,18 @@ void Projectile::playLaunchSound() {
 		g_pSoundManager->playWAV(this, "missiles/axe_throw.wav");
 	} else if (m_type == ResourceManager_wartools::MissileType::TouchOfDeath) {
 		g_pSoundManager->playWAV(this, "spells/touch_of_darkness.wav");
-	} else if (m_type == ResourceManager_wartools::MissileType::NormalSpell) {
+	} else if (m_type == ResourceManager_wartools::MissileType::Lightning ||
+		m_type == ResourceManager_wartools::MissileType::NormalSpell) {
 		g_pSoundManager->playWAV(this, "spells/lightning.wav");
+	} else if (m_type == ResourceManager_wartools::MissileType::DaemonFire) {
+		g_pSoundManager->playWAV(this, "missiles/fireball_throw.wav");
 	} else {
 		g_pSoundManager->playWAV(this, "missiles/catapult-ballista_attack.wav");
 	}
 }
 
 void Projectile::initializeMissile(Object* pSource, const Point& targetTile) {
-	playLaunchSound();
+	playLaunchSound(pSource);
 	if (!pSource->isPlacedOnMap()) {
 		m_expired = true;
 		return;
@@ -157,10 +178,11 @@ void Projectile::updatePosition() {
 		(m_targetPosition.x - m_startPosition.x) * m_elapsedTravelTicks / m_totalTravelTicks;
 	m_originPosition.y = m_startPosition.y +
 		(m_targetPosition.y - m_startPosition.y) * m_elapsedTravelTicks / m_totalTravelTicks;
-	if (m_type == ResourceManager_wartools::MissileType::BigCannon) {
-		const int stage = std::min(3, 4 * m_elapsedTravelTicks / m_totalTravelTicks);
-		m_sprite = g_pRessourceManager->getMissile(m_type, m_travelDirection, stage);
-	}
+	const int stages = g_pRessourceManager->missileAnimationStages(m_type);
+	const int stage = ProjectileRules::animationStage(m_elapsedTravelTicks,
+		m_totalTravelTicks, stages,
+		m_type == ResourceManager_wartools::MissileType::BigCannon);
+	m_sprite = g_pRessourceManager->getMissile(m_type, m_travelDirection, stage);
 }
 
 
@@ -183,10 +205,27 @@ void Projectile::handleCollision() {
 	// Rare case: Peasant my enter a mine while the arrow is under way. Thus, we have to check whether the object is currently placed on the map
 	if (pObj && pObj->isPlacedOnMap()) {
 		pObj->onAttackedBy(dynamic_cast<Object*>(g_pEventBroker.getEventHandler(m_attackerID)));
-		pObj->takeDamage(m_attackerStats);
+		const int healthBefore = pObj->getHealthPoints();
+		pObj->takeDamage(m_attackerStats, m_exactDamage);
+		if (m_type == ResourceManager_wartools::MissileType::TouchOfDeath) {
+			auto* attacker = dynamic_cast<Unit*>(g_pEventBroker.getEventHandler(m_attackerID));
+			if (attacker && !attacker->isDead())
+				attacker->increaseHealth(healthBefore - pObj->getHealthPoints());
+		}
 	}
-	if (m_type == ResourceManager_wartools::MissileType::CatapultRock)
-		handleCatapultSplash(pObj);
+	if (splashProfile().enabled())
+		handleSplash(pObj);
+	if (m_pMap && (m_type == ResourceManager_wartools::MissileType::BallistaBolt ||
+		m_type == ResourceManager_wartools::MissileType::CatapultRock)) {
+		m_pMap->addAnimation(m_pMap->getTile(m_impactTile),
+			g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::SiegeImpact).playOnce());
+	} else if (m_pMap && (m_type == ResourceManager_wartools::MissileType::BigCannon ||
+		m_type == ResourceManager_wartools::MissileType::Cannon)) {
+		m_pMap->addAnimation(m_pMap->getTile(m_impactTile),
+			g_pRessourceManager->getSpellAnimation(
+				ResourceManager_wartools::SpellVisual::CannonImpact).playOnce());
+	}
 	
 	// Additional logic for collision
 }
@@ -236,12 +275,27 @@ void Projectile::damageAreaAt(const Point& centerTile) {
 }
 
 
-void Projectile::handleCatapultSplash(Object* primaryTarget) {
+ProjectileRules::SplashProfile Projectile::splashProfile() const {
+	switch (m_type) {
+	case ResourceManager_wartools::MissileType::BallistaBolt:
+	case ResourceManager_wartools::MissileType::CatapultRock:
+	case ResourceManager_wartools::MissileType::BigCannon:
+		return ProjectileRules::SiegeSplash;
+	case ResourceManager_wartools::MissileType::Cannon:
+		return ProjectileRules::SmallCannonSplash;
+	default:
+		return {};
+	}
+}
+
+void Projectile::handleSplash(Object* primaryTarget) {
 	if (!m_pMap || !m_pAttackerOwner)
 		return;
+	const auto profile = splashProfile();
 	AttackerStats splash(
-		std::max(1, m_attackerStats.getBasicDamage() / 2),
-		m_attackerStats.getPiercingDamage() / 2);
+		m_attackerStats.getBasicDamage() == 0 ? 0 :
+			std::max(1, m_attackerStats.getBasicDamage() / profile.damageDivisor),
+		m_attackerStats.getPiercingDamage() / profile.damageDivisor);
 	for (const auto& [color, player] : m_pMap->m_mapPlayer) {
 		if (!player || player == m_pAttackerOwner || player->isNeutral())
 			continue;
@@ -250,8 +304,8 @@ void Projectile::handleCatapultSplash(Object* primaryTarget) {
 				continue;
 			bool inSplashRadius = false;
 			for (Tile* tile : object->getOccupiedTiles()) {
-				if (std::abs(tile->getX() - m_impactTile.x) <= 1 &&
-					std::abs(tile->getY() - m_impactTile.y) <= 1) {
+				if (std::abs(tile->getX() - m_impactTile.x) <= profile.radiusTiles &&
+					std::abs(tile->getY() - m_impactTile.y) <= profile.radiusTiles) {
 					inSplashRadius = true;
 					break;
 				}
@@ -277,9 +331,11 @@ void Projectile::playCollisionSound() {
 		break;
 	case ResourceManager_wartools::MissileType::Fireball:
 	case ResourceManager_wartools::MissileType::DragonBreath:
+	case ResourceManager_wartools::MissileType::DaemonFire:
 		g_pSoundManager->playWAV(this, "missiles/fireball_hit.wav");
 		break;
 	case ResourceManager_wartools::MissileType::NormalSpell:
+	case ResourceManager_wartools::MissileType::Lightning:
 	case ResourceManager_wartools::MissileType::TouchOfDeath:
 		g_pSoundManager->playWAV(this, "missiles/punch.wav");
 		break;
