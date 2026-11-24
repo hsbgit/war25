@@ -3,6 +3,7 @@
 #include "EventHandling/EventBroker.h"
 #include "EventHandling/EventProcessor.h"
 #include "Global/PseudoRandom.h"
+#include "Network/CommandTransport.h"
 
 #include <vector>
 
@@ -14,6 +15,24 @@ public:
     }
 
     std::vector<EventID> received;
+};
+
+class RecordingTransport final : public Network::ICommandTransport {
+public:
+	std::uint16_t localParticipant() const noexcept override { return 7; }
+	std::set<std::uint16_t> participants() const override { return {7}; }
+	void submitFrame(std::uint64_t tick, const std::vector<Event>& events) override {
+		submitted.push_back({7, tick, events});
+	}
+	std::vector<Network::CommandFrame> pollFrames() override {
+		std::vector<Network::CommandFrame> result;
+		result.swap(incoming);
+		return result;
+	}
+	void resetGame() override { incoming.clear(); submitted.clear(); }
+
+	std::vector<Network::CommandFrame> submitted;
+	std::vector<Network::CommandFrame> incoming;
 };
 }
 
@@ -61,4 +80,21 @@ TEST(Lockstep, CosmeticRandomnessDoesNotAffectSimulationStream) {
     EXPECT_EQ(PseudoRandom::rnd(0, 100000), first);
     (void)PseudoRandom::cosmeticRnd(0, 100000);
     EXPECT_EQ(PseudoRandom::rnd(0, 100000), second);
+}
+
+TEST(Lockstep, NetworkTransportMustEchoLocalFrameBeforeItExecutes) {
+	g_pEventBroker.reset();
+	RecordingProcessor processor;
+	RecordingTransport transport;
+	g_pEventBroker.attachCommandTransport(&transport);
+	g_pEventBroker.addEvent(Event(processor.getID(), EventID{31}, 4, 5));
+	g_pEventBroker.completeLocalFrame();
+	ASSERT_EQ(transport.submitted.size(), 1u);
+	EXPECT_TRUE(processor.received.empty());
+	EXPECT_FALSE(g_pEventBroker.advanceTick());
+
+	transport.incoming.push_back(transport.submitted.front());
+	ASSERT_TRUE(g_pEventBroker.advanceTick());
+	EXPECT_EQ(processor.received, (std::vector<EventID>{31}));
+	g_pEventBroker.reset();
 }

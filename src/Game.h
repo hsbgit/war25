@@ -35,6 +35,8 @@ namespace gui {
     class MiniMap;
 }
 
+namespace Network { class ICommandTransport; }
+
 
 class Game {
     std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
@@ -46,7 +48,8 @@ class Game {
     unsigned long cnt = 0;
 
 public:
-    explicit Game(SDL_Window* window, const std::string& strPathToPUDFile);
+    explicit Game(SDL_Window* window, const std::string& strPathToPUDFile,
+		Network::ICommandTransport* commandTransport = nullptr);
     ~Game();
 
     // Prevent copying

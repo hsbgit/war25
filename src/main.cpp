@@ -21,6 +21,7 @@ int windowWidth = War25::Constants::DEFAULT_WINDOW_WIDTH;
 int windowHeight = War25::Constants::DEFAULT_WINDOW_HEIGHT;
 
 #include <iostream>
+#include <memory>
 #include <SDL.h>
 #include <SDL_image.h>
 
@@ -50,6 +51,7 @@ int windowHeight = War25::Constants::DEFAULT_WINDOW_HEIGHT;
 #include "Renderer.h"
 #include "Resources/SoundManager.h"
 #include "Global/GlobalAttributes.h"
+#include "Network/LocalNetworkSession.h"
 
 // ----------------------------------------------------------------------------------------------------
 bool buildMode = false;
@@ -103,6 +105,20 @@ int main(int argc, char** argv)
             }
         }
     }
+
+	std::unique_ptr<Network::LocalNetworkSession> networkSession;
+	try {
+		// Normal games use a stable public port. Parallel map smoke tests use an
+		// ephemeral port so independent test processes cannot collide.
+		networkSession = std::make_unique<Network::LocalNetworkSession>(
+			smokeTestMap ? 0 : 24825);
+		std::cout << "Lockstep server listening on TCP port "
+			<< networkSession->port() << "; local human player connected" << std::endl;
+	} catch (const std::exception& error) {
+		std::cerr << "Could not start lockstep network session: "
+			<< error.what() << std::endl;
+		return 3;
+	}
 
     // Joystick, haptic and sensor subsystems are not used and may require
     // unavailable udev permissions in containers. Initialize only what the
@@ -198,7 +214,7 @@ int main(int argc, char** argv)
 
     while (strPathToPudFile.size()) {
         try {
-            Game game(window, strPathToPudFile);
+            Game game(window, strPathToPudFile, networkSession.get());
 
         // Exercise the same lifecycle as the browser: first unload a running
         // default map, then load the requested map in the same process.

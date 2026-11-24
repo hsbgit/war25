@@ -37,6 +37,7 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/EventHandling/EventProcessor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/Global/PseudoRandom.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/../src/Magic/IMagical.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/../src/Network/LocalNetworkSession.cpp
 )
 
 # Include directories for war25 source code
@@ -69,6 +70,10 @@ target_link_libraries(
 
 # Set C++20 standard for tests
 target_compile_features(war25_tests PRIVATE cxx_std_20)
+
+if(WIN32)
+    target_link_libraries(war25_tests PRIVATE ws2_32)
+endif()
 
 # Add tests to CTest
 include(GoogleTest)

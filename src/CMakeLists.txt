@@ -42,6 +42,7 @@ if(WIN32)
         "${WAR25_WAR2TOOLS_ROOT}/lib/libpud.lib"
         "${WAR25_WAR2TOOLS_ROOT}/lib/libwar2.lib"
         Winmm.lib
+		ws2_32.lib
     )
 
 else()
@@ -111,6 +112,7 @@ add_subdirectory(Global)
 add_subdirectory(GUI)
 add_subdirectory(Magic)
 add_subdirectory(Map)
+add_subdirectory(Network)
 add_subdirectory(Units)
 add_subdirectory(Resources)
 
@@ -134,6 +136,7 @@ add_executable(${PROJECT_NAME}
     $<TARGET_OBJECTS:war25_gui>
     $<TARGET_OBJECTS:war25_magic>
     $<TARGET_OBJECTS:war25_map>
+	$<TARGET_OBJECTS:war25_network>
     $<TARGET_OBJECTS:war25_units>
     $<TARGET_OBJECTS:war25_units_air>
     $<TARGET_OBJECTS:war25_units_land>

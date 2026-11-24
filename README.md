@@ -41,6 +41,16 @@ C++ is the programming language I started learning programming with. I wanted to
 
 The current game is designed using the RTS lockstep approach. This means, all relevant actions such as unit production or movements result in events that are executed at the beginning of a new gameframe (=tick). This is especially important when considering so far missing multiplayer code. The current code is far from perfect, but I think it allows you to contribute. You contribution is highly welcomed!
 
+## Lockstep networking
+
+At startup War25 opens an authoritative TCP relay on port `24825` and connects
+the current human player to it automatically. Local commands are serialized in
+network byte order and only enter the simulation after the server has echoed
+the complete command frame. This keeps the existing single-player behavior
+while exercising the same transport boundary needed by additional human
+participants. The implementation uses BSD sockets on Unix-like systems and
+Winsock on Windows; Boost or another networking dependency is not required.
+
 [See Section *How to build*](#how-to-build)
 
 ## What is the current state of development of war2.5?

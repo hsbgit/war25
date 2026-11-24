@@ -60,6 +60,10 @@ public:
 		return m_tileY;
 	}
 
+	inline std::uint16_t optionalData() const {
+		return m_optionalData;
+	}
+
 
 	inline bool operator ==(const Event& e) const {
 		return m_eventID == e.m_eventID;

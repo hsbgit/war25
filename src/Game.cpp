@@ -65,9 +65,13 @@ gui::DebugSpellWindow gSpellWindow;
 
 
 
-Game::Game(SDL_Window* window, const std::string& strPathToPUDFile) : m_window(window), wDisplaySettings(window), m_infoWindow(m_selectedObjects) {
+Game::Game(SDL_Window* window, const std::string& strPathToPUDFile,
+	Network::ICommandTransport* commandTransport)
+	: m_window(window), wDisplaySettings(window), m_infoWindow(m_selectedObjects) {
 	// A new map is a new deterministic lockstep session.
 	g_pEventBroker.reset();
+	if (commandTransport)
+		g_pEventBroker.attachCommandTransport(commandTransport);
 	PseudoRandom::seed(0x57415232u);
     SDL_GetWindowSize(m_window, &m_windowWidth, &m_windowHeight);
     g_pRessourceManager->setCursor(CursorTypes::HumanGauntlet);

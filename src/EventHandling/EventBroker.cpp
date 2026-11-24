@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <stdexcept>
 
 EventBroker g_pEventBroker;
 
@@ -45,12 +46,23 @@ void EventBroker::deregisterEventHandler(EventProcessor* pEP) {
 
 
 void EventBroker::addEvent(const Event& event) {
-	addEvent(m_localParticipant, commandTick(), event);
+	if (m_transport) {
+		const Tick tick = commandTick();
+		assert(!m_submittedLocalFrames.contains(tick));
+		assert(m_mapEventProcessorIDsToObjectAddresses.contains(event.eventProcessorID()));
+		m_pendingLocalCommands[tick].push_back(event);
+	} else {
+		addEvent(m_localParticipant, commandTick(), event);
+	}
 }
 
 EventBroker::Tick EventBroker::commandTick() const noexcept {
 	Tick tick = nextTick();
 	while (true) {
+		if (m_transport && m_submittedLocalFrames.contains(tick)) {
+			++tick;
+			continue;
+		}
 		auto frame = m_frames.find(tick);
 		if (frame == m_frames.end() ||
 			!frame->second.completedParticipants.contains(m_localParticipant)) {
@@ -70,7 +82,7 @@ void EventBroker::addEvent(ParticipantID participant, Tick tick, const Event& ev
 }
 
 void EventBroker::dispatchEvents() {
-	completeFrame(m_localParticipant, nextTick());
+	completeLocalFrame();
 	(void)advanceTick();
 }
 
@@ -81,7 +93,21 @@ void EventBroker::completeFrame(ParticipantID participant, Tick tick) {
 }
 
 void EventBroker::completeLocalFrame() {
-	completeFrame(m_localParticipant, nextTick());
+	if (!m_transport) {
+		completeFrame(m_localParticipant, nextTick());
+		return;
+	}
+	pumpTransport();
+	const Tick tick = nextTick();
+	if (m_submittedLocalFrames.contains(tick)) return;
+	auto pending = m_pendingLocalCommands.find(tick);
+	const std::vector<Event> empty;
+	m_transport->submitFrame(tick,
+		pending == m_pendingLocalCommands.end() ? empty : pending->second);
+	if (pending != m_pendingLocalCommands.end())
+		m_pendingLocalCommands.erase(pending);
+	m_submittedLocalFrames.insert(tick);
+	pumpTransport();
 }
 
 bool EventBroker::canAdvance() const {
@@ -92,6 +118,7 @@ bool EventBroker::canAdvance() const {
 }
 
 bool EventBroker::advanceTick() {
+	pumpTransport();
 	if (!canAdvance()) return false;
 	dispatchFrame(nextTick());
 	++m_currentTick;
@@ -114,6 +141,7 @@ void EventBroker::dispatchFrame(Tick tick) {
 	}
 	m_frames.erase(frameIt);
 	m_lockedEventProcessors.erase(tick);
+	m_submittedLocalFrames.erase(tick);
 }
 
 void EventBroker::configureParticipants(const std::set<ParticipantID>& participants,
@@ -125,12 +153,42 @@ void EventBroker::configureParticipants(const std::set<ParticipantID>& participa
 	m_localParticipant = localParticipant;
 }
 
+void EventBroker::attachCommandTransport(Network::ICommandTransport* transport) {
+	assert(transport);
+	assert(m_frames.empty());
+	assert(m_currentTick == 0);
+	m_transport = transport;
+	m_transport->resetGame();
+	configureParticipants(m_transport->participants(),
+		m_transport->localParticipant());
+}
+
+void EventBroker::pumpTransport() {
+	if (!m_transport) return;
+	for (Network::CommandFrame& incoming : m_transport->pollFrames()) {
+		if (incoming.tick <= m_currentTick ||
+			!m_participants.contains(incoming.participant)) continue;
+		CommandFrame& frame = m_frames[incoming.tick];
+		if (frame.completedParticipants.contains(incoming.participant)) continue;
+		for (const Event& event : incoming.events) {
+			if (!m_mapEventProcessorIDsToObjectAddresses.contains(
+				event.eventProcessorID()))
+				throw std::runtime_error("Network command targets an unknown event processor");
+			frame.commands[incoming.participant].push_back(event);
+		}
+		frame.completedParticipants.insert(incoming.participant);
+	}
+}
+
 void EventBroker::reset() {
 	m_frames.clear();
+	m_pendingLocalCommands.clear();
+	m_submittedLocalFrames.clear();
 	m_lockedEventProcessors.clear();
 	m_participants = {0};
 	m_localParticipant = 0;
 	m_currentTick = 0;
+	m_transport = nullptr;
 }
 
 

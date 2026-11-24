@@ -23,6 +23,7 @@
 
 #include "Event.h"
 #include "EventHandlerID.h"
+#include "Network/CommandTransport.h"
 
 class EventProcessor;
 
@@ -56,6 +57,7 @@ public:
 
 	void configureParticipants(const std::set<ParticipantID>& participants,
 		ParticipantID localParticipant = 0);
+	void attachCommandTransport(Network::ICommandTransport* transport);
 	void reset();
 
 
@@ -84,13 +86,17 @@ private:
 	};
 
 	void dispatchFrame(Tick tick);
+	void pumpTransport();
 
 	std::map<Tick, std::set<EventProcessorID>> m_lockedEventProcessors;
 	std::map<EventProcessorID, EventProcessor*> m_mapEventProcessorIDsToObjectAddresses;
 	std::map<Tick, CommandFrame> m_frames;
+	std::map<Tick, std::vector<Event>> m_pendingLocalCommands;
+	std::set<Tick> m_submittedLocalFrames;
 	std::set<ParticipantID> m_participants{0};
 	ParticipantID m_localParticipant = 0;
 	Tick m_currentTick = 0;
+	Network::ICommandTransport* m_transport = nullptr;
 };
 
 extern EventBroker g_pEventBroker;
