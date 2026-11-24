@@ -50,8 +50,9 @@ void StateEnterBuildingForDelivery::onEnter(const Event* pEvent) {
 
 
 State* StateEnterBuildingForDelivery::process() {
-    if (!m_pResourceAcceptorTile)
+    if (!m_pResourceAcceptorTile) {
         return transitionToNextState();
+	}
 
 	auto* pAcceptorBuilding = dynamic_cast<Building*>(m_pResourceAcceptorTile->getSeaOrLandUnit());
 	if (!pAcceptorBuilding || pAcceptorBuilding->isDead() ||

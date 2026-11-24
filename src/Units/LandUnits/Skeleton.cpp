@@ -18,19 +18,14 @@
 #include "Player.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "Global/GlobalAttributes.h"
+#include "Units/UnitPresentationRules.h"
 
 
 // Hm... has no fraction, neither human nor orc
 Skeleton::Skeleton(Player* pOwner, Map* pMap) : Unit(pOwner, Fraction::Orc, pMap, 40, 0, 3, 8, false), IArmed(6, 3, 1) {
-	// neutral\units\skeleton\acknowledgement 1 wav
-	// oger punching?
-
-	// sounds\missiles  punch.wav
-
-	/// sounds\misc explosion
-
 	setDyingSound("orc/basic_voices/dead.wav");
-	setSoundBaseDirectory("orc/units/goblin_sappers/");
+	setSoundBaseDirectory(std::string(UnitPresentationRules::voiceDirectory(
+		UnitPresentationRules::VoiceSet::Skeleton)));
 	setName("Skeletons");
 
 	setIdleAnimation();

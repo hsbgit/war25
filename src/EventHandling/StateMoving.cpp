@@ -27,8 +27,8 @@
 
 Tile* StateMoving::isTargetTileANeighbourTile() {
 	const auto& neighbourTiles = neighbourTilesForOwner();
-	auto it = std::find_if(neighbourTiles.begin(), neighbourTiles.end(), [this](const auto& it) {
-		return it.second == m_pTargetTile;
+	auto it = std::find_if(neighbourTiles.begin(), neighbourTiles.end(), [this](const auto& entry) {
+		return entry.second == m_pTargetTile;
 		});
 
 	return (it != neighbourTiles.end()) ? dynamic_cast<Tile*>((*it).second) : nullptr;
@@ -201,6 +201,7 @@ void StateMoving::onExit() {
 	m_pNextTileToMove = nullptr;
 	m_directionChanged = false;
 	m_animationNeedsUpdate = true;
+	m_visuallyWaiting = false;
 
 	m_path.clear();
 	m_pPathEndpoint = nullptr;
@@ -238,6 +239,13 @@ State* StateMoving::process() {
 
 		if (!m_pNextTileToMove) {
 			if (temporarilyBlocked) {
+				if (!m_visuallyWaiting && MovementRules::shouldShowIdleAnimation(
+					false, temporarilyBlocked)) {
+					auto* unit = dynamic_cast<Unit*>(m_pOwner);
+					unit->setIdleAnimation(m_currentDirection);
+					m_animationNeedsUpdate = true;
+					m_visuallyWaiting = true;
+				}
 				return this; // Still blocked, wait
 			}
 			else
@@ -258,6 +266,7 @@ State* StateMoving::process() {
 			pUnit->setCurrentAnimation(g_pRessourceManager->getUnitAnimation(pUnit, m_currentDirection, ResourceManager_wartools::AnimationType::Moving));
 			m_animationNeedsUpdate = false;
 		}
+		m_visuallyWaiting = false;
 	}
 
 	/*

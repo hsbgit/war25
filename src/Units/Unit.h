@@ -23,6 +23,7 @@
 #include "Magic/Buff.h"
 #include "Magic/BuffRules.h"
 #include "UnitActions.h"
+#include "UnitCommandRules.h"
 
 class Path;
 
@@ -135,9 +136,12 @@ private:
 	int m_speed;
 	int m_attackCooldownRemaining = 0;
 	int m_autoTargetScanRemaining = 0;
+	int m_pursuitUpdateRemaining = 0;
 	Direction m_attackDirection = Direction::N;
 	Direction m_facingDirection = Direction::N;
 	bool m_standGround = false;
+	UnitCommandRules::Mode m_commandMode = UnitCommandRules::Mode::Idle;
+	Point m_attackMoveDestination{-1, -1};
 	bool m_attackAnimationActive = false;
 	int m_selectionClicks = 0;
 	bool m_countsTowardFood = true;

@@ -228,20 +228,16 @@ NeighbourNodes Tile::getFreeNeighbourNodes(int unitSize_tiles, bool airPath) con
 
 		// Safety check: only proceed if we have a valid object to check
 		if (pObjectToCheck) {
-			std::erase_if(freeNodes, [this, &airPath, pObjectToCheck](const auto& pair) {
-				const Tile* pTile = (Tile*)pair.second;
+			std::erase_if(freeNodes, [this, pObjectToCheck](const auto& pair) {
+				const Tile* pTile = static_cast<const Tile*>(pair.second);
 
 				// Additional safety: check if pTile is valid and map exists
 				if (!pTile || !m_pMap) {
 					return true; // Remove invalid tiles
 				}
 
-				try {
-					return !m_pMap->canBePlacedAtPosition(pObjectToCheck, pTile->getX(), pTile->getY());
-				} catch (...) {
-					// If canBePlacedAtPosition crashes, consider the tile as blocked
-					return true;
-				}
+				return !m_pMap->canBePlacedAtPosition(
+					pObjectToCheck, pTile->getX(), pTile->getY());
 			});
 		}
 	}

@@ -28,7 +28,7 @@ IMagical::IMagical(int initialMana) : m_mana(std::clamp(initialMana, 0, 255)), m
 void IMagical::process() {
 	if (--m_remainingTicks <= 0) {
         m_remainingTicks = m_neededTicks;
-        m_mana = std::min(++m_mana, m_maxMana);
+		m_mana = std::min(m_mana + 1, m_maxMana);
     }
 }
 

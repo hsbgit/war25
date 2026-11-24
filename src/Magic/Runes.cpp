@@ -20,7 +20,7 @@
 #include "Map/Map.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "Resources/SoundManager.h"
-#include "Units/LandUnits/Dwarfes/Dwarfes.h"
+#include "Magic/RuneRules.h"
 
 
 Runes::Runes(Map* pMap) : m_pMap(pMap) {
@@ -37,18 +37,18 @@ void Runes::process() {
 
     auto it = std::remove_if(vecRuneTiles.begin(), vecRuneTiles.end(),
         [this](Tile* pTile) {
-            if (pTile->hasObject() && pTile->getSeaOrLandUnit()) {
-				Object* victim = pTile->getSeaOrLandUnit();
-				if (auto* demolition = dynamic_cast<Dwarfes*>(victim);
-					demolition && demolition->getHealthPoints() <= 50)
-					demolition->detonateWithoutAreaDamage();
-				else
-					victim->takeDamage(AttackerStats(0, 50), true);
+			Object* victim = pTile->getSeaOrLandUnit();
+			const auto result = RuneRules::triggerResult(victim != nullptr,
+				victim && victim->isDead(), victim && victim->isPlacedOnMap());
+			if (result == RuneRules::TriggerResult::KeepRune)
+				return false;
+			if (result == RuneRules::TriggerResult::DamageAndConsume) {
+				victim->takeDamage(AttackerStats(0, RuneRules::Damage), true);
                 g_pSoundManager->playWAV(pTile, std::string("misc") + PATH_SEPARATOR + "explosion.wav");
-                m_pMap->addAnimation(pTile, g_pRessourceManager->getExplosionAnimation());
-                return true;
-            }
-            return false;
+				m_pMap->addAnimation(pTile,
+					g_pRessourceManager->getExplosionAnimation().playOnce());
+			}
+			return true;
         });
 
     vecRuneTiles.erase(it, vecRuneTiles.end());

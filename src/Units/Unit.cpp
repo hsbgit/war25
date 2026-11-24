@@ -36,6 +36,7 @@
 #include "Units/LandUnits/Mage.h"
 #include "Units/LandUnits/Daemon.h"
 #include "Units/LandUnits/Peasant/Peasant.h"
+#include "Units/LandUnits/Skeleton.h"
 #include "Units/AirUnits/GryphonRider.h"
 #include "Units/SeaUnits/Battleship.h"
 #include "Units/SeaUnits/GnomishSubmarine.h"
@@ -145,6 +146,16 @@ void Unit::handleEvent(const Event& event) {
 	// interval would dereference an empty occupied-tile list.
 	if (!isPlacedOnMap())
 		return;
+	const auto generalAction = static_cast<GeneralActions>(event.getEventID());
+	if (generalAction == GeneralActions::Move) {
+		m_commandMode = UnitCommandRules::Mode::Move;
+		m_attackMoveDestination = {-1, -1};
+	} else if (generalAction == GeneralActions::Patrol) {
+		m_commandMode = UnitCommandRules::Mode::Patrol;
+	} else if (generalAction == GeneralActions::Stop) {
+		m_commandMode = UnitCommandRules::Mode::Idle;
+		m_attackMoveDestination = {-1, -1};
+	}
 	if (static_cast<GeneralActions>(event.getEventID()) == GeneralActions::Move &&
 		isLandObject()) {
 		Object* clicked = getMap()->getObjectOnTile({event.tileX(), event.tileY()});
@@ -160,6 +171,7 @@ void Unit::handleEvent(const Event& event) {
 		const auto action = static_cast<GeneralActions>(event.getEventID());
 		if (action == GeneralActions::StandGround) {
 			m_standGround = true;
+			m_commandMode = UnitCommandRules::Mode::StandGround;
 			armed->clearActiveTarget();
 			m_stateMachine.handleEvent(Event(getID(), GeneralActions::Stop));
 			return;
@@ -171,6 +183,9 @@ void Unit::handleEvent(const Event& event) {
 			if (target && target != this && target->isEnemy(this) &&
 				armed->canAttackTarget(target) &&
 				!target->getOwner()->isNeutral()) {
+				m_commandMode = UnitCommandRules::Mode::FocusAttack;
+				m_attackMoveDestination = {-1, -1};
+				m_pursuitUpdateRemaining = 0;
 				armed->assignTarget(target);
 				if (armed->activeTargetInRange(this)) {
 					// Stop an existing walk without clearing the target we just set.
@@ -183,6 +198,14 @@ void Unit::handleEvent(const Event& event) {
 						approach->getX(), approach->getY()));
 					return;
 				}
+				return;
+			} else if (!target) {
+				// Attacking empty ground is attack-move: unlike a normal right-click
+				// move it actively looks for threats and resumes the destination after combat.
+				m_commandMode = UnitCommandRules::Mode::AttackMove;
+				m_attackMoveDestination = {event.tileX(), event.tileY()};
+				armed->clearActiveTarget();
+				m_stateMachine.handleEvent(event);
 				return;
 			} else {
 				return;
@@ -359,12 +382,60 @@ void Unit::updateCombat() {
 	if (m_attackCooldownRemaining > 0) {
 		if (--m_attackCooldownRemaining == 0)
 			setIdleAnimation(m_attackDirection);
-		return;
 	}
-	if (isMoving())
-		return;
 
 	Object* target = armed->activeTarget();
+	if (target && UnitCommandRules::shouldInterruptPursuit(
+		isMoving(), armed->activeTargetInRange(this))) {
+		// The target may have entered range before the stale approach tile was
+		// reached. Stop here and strike from the unit's actual position.
+		m_stateMachine.handleEvent(Event(getID(), GeneralActions::Stop));
+	}
+	if (target && !armed->activeTargetInRange(this)) {
+		if (m_standGround) {
+			armed->clearActiveTarget();
+			return;
+		}
+		if (m_pursuitUpdateRemaining > 0) {
+			--m_pursuitUpdateRemaining;
+		} else if (Tile* approach = getMap()->getClosestAttackTile(
+			target, this, armed->attackRange())) {
+			m_stateMachine.handleEvent(Event(getID(), GeneralActions::Attack,
+				approach->getX(), approach->getY()));
+			m_pursuitUpdateRemaining = calculateRequiredTicksForGameAction(150);
+		}
+		return;
+	}
+
+	if (!target && UnitCommandRules::scansForTargetsWhileMoving(m_commandMode)) {
+		if (m_autoTargetScanRemaining > 0) {
+			--m_autoTargetScanRemaining;
+		} else {
+			target = selectAutomaticTarget(armed);
+			m_autoTargetScanRemaining = calculateRequiredTicksForGameAction(250);
+			if (target) {
+				armed->assignTarget(target);
+				if (!armed->activeTargetInRange(this)) {
+					if (Tile* approach = getMap()->getClosestAttackTile(
+						target, this, armed->attackRange()))
+						m_stateMachine.handleEvent(Event(getID(), GeneralActions::Attack,
+							approach->getX(), approach->getY()));
+					return;
+				}
+			}
+		}
+		if (!target && isIdle()) {
+			if (getTileLocation() == m_attackMoveDestination) {
+				m_commandMode = UnitCommandRules::Mode::Idle;
+				m_attackMoveDestination = {-1, -1};
+			} else {
+				m_stateMachine.handleEvent(Event(getID(), GeneralActions::Attack,
+					m_attackMoveDestination.x, m_attackMoveDestination.y));
+			}
+		}
+		if (!target) return;
+	}
+	if (isMoving()) return;
 	// Workers may defend themselves when explicitly ordered, but never acquire
 	// targets autonomously while idle.
 	if (!target && !dynamic_cast<Peasant*>(this) && isIdle()) {
@@ -381,19 +452,8 @@ void Unit::updateCombat() {
 	}
 	if (!target)
 		return;
-	if (!armed->activeTargetInRange(this)) {
-		if (m_standGround) {
-			armed->clearActiveTarget();
-			return;
-		}
-		// An explicitly selected target may have moved while we approached it.
-		if (isIdle()) {
-			const Point destination = target->getTileLocation();
-			handleEvent(Event(getID(), GeneralActions::Attack,
-				destination.x, destination.y));
-		}
-		return;
-	}
+	if (!armed->activeTargetInRange(this)) return;
+	if (m_attackCooldownRemaining > 0) return;
 
 	const Point ownPosition = getTileLocation();
 	const Point targetPosition = target->getTileLocation();
@@ -425,6 +485,10 @@ void Unit::updateCombat() {
 			g_pSoundManager->playWAV(this,
 				std::string(UnitPresentationRules::fixedAttackSound(
 					UnitPresentationRules::AttackSound::Punch)));
+		} else if (dynamic_cast<Skeleton*>(this)) {
+			g_pSoundManager->playWAV(this,
+				std::string(UnitPresentationRules::fixedAttackSound(
+					UnitPresentationRules::AttackSound::Fist)));
 		}
 		AttackerStats damage = armed->getAttackerStats();
 		if (hasBuff(BuffType::Bloodlust)) {
@@ -480,6 +544,8 @@ void Unit::onAttackedBy(Object* attacker) {
 	if (!attacker || isDead() || !isPlacedOnMap() || !attacker->isPlacedOnMap())
 		return;
 	auto* armed = dynamic_cast<IArmed*>(this);
+	if (UnitCommandRules::ignoresAttackersWhileMoving(m_commandMode, isMoving()))
+		return;
 	if (armed && armed->isArmed() && !dynamic_cast<Peasant*>(this)) {
 		// Keep fighting a current target that is already actionable. Otherwise
 		// retaliate against the visible attacker, just like Stratagus' offered

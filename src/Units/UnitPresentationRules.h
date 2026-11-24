@@ -5,10 +5,15 @@
 
 namespace UnitPresentationRules {
 
+inline bool usesGenericExplosion(bool isDemolitionUnit) {
+	return isDemolitionUnit;
+}
+
 enum class AttackSound {
 	None,
 	Sword,
 	Punch,
+	Fist,
 	Bow,
 	Axe,
 	MageFireball,
@@ -16,6 +21,15 @@ enum class AttackSound {
 };
 
 enum class SelectionSound { Selected, Annoyed };
+
+enum class VoiceSet { Skeleton };
+
+inline std::string_view voiceDirectory(VoiceSet voice) {
+	switch (voice) {
+	case VoiceSet::Skeleton: return "neutral/units/skeleton/";
+	}
+	return {};
+}
 
 inline SelectionSound selectionSoundForClick(int clickCount, bool hasAnnoyedSounds) {
 	return hasAnnoyedSounds && clickCount >= 5
@@ -25,6 +39,7 @@ inline SelectionSound selectionSoundForClick(int clickCount, bool hasAnnoyedSoun
 inline std::string_view fixedAttackSound(AttackSound sound) {
 	switch (sound) {
 	case AttackSound::Punch: return "missiles/punch.wav";
+	case AttackSound::Fist: return "missiles/fist.wav";
 	case AttackSound::Bow: return "missiles/bow_throw.wav";
 	case AttackSound::Axe: return "missiles/axe_throw.wav";
 	case AttackSound::MageFireball: return "missiles/fireball_hit.wav";

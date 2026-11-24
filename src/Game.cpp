@@ -51,6 +51,7 @@ Map* pMap = nullptr;
 #include "GUI/MenuBarWindow.h"
 #include "GUI/MiniMap.h"
 #include "GUI/ObjectInfoWindow.h"
+#include "GUI/SelectionRules.h"
 #include "GUI/PlayerStatsWindow.h"
 #include "Magic/SpellExecutor.h"
 
@@ -168,6 +169,12 @@ void Game::doEventHandling() {
         if (event.type == SDL_KEYDOWN) {
 			if (const auto season = seasonForHotkey(static_cast<char>(event.key.keysym.sym)))
 				g_pRessourceManager->switchSeason(*season);
+			else if (event.key.keysym.sym == SDLK_a &&
+				m_infoWindow.activateTargetAction(static_cast<int>(GeneralActions::Attack))) {
+				const bool alliance = pMap->humanControlledPlayer()->getFraction() == Fraction::Alliance;
+				g_pRessourceManager->setCursor(alliance
+					? CursorTypes::RedEagle : CursorTypes::RedCrosshairs);
+			}
             else if (event.key.keysym.sym == SDLK_ESCAPE) {
                 m_selectedObjects.clear();
             }
@@ -346,11 +353,20 @@ void Game::doEventHandling() {
 
 						const bool draggedSelection = selectionRect.w > 2 || selectionRect.h > 2;
 						if (draggedSelection) {
-							const bool containsUnit = std::any_of(userSelection.begin(), userSelection.end(),
-								[](Object* object) { return dynamic_cast<Unit*>(object) != nullptr; });
-							if (containsUnit)
+							const bool containsOwnedUnit = std::any_of(userSelection.begin(), userSelection.end(),
+								[](Object* object) {
+									return dynamic_cast<Unit*>(object) && !dynamic_cast<Critter*>(object) &&
+										object->getOwner() == pMap->humanControlledPlayer();
+								});
+							if (containsOwnedUnit)
 								std::erase_if(userSelection, [](Object* object) {
-									return dynamic_cast<Unit*>(object) == nullptr;
+									const auto kind = dynamic_cast<Critter*>(object)
+										? gui::SelectionRules::DragObjectKind::Critter
+										: dynamic_cast<Unit*>(object) &&
+											object->getOwner() == pMap->humanControlledPlayer()
+										? gui::SelectionRules::DragObjectKind::OwnedUnit
+										: gui::SelectionRules::DragObjectKind::Other;
+									return !gui::SelectionRules::keepInDragSelection(kind, true);
 								});
 						}
 
@@ -400,6 +416,7 @@ bool Game::doUpdate() {
     // With multiple participants this returns false until every peer supplied
     // the same tick, so simulation can never run ahead of command input.
     g_pEventBroker.completeLocalFrame();
+	g_pSoundManager->beginGameFrame();
     if (!g_pEventBroker.advanceTick()) return false;
 
     auto start = std::chrono::high_resolution_clock::now();

@@ -5,8 +5,8 @@ set(RESOURCE_SOURCES
     IResourceMine.cpp
     IResourceMine.h
     ResourceType.h
+	ResourceRules.h
 )
 
 add_library(war25_units_resource OBJECT ${RESOURCE_SOURCES})
 target_link_libraries(war25_units_resource PUBLIC war25_common)
-

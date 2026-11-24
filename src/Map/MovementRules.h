@@ -6,6 +6,15 @@
 
 namespace MovementRules {
 
+inline bool tileWithinMap(int x, int y, int sideLength) {
+	return sideLength > 0 && x >= 0 && y >= 0 && x < sideLength && y < sideLength;
+}
+
+inline bool footprintWithinMap(int x, int y, int tileSize, int sideLength) {
+	return tileSize > 0 && tileWithinMap(x, y, sideLength) &&
+		x <= sideLength - tileSize && y <= sideLength - tileSize;
+}
+
 inline bool terrainAllows(bool isLandUnit, bool isSeaUnit, bool canDockOnCoast,
 	bool tileIsLand, bool tileIsSea, bool tileIsCoast,
 	bool tileIsRocks, bool tileIsWood, bool tileIsWall) {
@@ -26,6 +35,11 @@ inline bool requiresOrthogonalDiagonalClearance(bool isAirUnit) {
 
 inline bool reachedTilePixelOffset(int offset, int speed) {
 	return speed == 0 || (speed > 0 ? offset >= 0 : offset <= 0);
+}
+
+inline bool shouldShowIdleAnimation(bool hasReservedNextTile,
+	bool temporarilyBlocked) {
+	return !hasReservedNextTile && temporarilyBlocked;
 }
 
 inline std::optional<int> occupancyTraversalCost(bool occupied,

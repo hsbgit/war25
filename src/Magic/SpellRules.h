@@ -12,6 +12,7 @@ inline constexpr int BombardmentShards = 11;
 inline constexpr int BlizzardFallHeightTiles = 4;
 inline constexpr int BombardmentShardDelayMs = 120;
 inline constexpr int BlizzardFallDurationMs = 500;
+inline constexpr int BlizzardImpactFrame = 2;
 inline constexpr int BlizzardDebugCycles = 5;
 inline constexpr int BlizzardCycleDelayMs = 1500;
 inline constexpr int FireballDamage = 34;
@@ -49,6 +50,10 @@ inline bool corpseIsRaiseable(int elapsedMs) {
 
 inline int blizzardCycles(bool debugCast) {
 	return debugCast ? BlizzardDebugCycles : 1;
+}
+
+inline bool blizzardFrameIsImpact(int frame) {
+	return frame >= BlizzardImpactFrame;
 }
 
 inline int fallingOffsetPixels(int fallHeightTiles, int tileWidth,

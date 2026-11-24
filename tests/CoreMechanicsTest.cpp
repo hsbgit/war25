@@ -4,15 +4,20 @@
 #include "Magic/BuffRules.h"
 #include "Magic/SpellCosts.h"
 #include "Magic/SpellRules.h"
+#include "Magic/RuneRules.h"
 #include "Map/MovementRules.h"
 #include "Global/SimulationSettings.h"
 #include "Global/ProductionRules.h"
 #include "Resources/Season.h"
 #include "Resources/AnimationRules.h"
+#include "Resources/AudioRules.h"
 #include "Units/CombatRules.h"
 #include "Units/ProjectileRules.h"
 #include "Units/UnitPresentationRules.h"
+#include "Units/UnitCommandRules.h"
+#include "Units/Resource/ResourceRules.h"
 #include "GUI/DebugSpellRules.h"
+#include "GUI/SelectionRules.h"
 
 int g_tick_ms = 25;
 
@@ -42,6 +47,24 @@ TEST(MovementRulesTest, OpenWaterAndClearLandRemainTraversable) {
 		true, false, false, false, true, false));
 }
 
+TEST(MovementRulesTest, MapAndFootprintBoundsRejectNegativeOrOverflowingCoordinates) {
+	EXPECT_TRUE(MovementRules::tileWithinMap(0, 0, 64));
+	EXPECT_TRUE(MovementRules::tileWithinMap(63, 63, 64));
+	EXPECT_FALSE(MovementRules::tileWithinMap(-1, 0, 64));
+	EXPECT_FALSE(MovementRules::tileWithinMap(64, 0, 64));
+	EXPECT_TRUE(MovementRules::footprintWithinMap(62, 62, 2, 64));
+	EXPECT_FALSE(MovementRules::footprintWithinMap(63, 63, 2, 64));
+	EXPECT_FALSE(MovementRules::footprintWithinMap(0, 0, 0, 64));
+}
+
+TEST(ResourceRulesTest, DeadHiddenOrWrongResourceAcceptorsAreRejected) {
+	EXPECT_TRUE(ResourceRules::eligibleAcceptor(true, true, true, true));
+	EXPECT_FALSE(ResourceRules::eligibleAcceptor(false, true, true, true));
+	EXPECT_FALSE(ResourceRules::eligibleAcceptor(true, false, true, true));
+	EXPECT_FALSE(ResourceRules::eligibleAcceptor(true, true, false, true));
+	EXPECT_FALSE(ResourceRules::eligibleAcceptor(true, true, true, false));
+}
+
 TEST(MovementRulesTest, OnlyAirMovementKeepsSweptFootprintClearance) {
 	EXPECT_FALSE(MovementRules::requiresOrthogonalDiagonalClearance(false));
 	EXPECT_TRUE(MovementRules::requiresOrthogonalDiagonalClearance(true));
@@ -53,6 +76,35 @@ TEST(MovementRulesTest, PixelStepStopsWhenItReachesOrCrossesZero) {
 	EXPECT_FALSE(MovementRules::reachedTilePixelOffset(2, -6));
 	EXPECT_TRUE(MovementRules::reachedTilePixelOffset(-4, -6));
 	EXPECT_TRUE(MovementRules::reachedTilePixelOffset(0, 0));
+}
+
+TEST(MovementRulesTest, TemporarilyBlockedUnitUsesIdleAnimationUntilItCanStep) {
+	EXPECT_TRUE(MovementRules::shouldShowIdleAnimation(false, true));
+	EXPECT_FALSE(MovementRules::shouldShowIdleAnimation(true, true));
+	EXPECT_FALSE(MovementRules::shouldShowIdleAnimation(false, false));
+}
+
+TEST(UnitCommandRulesTest, PlainMoveIgnoresAttackersOnlyWhileTravelling) {
+	using Mode = UnitCommandRules::Mode;
+	EXPECT_TRUE(UnitCommandRules::ignoresAttackersWhileMoving(Mode::Move, true));
+	EXPECT_FALSE(UnitCommandRules::ignoresAttackersWhileMoving(Mode::Move, false));
+	EXPECT_FALSE(UnitCommandRules::ignoresAttackersWhileMoving(Mode::AttackMove, true));
+}
+
+TEST(UnitCommandRulesTest, AttackMoveScansAndPursuitStopsAsSoonAsTargetIsInRange) {
+	using Mode = UnitCommandRules::Mode;
+	EXPECT_TRUE(UnitCommandRules::scansForTargetsWhileMoving(Mode::AttackMove));
+	EXPECT_FALSE(UnitCommandRules::scansForTargetsWhileMoving(Mode::Move));
+	EXPECT_TRUE(UnitCommandRules::shouldInterruptPursuit(true, true));
+	EXPECT_FALSE(UnitCommandRules::shouldInterruptPursuit(true, false));
+}
+
+TEST(SelectionRulesTest, OwnedUnitsExcludeCrittersAndOtherObjectsFromDragSelection) {
+	using Kind = gui::SelectionRules::DragObjectKind;
+	EXPECT_TRUE(gui::SelectionRules::keepInDragSelection(Kind::OwnedUnit, true));
+	EXPECT_FALSE(gui::SelectionRules::keepInDragSelection(Kind::Critter, true));
+	EXPECT_FALSE(gui::SelectionRules::keepInDragSelection(Kind::Other, true));
+	EXPECT_TRUE(gui::SelectionRules::keepInDragSelection(Kind::Critter, false));
 }
 
 TEST(CombatRulesTest, ShipsChooseTheNearestBroadsideFacing) {
@@ -140,6 +192,30 @@ TEST(AnimationRulesTest, WarcraftSpellSheetsUseTheirRealFrameGeometry) {
 	EXPECT_EQ(AnimationRules::gridFrameCount(160, 64, 32, 32, 8), 8);
 	EXPECT_EQ(AnimationRules::gridFrameCount(160, 96, 32, 48, 6), 6);
 	EXPECT_EQ(AnimationRules::gridFrameCount(240, 96, 48, 48, 10), 10);
+}
+
+TEST(AnimationRulesTest, FactionSpecificUnitSheetsUseTheirOwnGeometryAndRows) {
+	using namespace AnimationRules;
+	EXPECT_TRUE(GryphonRider.fits(400, 1040));
+	EXPECT_EQ(GryphonRider.dyingFrames, 6);
+	EXPECT_TRUE(Dragon.fits(440, 800));
+	EXPECT_EQ(Dragon.frameWidth, 88);
+	EXPECT_EQ(Dragon.attackingFrames, 1);
+	EXPECT_TRUE(HumanDemolition.fits(280, 728));
+	EXPECT_TRUE(OrcDemolition.fits(280, 840));
+	EXPECT_EQ(HumanDemolition.dyingFrames, 8);
+	EXPECT_EQ(OrcDemolition.dyingFrames, 10);
+	EXPECT_TRUE(HumanArcher.fits(360, 720));
+	EXPECT_TRUE(OrcArcher.fits(360, 864));
+	EXPECT_TRUE(HumanMage.fits(360, 1152));
+	EXPECT_TRUE(DeathKnight.fits(360, 936));
+	EXPECT_TRUE(FlyingMachine.fits(400, 320));
+	EXPECT_TRUE(Zeppelin.fits(360, 144));
+}
+
+TEST(AnimationRulesTest, HumanGeometryCannotDescribeDragonSheet) {
+	EXPECT_FALSE(AnimationRules::GryphonRider.fits(440, 800));
+	EXPECT_FALSE(AnimationRules::Dragon.fits(400, 1040));
 }
 
 TEST(MagicTest, BombardmentCoversFiveByFiveWithElevenFallingShards) {
@@ -260,6 +336,13 @@ TEST(MagicTest, BlizzardFallsDiagonallyDownAndRightAtFortyFiveDegrees) {
 	EXPECT_EQ(SpellRules::fallingOffsetPixels(4, 32, 20, 20), 0);
 }
 
+TEST(MagicTest, BlizzardImpactFramesStartOnlyWhenShardTouchesGround) {
+	EXPECT_FALSE(SpellRules::blizzardFrameIsImpact(0));
+	EXPECT_FALSE(SpellRules::blizzardFrameIsImpact(1));
+	EXPECT_TRUE(SpellRules::blizzardFrameIsImpact(2));
+	EXPECT_TRUE(SpellRules::blizzardFrameIsImpact(3));
+}
+
 TEST(MagicTest, CorpseCanOnlyBeRaisedDuringExposedSkeletonPhase) {
 	EXPECT_FALSE(SpellRules::corpseIsRaiseable(0));
 	EXPECT_FALSE(SpellRules::corpseIsRaiseable(SpellRules::CorpseFreshDurationMs - 1));
@@ -304,6 +387,15 @@ TEST(MagicTest, FlameShieldUsesSixOrbitingFlamesAndSpellDetonationHasNoSplash) {
 	EXPECT_EQ(SpellRules::SpellTriggeredDemolitionSplashDamage, 0);
 }
 
+TEST(MagicTest, RunesUseOneSafeDamagePathForDemolitionAndOtherUnits) {
+	using Result = RuneRules::TriggerResult;
+	EXPECT_EQ(RuneRules::Damage, 50);
+	EXPECT_EQ(RuneRules::triggerResult(false, false, false), Result::KeepRune);
+	EXPECT_EQ(RuneRules::triggerResult(true, false, true), Result::DamageAndConsume);
+	EXPECT_EQ(RuneRules::triggerResult(true, true, true), Result::ConsumeRune);
+	EXPECT_EQ(RuneRules::triggerResult(true, false, false), Result::ConsumeRune);
+}
+
 TEST(MagicTest, HasteAndSlowCancelEachOther) {
 	EXPECT_EQ(BuffRules::cancelledBy(BuffType::Haste), BuffType::Slow);
 	EXPECT_EQ(BuffRules::cancelledBy(BuffType::Slow), BuffType::Haste);
@@ -335,11 +427,13 @@ TEST(SimulationSettingsTest, SixteenTimesAcceleratesEverySimulationTickEqually) 
 	EXPECT_DOUBLE_EQ(SimulationSettings::tickDurationMilliseconds(25, 16.0f), 1.5625);
 }
 
-TEST(SeasonHotkeysTest, RuntimeWasdMappingIsPreserved) {
-	EXPECT_EQ(seasonForHotkey('w'), Season::Winter);
-	EXPECT_EQ(seasonForHotkey('s'), Season::Summer);
-	EXPECT_EQ(seasonForHotkey('a'), Season::Wasteland);
-	EXPECT_EQ(seasonForHotkey('d'), Season::Swamp);
+TEST(SeasonHotkeysTest, SeasonsUseUiopAndLeaveAttackKeyFree) {
+	EXPECT_EQ(seasonForHotkey('u'), Season::Summer);
+	EXPECT_EQ(seasonForHotkey('i'), Season::Swamp);
+	EXPECT_EQ(seasonForHotkey('o'), Season::Wasteland);
+	EXPECT_EQ(seasonForHotkey('p'), Season::Winter);
+	EXPECT_FALSE(seasonForHotkey('a').has_value());
+	EXPECT_FALSE(seasonForHotkey('w').has_value());
 	EXPECT_FALSE(seasonForHotkey('x').has_value());
 }
 
@@ -366,6 +460,15 @@ TEST(AnimationRulesTest, WarcraftBluePaletteCyclesThroughFivePhases) {
 	EXPECT_EQ(AnimationRules::paletteCycleSourceIndex(100, 3), 100);
 }
 
+TEST(AudioRulesTest, DuplicateGameplaySoundsAreSuppressedOnlyWithinOneFrame) {
+	std::unordered_set<std::string> played;
+	EXPECT_TRUE(AudioRules::registerGameplaySound(played, "missiles/punch.wav"));
+	EXPECT_FALSE(AudioRules::registerGameplaySound(played, "missiles/punch.wav"));
+	EXPECT_TRUE(AudioRules::registerGameplaySound(played, "missiles/fist.wav"));
+	played.clear();
+	EXPECT_TRUE(AudioRules::registerGameplaySound(played, "missiles/punch.wav"));
+}
+
 TEST(UnitPresentationRulesTest, AttackAnimationReturnsToIdleWhenFramesFinish) {
 	EXPECT_FALSE(UnitPresentationRules::shouldReturnToIdle(false, true));
 	EXPECT_FALSE(UnitPresentationRules::shouldReturnToIdle(true, false));
@@ -378,12 +481,22 @@ TEST(UnitPresentationRulesTest, CanonicalAttackSoundsAreMapped) {
 		"missiles/sword_attack/2.wav");
 	EXPECT_EQ(UnitPresentationRules::fixedAttackSound(Sound::Punch),
 		"missiles/punch.wav");
+	EXPECT_EQ(UnitPresentationRules::fixedAttackSound(Sound::Fist),
+		"missiles/fist.wav");
 	EXPECT_EQ(UnitPresentationRules::fixedAttackSound(Sound::Bow),
 		"missiles/bow_throw.wav");
 	EXPECT_EQ(UnitPresentationRules::fixedAttackSound(Sound::Axe),
 		"missiles/axe_throw.wav");
 	EXPECT_EQ(UnitPresentationRules::fixedAttackSound(Sound::MageFireball),
 		"missiles/fireball_hit.wav");
+}
+
+TEST(UnitPresentationRulesTest, SkeletonDoesNotReuseOgreCombatOrVoiceAudio) {
+	using Sound = UnitPresentationRules::AttackSound;
+	EXPECT_NE(UnitPresentationRules::fixedAttackSound(Sound::Fist),
+		UnitPresentationRules::fixedAttackSound(Sound::Punch));
+	EXPECT_EQ(UnitPresentationRules::voiceDirectory(
+		UnitPresentationRules::VoiceSet::Skeleton), "neutral/units/skeleton/");
 }
 
 TEST(UnitPresentationRulesTest, RepeatedClicksSwitchToAnnoyedWithoutExplosion) {
@@ -397,6 +510,11 @@ TEST(UnitPresentationRulesTest, RepeatedClicksSwitchToAnnoyedWithoutExplosion) {
 TEST(UnitPresentationRulesTest, DragonsAndGryphonsExposeAttackGround) {
 	EXPECT_TRUE(UnitPresentationRules::supportsAttackGround(true));
 	EXPECT_FALSE(UnitPresentationRules::supportsAttackGround(false));
+}
+
+TEST(UnitPresentationRulesTest, DemolitionUnitsUseCleanGenericExplosion) {
+	EXPECT_TRUE(UnitPresentationRules::usesGenericExplosion(true));
+	EXPECT_FALSE(UnitPresentationRules::usesGenericExplosion(false));
 }
 
 TEST(DebugSpellRulesTest, EveryVisibleSpellButtonHasATargetedSpell) {

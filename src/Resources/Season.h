@@ -31,10 +31,10 @@ public:
 
 inline std::optional<Season> seasonForHotkey(char key) {
 	switch (key) {
-	case 's': return Season::Summer;
-	case 'd': return Season::Swamp;
-	case 'w': return Season::Winter;
-	case 'a': return Season::Wasteland;
+	case 'u': return Season::Summer;
+	case 'i': return Season::Swamp;
+	case 'o': return Season::Wasteland;
+	case 'p': return Season::Winter;
 	default: return std::nullopt;
 	}
 }

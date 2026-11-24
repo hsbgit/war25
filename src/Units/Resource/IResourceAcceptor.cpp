@@ -18,6 +18,7 @@
 #include "IResourceCollector.h"
 #include "Units/Unit.h"
 #include "Player.h"
+#include "Units/Resource/ResourceRules.h"
 #include <iostream>
 #include <limits>
 
@@ -30,13 +31,11 @@ IResourceAcceptor* findNearestResourceAcceptor(Unit* pUnit, Player* pPlayer) {
 	int distance = std::numeric_limits<int>::max();
 
 	for (auto& unit : pPlayer->getObjects()) {
-		IResourceAcceptor* pPossibleAcceptor = dynamic_cast<IResourceAcceptor*>(unit);
-
-		if (dynamic_cast<IResourceAcceptor*>(pPossibleAcceptor) == nullptr)
-			continue;
-
-
-		if (!pPossibleAcceptor->acceptsResource(pCollector->currentlyCarrying()))
+		auto* pPossibleAcceptor = dynamic_cast<IResourceAcceptor*>(unit);
+		const bool accepts = pPossibleAcceptor &&
+			pPossibleAcceptor->acceptsResource(pCollector->currentlyCarrying());
+		if (!ResourceRules::eligibleAcceptor(unit != nullptr,
+			unit && !unit->isDead(), unit && unit->isPlacedOnMap(), accepts))
 			continue;
 
 		int newDistance = std::abs(unit->getTileLocation().x - pUnit->getTileLocation().x) + std::abs(unit->getTileLocation().y - pUnit->getTileLocation().y);

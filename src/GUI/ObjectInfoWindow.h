@@ -40,6 +40,7 @@ namespace gui {
 		inline bool isActionButtonActive() const { return m_selectedAction != kNoAction; }
 		bool getSelectedBuildingAction(PeasantActions& action) const;
 		std::optional<int> selectedActionEvent() const;
+		bool activateTargetAction(int eventID);
 
 		void draw() override;
 

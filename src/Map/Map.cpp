@@ -154,7 +154,7 @@ Pud* openCompatiblePud(const std::string& filename) {
  *
  * Returns nullptr if nothing could be found.
  */
-Tile* Map::getNextFreeTile(const Point& world_pos, int maxDistance) {
+Tile* Map::getNextFreeTile(const Point& world_pos, int maxDistance, Object::Type domain) {
 	for (int distance = 1; distance <= maxDistance; distance++) {
 		for (int dy = -distance; dy <= distance; dy++) {
 			for (int dx = -distance; dx <= distance; dx++) {
@@ -162,10 +162,10 @@ Tile* Map::getNextFreeTile(const Point& world_pos, int maxDistance) {
 				int x = world_pos.x + dx; // x horizontal
 
 				if (dx == -distance || dx == distance || dy == -distance || dy == distance) {
-					if (y >= 0 && y < m_arrTileMap.size() && x >= 0 && x < m_arrTileMap[0].size()) {
+					if (MovementRules::tileWithinMap(x, y, sideLength())) {
 						Tile* nextTile = m_arrTileMap[y][x]; // Access via [y][x]
 
-						if (!nextTile->getSeaOrLandUnit() && !nextTile->isDestroyable() && !nextTile->isCoast()) {
+						if (isSpaceAvailableForUnit(y, x, 1, domain)) {
 							return nextTile; // Return frist matching tile
 						}
 					}
@@ -178,9 +178,9 @@ Tile* Map::getNextFreeTile(const Point& world_pos, int maxDistance) {
 }
 
 
-Tile* Map::getNextFreeTile(Tile* pTile, int maxDistance) {
+Tile* Map::getNextFreeTile(Tile* pTile, int maxDistance, Object::Type domain) {
 	Point pos_world = { pTile->getX(), pTile->getY() };
-	return getNextFreeTile(pos_world, maxDistance);
+	return getNextFreeTile(pos_world, maxDistance, domain);
 }
 
 
@@ -200,7 +200,7 @@ std::vector<Tile*> Map::getNeighbourTiles(Tile* pTile, int distance) {
 			int ny = tileY + dy;
 
 			// Are coordinates inside map?
-			if (nx >= 0 && nx < m_arrTileMap[0].size() && ny >= 0 && ny < m_arrTileMap.size()) {
+			if (MovementRules::tileWithinMap(nx, ny, sideLength())) {
 				Tile* neighbourTile = m_arrTileMap[ny][nx];
 				vecNeighbourTiles.push_back(neighbourTile);
 			}
@@ -616,11 +616,8 @@ std::set<Object*> Map::getObjects(const Point& tileUL_world, const Point& tileLR
 
 
 Object* Map::getObjectOnTile(int tile_x_world, int tile_y_world) {
-	tile_x_world = std::max(0, tile_x_world);
-	tile_x_world = std::min(tile_x_world, sideLength() - 1);
-
-	tile_y_world = std::max(0, tile_y_world);
-	tile_y_world = std::min(tile_y_world, sideLength() - 1);
+	if (!MovementRules::tileWithinMap(tile_x_world, tile_y_world, sideLength()))
+		return nullptr;
 
 	// Is the tile explored / visible?
 	auto& mapExplored = humanControlledPlayer()->getMapInfo()->m_mapExplored;
@@ -725,14 +722,10 @@ std::set<Object*> Map::getVisibleObjectsWithinRange(Object* pObj, int range, boo
 
 
 bool Map::isSpaceAvailableForUnit(int tile_y, int tile_x, int unitTileSize, Object::Type objType) {
-	int max_x = tile_x + unitTileSize - 1;
-	int max_y = tile_y + unitTileSize - 1;
-
-	if (max_x >= sideLength())
+	if (!MovementRules::footprintWithinMap(tile_x, tile_y, unitTileSize, sideLength()))
 		return false;
-
-	if (max_y >= sideLength())
-		return false;
+	const int max_x = tile_x + unitTileSize - 1;
+	const int max_y = tile_y + unitTileSize - 1;
 
 	// bei townhall z.b. auf abstand zu goldminen in der nähe pruefen
 	for (int y = tile_y; y <= max_y; ++y) {

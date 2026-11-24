@@ -94,8 +94,36 @@ void ObjectInfoWindow::onLeftClicked(const Point& tile_world) {
         g_pSoundManager->playWAV("ui/placement_error.wav");
         return;
     }
-    action.trigger(tile_world);
-    m_selectedAction = kNoAction;
+	if (action.getEventID() == static_cast<EventID>(GeneralActions::Attack)) {
+		for (Object* object : m_selectedObjects) {
+			if (object->getOwner() != object->getMap()->humanControlledPlayer()) continue;
+			auto actionsForObject = object->getActions();
+			auto attack = std::find_if(actionsForObject.begin(), actionsForObject.end(),
+				[](const Action& candidate) {
+					return candidate.getEventID() == static_cast<EventID>(GeneralActions::Attack);
+				});
+			if (attack == actionsForObject.end()) continue;
+			g_pEventBroker.lockEventProcessor(attack->getEventProcessorID());
+			attack->trigger(tile_world);
+		}
+	} else {
+		action.trigger(tile_world);
+	}
+	m_selectedAction = kNoAction;
+}
+
+bool ObjectInfoWindow::activateTargetAction(int eventID) {
+	if (!m_pCurrSelectedObject) return false;
+	const auto actions = m_pCurrSelectedObject->getActions();
+	for (int i = 0; i < static_cast<int>(actions.size()); ++i) {
+		if (static_cast<int>(actions[i].getEventID()) == eventID &&
+			actions[i].getActionType() == Action::ActionType::WithWorldTile) {
+			m_selectedAction = i;
+			m_pActionMenuObject = m_pCurrSelectedObject;
+			return true;
+		}
+	}
+	return false;
 }
 
 bool ObjectInfoWindow::getSelectedBuildingAction(PeasantActions& buildingAction) const {

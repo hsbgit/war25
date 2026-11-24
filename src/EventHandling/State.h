@@ -43,7 +43,7 @@ public:
 		m_callback = callback;
 	}
 
-	virtual void onEnter(const Event* pEvent = nullptr) { }
+	virtual void onEnter(const Event* = nullptr) { }
 
 	virtual void onExit() {
 		if (m_callback) {

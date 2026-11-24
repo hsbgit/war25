@@ -92,6 +92,19 @@ Animation Animation::singleFrame(std::size_t frame) const {
 	return result;
 }
 
+Animation Animation::frameRange(std::size_t firstFrame, std::size_t frameCount,
+	bool playOnce) const {
+	assert(frameCount > 0);
+	assert(firstFrame + frameCount <= m_vecSprites.size());
+	Animation result(m_pBaseTexture, m_interval_ms, playOnce);
+	for (std::size_t frame = firstFrame; frame < firstFrame + frameCount; ++frame) {
+		Sprite sprite = m_vecSprites.at(frame);
+		sprite.updateTexture(result.getBaseTexture());
+		result.addSprite(sprite);
+	}
+	return result;
+}
+
 Animation Animation::playOnce() const {
 	Animation result(*this);
 	result.m_playOnce = true;

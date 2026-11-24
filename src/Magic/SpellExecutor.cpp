@@ -170,7 +170,8 @@ bool SpellExecutor::castSpellInternal(Unit* caster, EventID spell,
 	case (int)OgreActions::EyeOfKillrogg:
 	{
 		if (!caster) return false;
-		Tile* spawnTile = m_pMap->getNextFreeTile(caster->getTile(), 2);
+		Tile* spawnTile = m_pMap->getNextFreeTile(caster->getTile(), 2,
+			Object::Type::Air);
 		if (!spawnTile) return false;
 		auto* eye = new EyeOfKillrogg(caster->getOwner(), m_pMap);
 		m_pMap->placeUnit(spawnTile, eye);
@@ -364,7 +365,8 @@ bool SpellExecutor::castSpellInternal(Unit* caster, EventID spell,
 				cycle * SpellRules::BlizzardCycleDelayMs +
 					shard * SpellRules::BombardmentShardDelayMs,
 				SpellRules::BlizzardFallDurationMs,
-				SpellRules::BlizzardFallHeightTiles));
+				SpellRules::BlizzardFallHeightTiles,
+				SpellRules::BlizzardImpactFrame, "missiles/fireball_hit.wav"));
 		}
 		g_pSoundManager->playWAV("spells/blizzard.wav");
 		applied = true;

@@ -38,6 +38,7 @@
 #include "Resources/resourcemanager_wartools.h"
 #include "PlayerColor.h"
 #include "Global/Object.h"
+#include "Map/MovementRules.h"
 #include <pud.h>
 
 class Object;
@@ -69,8 +70,10 @@ public:
     }
     Point m_humanPlayerStartPosition = { 0, 0 };
 
-    Tile* getNextFreeTile(const Point& world_pos, int maxDistance = 10);
-    Tile* getNextFreeTile(Tile* pTile, int maxDistance = 10);
+    Tile* getNextFreeTile(const Point& world_pos, int maxDistance = 10,
+		Object::Type domain = Object::Type::Land);
+    Tile* getNextFreeTile(Tile* pTile, int maxDistance = 10,
+		Object::Type domain = Object::Type::Land);
 
     std::vector<Tile*> getNeighbourTiles(Tile* pTile, int distance = 1);
     Tile* getNeighbourTileWithWood(Tile* pTile, int distance = 1);
@@ -99,11 +102,10 @@ public:
     }
 
     inline Tile* getTile(const Point& tile_world) {
-        if (tile_world.y < m_arrTileMap.size() && tile_world.x < m_arrTileMap[tile_world.y].size()) {
-            return m_arrTileMap[tile_world.y][tile_world.x];
-        }
-
-        return 0; // May happen if a Ogre Mage Rune is cast at the border of the map as it results in a + shape
+		if (!MovementRules::tileWithinMap(tile_world.x, tile_world.y, sideLength()))
+			return nullptr;
+		return m_arrTileMap[static_cast<std::size_t>(tile_world.y)]
+			[static_cast<std::size_t>(tile_world.x)];
     }
 
     inline int sideLength() const {
@@ -226,7 +228,7 @@ BuildingType* Map::isNextToBuilding(Tile* pTile, int distance) {
             if (dx == 0 && dy == 0) continue;
 
             // Stelle sicher, dass die Koordinaten innerhalb der Karte sind
-            if (y >= 0 && y < m_arrTileMap.size() && x >= 0 && x < m_arrTileMap[0].size()) {
+            if (MovementRules::tileWithinMap(x, y, sideLength())) {
                 Tile* neighbourTile = m_arrTileMap[y][x]; // Zugriff auf das Nachbartile
 
                 // Versuche, die Einheit auf dem Tile als den gesuchten Geb�udetyp zu casten

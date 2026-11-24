@@ -54,7 +54,6 @@ public:
 
 protected:
 	void doEventHandling();
-	void queueEvent(const Event& event) {}
 
 private:
 	void eventFinished(const Event& event);

@@ -25,7 +25,10 @@
 #include <iostream>
 
 
-Object::Object(Player* pOwner, Map* pMap, int healthPointsMax, int armor, int sight) : m_pOwner(pOwner), m_pMap(pMap), m_healthPoints(healthPointsMax), m_healthPointsMax(healthPointsMax), m_armor(armor), m_sight(sight), m_icon(g_pRessourceManager->getUISprite("orc//cursors//red_crosshairs.png")) {
+Object::Object(Player* pOwner, Map* pMap, int healthPointsMax, int armor, int sight)
+	: m_icon(g_pRessourceManager->getUISprite("orc//cursors//red_crosshairs.png")),
+	  m_pOwner(pOwner), m_sight(sight), m_armor(armor),
+	  m_healthPoints(healthPointsMax), m_healthPointsMax(healthPointsMax), m_pMap(pMap) {
 	if (!m_pOwner) {
 		throw std::logic_error("Each object must have an owner!");
 	}

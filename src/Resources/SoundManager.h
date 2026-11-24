@@ -21,6 +21,7 @@
 #include <string>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "Map/MapObject.h"
 #include "Global/Viewport.h"
@@ -42,6 +43,7 @@ public:
     void playWAV(const std::string& strFileName);
     void playSelectionWAV(const std::string& strFileName);
     void playSelectionWAV(const Object* pObj, const std::string& strFileName);
+	void beginGameFrame();
 
 
 private:
@@ -50,6 +52,7 @@ private:
     void reduceVolume(int channel);
 
     std::unordered_map<std::string, Sound> m_sounds;
+	std::unordered_set<std::string> m_gameplaySoundsPlayedThisFrame;
 
 };
 

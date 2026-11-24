@@ -220,8 +220,11 @@ public:
 
 	Animation m_animExplosion, m_animDestroyedBuilding, m_animDestroyedBuildingSea;
 
-	void createUnitAnimations(std::type_index correspondingType, int iconSquareWidth_px, int spriteCountMoving, int spriteCountAttacking, int spriteCountDying);
-	void createVesselAnimations(std::type_index correspondingType, int iconSquareWidth_px);
+	void createUnitAnimations(std::type_index correspondingType, Fraction assetFraction,
+		int frameWidth, int frameHeight, int spriteCountMoving,
+		int spriteCountAttacking, int spriteCountDying);
+	void createVesselAnimations(std::type_index correspondingType,
+		Fraction assetFraction, int frameWidth, int frameHeight);
 
 
 
@@ -246,8 +249,13 @@ public:
 
 	//  Animation m_idleMage, m_idleBattleShip, m_idleGryphonRider;
 
-	std::unordered_map<std::type_index, std::unordered_map<Direction, Animation>> mapIdleAnimations;
-	std::unordered_map<std::type_index, std::unordered_map<Direction, Animation>> mapUnitMovementAnimations, mapUnitAttackAnimations, mapUnitDyingAnimations;
+	using DirectionAnimations = std::unordered_map<Direction, Animation>;
+	using FactionAnimations = std::unordered_map<Fraction, DirectionAnimations>;
+	using UnitAnimations = std::unordered_map<std::type_index, FactionAnimations>;
+	UnitAnimations mapIdleAnimations;
+	UnitAnimations mapUnitMovementAnimations;
+	UnitAnimations mapUnitAttackAnimations;
+	UnitAnimations mapUnitDyingAnimations;
 
 
 
@@ -273,7 +281,6 @@ private:
 	void createUnitSprites(Fraction fraction);
 	void loadCoastalConstructionSprites();
 	void createidleAnimations();
-	void createidleAnimation(std::type_index correspondingType, int squareWidth_px, int rows, int cols, unsigned int interval_ms, Point posOffset);
 
 	static const std::string strPrefix;
 

@@ -50,11 +50,6 @@ public:
 	}
 
 
-	// IEventHandler
-	enum class Events { ProducePeasant, Upgrade, Cancel };
-
-
-
 	inline bool isKeepOrUpgradingTo() const {
 		return (getUpgradeLevel() == UpgradeLevel::UpgradingToKeep) || (getUpgradeLevel() == UpgradeLevel::Keep);
 	}

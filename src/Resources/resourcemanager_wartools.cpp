@@ -75,6 +75,7 @@ const Sprite* ResourceManager_wartools::getBuffIcon(BuffType type) const {
 // Unfortunately required as SDL_SetCursor does not always work properly -> Windows default cursor is set again so we call refreshLoadedCursor
 #include "Animation.h"
 #include "Units/Unit.h"
+#include "Units/UnitPresentationRules.h"
 #include "Player.h"
 #include "Global/GlobalAttributes.h"
 #include "Units/Critter.h"
@@ -123,123 +124,75 @@ const Sprite* ResourceManager_wartools::getBuffIcon(BuffType type) const {
 #include "Global/BuildingPlacement.h"
 #include "Resources/AnimationRules.h"
 
-void ResourceManager_wartools::createUnitAnimations(std::type_index correspondingType, int iconSquareWidth_px, int spriteCountMoving, int spriteCountAttacking, int spriteCountDying) {
-	PlayerColor color = PlayerColor::Red; // Color does not matter, will be changed individually, e.g., in getUnitIdleAnimation
-	// Animation geometry is faction-independent, but a few legal unit types
-	// (Eye of Killrogg, Skeleton) only have a sheet in one faction directory.
-	// Select an actually loaded sheet instead of mutating the Human map with a
-	// null entry through operator[].
-	TextureMap* textMap = &m_mapUnitTexturesHuman;
-	if (!textMap->contains(correspondingType) ||
-		!textMap->at(correspondingType).contains(color))
-		textMap = &m_mapUnitTexturesOrc;
-	if (!textMap->contains(correspondingType) ||
-		!textMap->at(correspondingType).contains(color))
-		textMap = &m_mapUnitTexturesNeutral;
-	Texture* pTexture = textMap->at(correspondingType).at(color);
-	assert(pTexture);
-
+void ResourceManager_wartools::createUnitAnimations(std::type_index correspondingType,
+	Fraction assetFraction, int frameWidth, int frameHeight, int spriteCountMoving,
+	int spriteCountAttacking, int spriteCountDying) {
+	const PlayerColor color = PlayerColor::Red;
+	TextureMap* textMap = assetFraction == Fraction::Alliance
+		? &m_mapUnitTexturesHuman : assetFraction == Fraction::Orc
+		? &m_mapUnitTexturesOrc : &m_mapUnitTexturesNeutral;
+	Texture* texture = textMap->at(correspondingType).at(color);
+	assert(texture);
 
 	for (Direction direction : AllDirections) {
-		// Do we have to flip the sprites?
-		int colOffset = (int)direction;
+		int column = static_cast<int>(direction);
 		bool flip = false;
-		if (colOffset > 4) {
-			colOffset -= (colOffset - 4) * 2;
+		if (column > 4) {
+			column -= (column - 4) * 2;
 			flip = true;
 		}
+		const int footprintPixels =
+			gMapUnitTilesize.at(correspondingType) * Tile::TileWidth_px;
+		const Point offset{(footprintPixels - frameWidth) / 2,
+			(footprintPixels - frameHeight) / 2};
+		constexpr unsigned int intervalMs = 100;
 
-		// Do we have to adjust the position as the unit sprite is actually larger than the available tile area?
-		Point posOffset = { 0, 0 };
-		int unitSize_tile = gMapUnitTilesize[correspondingType];
+		Animation movement(texture, intervalMs);
+		for (int row = 0; row < spriteCountMoving; ++row)
+			movement.addSprite(Sprite(movement.getBaseTexture(),
+				{column * frameWidth, row * frameHeight, frameWidth, frameHeight},
+				offset, flip));
+		mapUnitMovementAnimations[correspondingType][assetFraction][direction] = movement;
 
-		if (iconSquareWidth_px != Tile::TileWidth_px * unitSize_tile) {
-			int offset_CenterPoint_px = iconSquareWidth_px / 2 - 16 * unitSize_tile;
-			posOffset.x = -offset_CenterPoint_px;
-			posOffset.y = -offset_CenterPoint_px;
-		}
-
-		// Movement animations
-		unsigned int interval_ms = 100;
-		Animation anim((*textMap)[correspondingType][color], interval_ms);
-
-		int startOffset = 0;
-		for (int rowOffset = startOffset; rowOffset < startOffset + spriteCountMoving; ++rowOffset) {
-			Rect r = { colOffset * iconSquareWidth_px, rowOffset * iconSquareWidth_px, iconSquareWidth_px, iconSquareWidth_px };
-			anim.addSprite(Sprite(anim.getBaseTexture(), r, posOffset, flip));
-		}
-
-		mapUnitMovementAnimations[correspondingType][direction] = anim;
 		if (spriteCountMoving > 0) {
-			Animation idle((*textMap)[correspondingType][color], interval_ms);
-			const Rect standingFrame = {colOffset * iconSquareWidth_px, 0,
-				iconSquareWidth_px, iconSquareWidth_px};
-			idle.addSprite(Sprite(idle.getBaseTexture(), standingFrame, posOffset, flip));
-			mapIdleAnimations[correspondingType][direction] = idle;
+			Animation idle(texture, intervalMs);
+			idle.addSprite(Sprite(idle.getBaseTexture(),
+				{column * frameWidth, 0, frameWidth, frameHeight}, offset, flip));
+			mapIdleAnimations[correspondingType][assetFraction][direction] = idle;
 		}
 
-
-
-		// Attack animations
-		startOffset += spriteCountMoving;
-		Animation animAttacking((*textMap)[correspondingType][color], interval_ms);
-		for (int rowOffset = startOffset; rowOffset < startOffset + spriteCountAttacking; ++rowOffset) {
-			Rect r = { colOffset * iconSquareWidth_px, rowOffset * iconSquareWidth_px, iconSquareWidth_px, iconSquareWidth_px };
-			animAttacking.addSprite(Sprite(animAttacking.getBaseTexture(), r, posOffset, flip));
-		}
+		Animation attacking(texture, intervalMs);
+		for (int row = spriteCountMoving;
+			row < spriteCountMoving + spriteCountAttacking; ++row)
+			attacking.addSprite(Sprite(attacking.getBaseTexture(),
+				{column * frameWidth, row * frameHeight, frameWidth, frameHeight},
+				offset, flip));
 		if (spriteCountAttacking > 0)
-			mapUnitAttackAnimations[correspondingType][direction] = animAttacking;
+			mapUnitAttackAnimations[correspondingType][assetFraction][direction] = attacking;
 
-
-		// Dying animations
-		// interval_ms = 250;
-
-
-		if (correspondingType == typeid(Ballista) || correspondingType == typeid(Dwarfes) ||
+		if (correspondingType == typeid(Ballista) ||
 			correspondingType == typeid(EyeOfKillrogg)) {
-			// Siege engines and demolition squads explode and leave no body.
-			mapUnitDyingAnimations[correspondingType][direction] = getExplosionAnimation();
+			mapUnitDyingAnimations[correspondingType][assetFraction][direction] =
+				getExplosionAnimation();
 			continue;
 		}
 
-		// Add unit specific sprites
-		startOffset += spriteCountAttacking;
-		Animation animDying((*textMap)[correspondingType][color], interval_ms, true);
-
-		// startOffset = 9;
-
-		for (int rowOffset = startOffset; rowOffset < startOffset + spriteCountDying; ++rowOffset) {
-			Rect r = { colOffset * iconSquareWidth_px, rowOffset * iconSquareWidth_px, iconSquareWidth_px, iconSquareWidth_px };
-			animDying.addSprite(Sprite(animDying.getBaseTexture(), r, posOffset, flip));
-		}
-
-		// Add generic sprites from corpses.png
-		//     Texture *pTextureCorpses = ;
-		/*
-
-		startOffset = 0;
-		for (int rowOffset = startOffset; rowOffset < startOffset + 6; ++rowOffset) {
-			Rect r = { colOffset * iconSquareWidth_px, rowOffset * iconSquareWidth_px, iconSquareWidth_px, iconSquareWidth_px };
-			animDying.addSprite(Sprite(&textMap[typeid(Peasant)][color], r, posOffset, flip));
-		}
-		*/
-		// 0,1 human, orc
-		// 2,3,4,5
-
-		mapUnitDyingAnimations[correspondingType][direction] = animDying;
+		Animation dying(texture, intervalMs, true);
+		for (int row = spriteCountMoving + spriteCountAttacking;
+			row < spriteCountMoving + spriteCountAttacking + spriteCountDying; ++row)
+			dying.addSprite(Sprite(dying.getBaseTexture(),
+				{column * frameWidth, row * frameHeight, frameWidth, frameHeight},
+				offset, flip));
+		mapUnitDyingAnimations[correspondingType][assetFraction][direction] = dying;
 	}
 }
 
 
-void ResourceManager_wartools::createVesselAnimations(std::type_index correspondingType, int iconSquareWidth_px) {
+void ResourceManager_wartools::createVesselAnimations(std::type_index correspondingType,
+	Fraction assetFraction, int frameWidth, int frameHeight) {
 	PlayerColor color = PlayerColor::Red; // Color does not matter, will be changed individually, e.g., in getUnitIdleAnimation
-	TextureMap* textMap = &m_mapUnitTexturesHuman;
-	if (!textMap->contains(correspondingType) ||
-		!textMap->at(correspondingType).contains(color))
-		textMap = &m_mapUnitTexturesOrc;
-	if (!textMap->contains(correspondingType) ||
-		!textMap->at(correspondingType).contains(color))
-		textMap = &m_mapUnitTexturesNeutral;
+	TextureMap* textMap = assetFraction == Fraction::Alliance
+		? &m_mapUnitTexturesHuman : &m_mapUnitTexturesOrc;
 	Texture* pTexture = textMap->at(correspondingType).at(color);
 	assert(pTexture);
 
@@ -258,24 +211,22 @@ void ResourceManager_wartools::createVesselAnimations(std::type_index correspond
 		Point posOffset = { 0, 0 };
 		int unitSize_tile = gMapUnitTilesize[correspondingType];
 
-		if (iconSquareWidth_px != Tile::TileWidth_px * unitSize_tile) {
-			int offset_CenterPoint_px = iconSquareWidth_px / 2 - 16 * unitSize_tile;
-			posOffset.x = -offset_CenterPoint_px;
-			posOffset.y = -offset_CenterPoint_px;
-		}
+		const int footprintPixels = Tile::TileWidth_px * unitSize_tile;
+		posOffset.x = (footprintPixels - frameWidth) / 2;
+		posOffset.y = (footprintPixels - frameHeight) / 2;
 
 		// Movement animations
 		unsigned int interval_ms = VESSEL_ANIMATION_INTERVAL;
 		Animation anim((*textMap)[correspondingType][color], interval_ms);
 
-		Rect r = { colOffset * iconSquareWidth_px, 0, iconSquareWidth_px, iconSquareWidth_px };
+		Rect r = { colOffset * frameWidth, 0, frameWidth, frameHeight };
 		anim.addSprite(Sprite(anim.getBaseTexture(), r, posOffset, flip));
 
 
 		posOffset.y += 3; // Ships float up and down when being idle
 		anim.addSprite(Sprite(anim.getBaseTexture(), r, posOffset, flip));
 
-		mapUnitMovementAnimations[correspondingType][direction] = anim;
+		mapUnitMovementAnimations[correspondingType][assetFraction][direction] = anim;
 
 
 		// Sinking animations
@@ -285,10 +236,11 @@ void ResourceManager_wartools::createVesselAnimations(std::type_index correspond
 
 		// Turtle and GnomishSubmarine just have bubbles when sinking
 		if (correspondingType != typeid(GnomishSubmarine)) {
-			Rect rectSinking = { colOffset * iconSquareWidth_px, 1 * iconSquareWidth_px, iconSquareWidth_px, iconSquareWidth_px };
+			Rect rectSinking = { colOffset * frameWidth, frameHeight,
+				frameWidth, frameHeight };
 			animSinking.addSprite(Sprite(anim.getBaseTexture(), rectSinking, posOffset, flip));
 
-			rectSinking.y = 2 * iconSquareWidth_px;
+			rectSinking.y = 2 * frameHeight;
 			animSinking.addSprite(Sprite(anim.getBaseTexture(), rectSinking, posOffset, flip));
 		}
 
@@ -299,7 +251,7 @@ void ResourceManager_wartools::createVesselAnimations(std::type_index correspond
 		// Bubbles are part of the neutral/units/corpses.png file. Bubbles do not have a player specific color meaning "Red" ist not important here
 		animSinking.addSprite(Sprite(&m_mapUnitTexturesNeutral[typeid(Peasant)][PlayerColor::Red], rectBubbles));
 
-		mapUnitDyingAnimations[correspondingType][direction] = animSinking;
+		mapUnitDyingAnimations[correspondingType][assetFraction][direction] = animSinking;
 	}
 }
 
@@ -310,9 +262,12 @@ Animation ResourceManager_wartools::getBuildingAnimation(Building* pBuilding, An
 
 
 Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction direction, AnimationType animType) {
-	//  std::cerr << "Typeid: " << typeid(*pUnit).name() << std::endl;
-	assert(mapUnitMovementAnimations.contains(typeid(*pUnit))); // Unit type considered?
-	assert(mapUnitMovementAnimations[typeid(*pUnit)].contains(direction)); // Appropriate direction considered?
+	const std::type_index type = typeid(*pUnit);
+	assert(mapUnitMovementAnimations.contains(type));
+	const Fraction assetFraction = mapUnitMovementAnimations.at(type).contains(pUnit->getFraction())
+		? pUnit->getFraction() : Fraction::Neutral;
+	assert(mapUnitMovementAnimations.at(type).contains(assetFraction));
+	assert(mapUnitMovementAnimations.at(type).at(assetFraction).contains(direction));
 
 	ResourceType carriedResource = ResourceType::Nothing;
 	if (auto* pCollector = dynamic_cast<IResourceCollector*>(pUnit))
@@ -330,23 +285,21 @@ Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction dire
 
 	if (animType == AnimationType::Moving) {
 		// Get appropriate animation
-		Animation a(mapUnitMovementAnimations[typeid(*pUnit)][direction]);
-		// The Zeppelin sheet has a single living frame per direction. Row one
-		// belongs to the Flying Machine animation and must not be cycled for Orcs.
-		if (dynamic_cast<GnomishFlyingMaschine*>(pUnit) &&
-			pUnit->getFraction() == Fraction::Orc)
-			a = a.singleFrame(0);
+		Animation a(mapUnitMovementAnimations.at(type).at(assetFraction).at(direction));
 		// Update general animation with specific colored unit texture
 		a.setBaseTexture(pCorrectColorTexture);
 		return a;
 	}
 
 	if (animType == AnimationType::Dying) {
+		if (UnitPresentationRules::usesGenericExplosion(
+			dynamic_cast<Dwarfes*>(pUnit) != nullptr))
+			return getExplosionAnimation().playOnce();
 		if (dynamic_cast<GnomishFlyingMaschine*>(pUnit) &&
 			pUnit->getFraction() == Fraction::Orc)
 			return getExplosionAnimation().playOnce();
 		// Get appropriate animation
-		Animation a(mapUnitDyingAnimations[typeid(*pUnit)][direction]);
+		Animation a(mapUnitDyingAnimations.at(type).at(assetFraction).at(direction));
 		// Update general animation with specific colored unit texture
 		a.setBaseTexture(pCorrectColorTexture);
 		return a;
@@ -355,19 +308,21 @@ Animation ResourceManager_wartools::getUnitAnimation(Unit* pUnit, Direction dire
 	if (animType == AnimationType::Attacking) {
 		// Several vessel sheets contain directional idle/movement frames but no
 		// dedicated attack rows. Combat must still work for those units.
-		if (!mapUnitAttackAnimations.contains(typeid(*pUnit)) ||
-			!mapUnitAttackAnimations[typeid(*pUnit)].contains(direction))
+		if (!mapUnitAttackAnimations.contains(type) ||
+			!mapUnitAttackAnimations.at(type).contains(assetFraction) ||
+			!mapUnitAttackAnimations.at(type).at(assetFraction).contains(direction))
 			return getUnitIdleAnimation(pUnit, direction);
-		Animation a(mapUnitAttackAnimations[typeid(*pUnit)][direction]);
+		Animation a(mapUnitAttackAnimations.at(type).at(assetFraction).at(direction));
 		a.setBaseTexture(pCorrectColorTexture);
 		return a;
 	}
 
 	if (animType == AnimationType::Working_Gold ||
 		animType == AnimationType::Working_Lumber) {
-		assert(mapUnitAttackAnimations.contains(typeid(*pUnit)));
-		assert(mapUnitAttackAnimations[typeid(*pUnit)].contains(direction));
-		Animation a(mapUnitAttackAnimations[typeid(*pUnit)][direction]);
+		assert(mapUnitAttackAnimations.contains(type));
+		assert(mapUnitAttackAnimations.at(type).contains(assetFraction));
+		assert(mapUnitAttackAnimations.at(type).at(assetFraction).contains(direction));
+		Animation a(mapUnitAttackAnimations.at(type).at(assetFraction).at(direction));
 		a.setBaseTexture(pCorrectColorTexture);
 		return a;
 	}
@@ -440,7 +395,11 @@ Animation ResourceManager_wartools::getUnitIdleAnimation(Unit* pUnit, Direction 
 		? &mapUnitMovementAnimations : &mapIdleAnimations;
 	if (!animations->contains(type))
 		return Animation();
-	auto& directional = animations->at(type);
+	const Fraction assetFraction = animations->at(type).contains(pUnit->getFraction())
+		? pUnit->getFraction() : Fraction::Neutral;
+	if (!animations->at(type).contains(assetFraction))
+		return Animation();
+	auto& directional = animations->at(type).at(assetFraction);
 	if (!directional.contains(direction)) {
 		// Some exceptional sprites (notably skeletons) have only a north idle.
 		// Falling back is harmless and must not flood stderr every few seconds.
@@ -449,10 +408,6 @@ Animation ResourceManager_wartools::getUnitIdleAnimation(Unit* pUnit, Direction 
 		direction = Direction::N;
 	}
 	Animation a(directional.at(direction));
-	if (dynamic_cast<GnomishFlyingMaschine*>(pUnit) &&
-		pUnit->getFraction() == Fraction::Orc)
-		a = a.singleFrame(0);
-
 	ResourceType carriedResource = ResourceType::Nothing;
 	if (auto* pCollector = dynamic_cast<IResourceCollector*>(pUnit))
 		carriedResource = pCollector->currentlyCarrying();
@@ -494,57 +449,6 @@ Animation ResourceManager_wartools::getDyingAnimation(Unit* pUnit) {
 Sprite* ResourceManager_wartools::getUIElement(Ressources uiElement) {
 	return 0;
 }
-
-#include <cmath>
-
-void ResourceManager_wartools::createidleAnimation(std::type_index correspondingType, int squareWidth_px, int rows, int cols, unsigned int interval_ms, Point posOffset = { 0, 0 }) {
-	assert(rows > 0);
-	assert(cols > 0);
-
-	PlayerColor color = PlayerColor::Red; // Color does not matter, will be changed individually, e.g., in getUnitIdleAnimation
-	TextureMap* textMap = &m_mapUnitTexturesHuman;
-	if (!textMap->contains(correspondingType) ||
-		!textMap->at(correspondingType).contains(color))
-		textMap = &m_mapUnitTexturesOrc;
-	if (!textMap->contains(correspondingType) ||
-		!textMap->at(correspondingType).contains(color))
-		textMap = &m_mapUnitTexturesNeutral;
-	Texture* pTexture = textMap->at(correspondingType).at(color);
-	assert(pTexture);
-
-
-	// Offset calculation. In most cases we have to adjust the initial draw position because
-	// almost none unit has 32x32 sprites which would fit exactly to a 32x32 tile (a critter does)
-	//
-	// Example: Elven Archer has a dimension of 360px/5 = 64px (see *.png files). Hence, we have
-	// to shift x and y coordinates accordingly such that the center of the sprite matches the center of the tile.
-	//
-	// Moreover it might be the case that a unit does occupy more than one tile (dragons, ships, ...)
-	// In these cases we have to shift even more.
-	int tile_size = gMapUnitTilesize[correspondingType];
-
-	if (squareWidth_px != Tile::TileWidth_px * tile_size) {
-		int offset_MiddlePoint_px = squareWidth_px / 2 - 16 * tile_size;
-		posOffset.x = -offset_MiddlePoint_px;
-		posOffset.y = -offset_MiddlePoint_px;
-	}
-
-	Rect rect = { 0, 0, squareWidth_px, squareWidth_px };
-
-	Animation anim((*textMap)[correspondingType][color], interval_ms);
-
-	for (int r = 0; r < rows; ++r) {
-		for (int c = 0; c < cols; ++c) {
-			anim.addSprite(Sprite(anim.getBaseTexture(), rect, posOffset));
-			rect.y += squareWidth_px;
-		}
-
-		rect.x += squareWidth_px;
-	}
-
-	mapIdleAnimations[correspondingType][Direction::N] = anim;
-}
-
 
 void ResourceManager_wartools::createExplosionAnimation() {
 	int iconSquareWidth_px = EXPLOSION_SPRITE_SIZE;
@@ -692,46 +596,45 @@ void ResourceManager_wartools::createBuffIcons() {
 
 
 void ResourceManager_wartools::createidleAnimations() {
-	// See png files for row/column structure. Skeletons use their movement
-	// sheet for idle frames and are initialized separately below.
-	createidleAnimation(typeid(Ballista), 320 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(Dwarfes), 280 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(Archer), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(Footman), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(GnomishFlyingMaschine), 400 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(EyeOfKillrogg), 160 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(GryphonRider), 400 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(Knight), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(Mage), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(Peasant), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
-	createidleAnimation(typeid(Daemon), 360 / 5, 1, 1, DEFAULT_UNIT_IDLE_INTERVAL);
+	for (Fraction faction : {Fraction::Alliance, Fraction::Orc}) {
+		createVesselAnimations(typeid(Battleship), faction, 88, 88);
+		createVesselAnimations(typeid(Destroyer), faction,
+			faction == Fraction::Alliance ? 80 : 88, 88);
+		createVesselAnimations(typeid(GnomishSubmarine), faction, 72, 72);
+		createVesselAnimations(typeid(Tanker), faction, 72, 72);
+		createVesselAnimations(typeid(Transport), faction, 72, 72);
+	}
 
+	auto createFromLayout = [this](std::type_index type, Fraction faction,
+		const AnimationRules::UnitSheetLayout& layout) {
+		createUnitAnimations(type, faction, layout.frameWidth, layout.frameHeight,
+			layout.movingFrames, layout.attackingFrames, layout.dyingFrames);
+	};
+	createFromLayout(typeid(Archer), Fraction::Alliance, AnimationRules::HumanArcher);
+	createFromLayout(typeid(Archer), Fraction::Orc, AnimationRules::OrcArcher);
+	createFromLayout(typeid(Dwarfes), Fraction::Alliance, AnimationRules::HumanDemolition);
+	createFromLayout(typeid(Dwarfes), Fraction::Orc, AnimationRules::OrcDemolition);
 
-
-
-	createVesselAnimations(typeid(Battleship), 440 / 5);
-	createVesselAnimations(typeid(Destroyer), 400 / 5);
-	createVesselAnimations(typeid(GnomishSubmarine), 360 / 5);
-	createVesselAnimations(typeid(Tanker), 360 / 5);
-	createVesselAnimations(typeid(Transport), 360 / 5);
-
-
-	createUnitAnimations(typeid(Archer), 360 / 5, 5, 2, 3);
-
-	// Again, internal structure differs completely from other units...
-	createUnitAnimations(typeid(Dwarfes), 280 / 5, 2, 3, 3);
-
-	createUnitAnimations(typeid(Ballista), 320 / 5, 2, 2, 0);
-	createUnitAnimations(typeid(GnomishFlyingMaschine), 400 / 5, 2, 0, 2);
+	createUnitAnimations(typeid(Ballista), Fraction::Alliance, 64, 64, 2, 2, 0);
+	createUnitAnimations(typeid(Ballista), Fraction::Orc, 64, 64, 2, 2, 0);
+	createFromLayout(typeid(GnomishFlyingMaschine), Fraction::Alliance,
+		AnimationRules::FlyingMachine);
+	createFromLayout(typeid(GnomishFlyingMaschine), Fraction::Orc,
+		AnimationRules::Zeppelin);
 	// Wargus extracts the eye as a single 5-direction row. Reusing that row for
 	// movement gives the engine directional frames without inventing assets.
-	createUnitAnimations(typeid(EyeOfKillrogg), 160 / 5, 1, 0, 0);
-	createUnitAnimations(typeid(GryphonRider), 400 / 5, 4, 3, 5);
-	createUnitAnimations(typeid(Footman), 360 / 5, 5, 4, 3);
-	createUnitAnimations(typeid(Knight), 360 / 5, 5, 4, 5);
-	createUnitAnimations(typeid(Mage), 360 / 5, 5, 4, 7);
-	createUnitAnimations(typeid(Peasant), 360 / 5, 5, 5, 3);
-	createUnitAnimations(typeid(Daemon), 360 / 5, 5, 5, 5);
+	createUnitAnimations(typeid(EyeOfKillrogg), Fraction::Orc, 32, 32, 1, 0, 0);
+	createFromLayout(typeid(GryphonRider), Fraction::Alliance,
+		AnimationRules::GryphonRider);
+	createFromLayout(typeid(GryphonRider), Fraction::Orc, AnimationRules::Dragon);
+	for (Fraction faction : {Fraction::Alliance, Fraction::Orc}) {
+		createUnitAnimations(typeid(Footman), faction, 72, 72, 5, 4, 3);
+		createUnitAnimations(typeid(Knight), faction, 72, 72, 5, 4, 5);
+		createUnitAnimations(typeid(Peasant), faction, 72, 72, 5, 5, 3);
+	}
+	createFromLayout(typeid(Mage), Fraction::Alliance, AnimationRules::HumanMage);
+	createFromLayout(typeid(Mage), Fraction::Orc, AnimationRules::DeathKnight);
+	createUnitAnimations(typeid(Daemon), Fraction::Neutral, 72, 72, 5, 5, 5);
 
 	// Skeletons use five frames horizontally and a living/death row pair per
 	// direction, unlike the regular unit sheets.
@@ -759,10 +662,10 @@ void ResourceManager_wartools::createidleAnimations() {
 				frameSize, frameSize};
 			dying.addSprite(Sprite(dying.getBaseTexture(), dead, offset, flipped));
 		}
-		mapUnitMovementAnimations[typeid(Skeleton)][direction] = movement;
-		mapUnitAttackAnimations[typeid(Skeleton)][direction] = attack;
-		mapUnitDyingAnimations[typeid(Skeleton)][direction] = dying;
-		mapIdleAnimations[typeid(Skeleton)][direction] = movement.singleFrame(0);
+		mapUnitMovementAnimations[typeid(Skeleton)][Fraction::Neutral][direction] = movement;
+		mapUnitAttackAnimations[typeid(Skeleton)][Fraction::Neutral][direction] = attack;
+		mapUnitDyingAnimations[typeid(Skeleton)][Fraction::Neutral][direction] = dying;
+		mapIdleAnimations[typeid(Skeleton)][Fraction::Neutral][direction] = movement.singleFrame(0);
 	}
 
 

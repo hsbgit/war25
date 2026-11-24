@@ -15,6 +15,7 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 */
 #include "SoundManager.h"
+#include "AudioRules.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -29,7 +30,7 @@ SoundManager::SoundManager() {
 		throw std::runtime_error(std::string("Error initializing SDL_mixer: ") + Mix_GetError());
     }
 
-	Mix_AllocateChannels(12);
+	Mix_AllocateChannels(32);
 	Mix_ReserveChannels(1); // Channel 0 is dedicated to non-overlapping selection voices.
 }
 
@@ -48,7 +49,7 @@ void SoundManager::playWAV(const Tile* pTile, const std::string& strFileName) {
     try {
         int channel = playWAVInternal(strFileName);
 
-        if (!gViewport.isTileVisible(pTile)) {
+        if (channel >= 0 && !gViewport.isTileVisible(pTile)) {
             reduceVolume(channel);
         }
     }
@@ -62,7 +63,7 @@ void SoundManager::playWAV(const Object* pObj, const std::string& strFileName) {
     try {
         int channel = playWAVInternal(strFileName);
 
-        if (!gViewport.isObjectVisible(pObj)) {
+        if (channel >= 0 && !gViewport.isObjectVisible(pObj)) {
             reduceVolume(channel);
         }
     }
@@ -76,7 +77,7 @@ void SoundManager::playWAV(const MapObject* pObj, const std::string& strFileName
     try {
         int channel = playWAVInternal(strFileName);
 
-        if (!gViewport.isObjectVisible(pObj)) {
+        if (channel >= 0 && !gViewport.isObjectVisible(pObj)) {
             reduceVolume(channel);
         }
     }
@@ -133,6 +134,9 @@ int SoundManager::playSelectionWAVInternal(const std::string& strFileName) {
 
 
 int SoundManager::playWAVInternal(const std::string& strFileName) {
+	if (!AudioRules::registerGameplaySound(
+		m_gameplaySoundsPlayedThisFrame, strFileName))
+		return -1;
     if (!m_sounds.contains(strFileName)) {
         std::string strPath = strFolderPrefix + strFileName;
         m_sounds.emplace(strFileName, Sound(strPath));
@@ -143,12 +147,15 @@ int SoundManager::playWAVInternal(const std::string& strFileName) {
 
     int channel = Mix_PlayChannel(-1, s.getSample(), 0);
     if (channel == -1) {
-        std::cerr << "Sound success: " << channel << "\t" << SDL_GetError() << std::endl;
-        throw std::runtime_error("Mix_PlayChannel error");
+		return -1;
     }
 
     Mix_Volume(channel, MIX_MAX_VOLUME);
     return channel;
+}
+
+void SoundManager::beginGameFrame() {
+	m_gameplaySoundsPlayedThisFrame.clear();
 }
 
 

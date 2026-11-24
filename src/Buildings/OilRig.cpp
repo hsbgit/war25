@@ -52,7 +52,8 @@ bool OilRig::placeTanker(IResourceCollector* pCollector, bool withOil) {
 	auto* tanker = dynamic_cast<Tanker*>(pCollector);
 	Tile* freeTile = getMap()->getFreeTileAroundBuilding(this, tanker);
 	if (!freeTile)
-		freeTile = getMap()->getNextFreeTile(getTile(), getMap()->sideLength());
+		freeTile = getMap()->getNextFreeTile(getTile(), getMap()->sideLength(),
+			Object::Type::Sea);
 	if (!freeTile)
 		return false;
 	if (withOil) {
