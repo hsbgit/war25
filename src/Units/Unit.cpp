@@ -44,6 +44,7 @@
 #include "Units/SeaUnits/Transport.h"
 #include "Units/CombatRules.h"
 #include "Units/UnitPresentationRules.h"
+#include "Units/TransportRules.h"
 #include <iostream>
 #include <filesystem>
 
@@ -64,8 +65,10 @@ Unit::Unit(Player* pOwner, Fraction fraction, Map* pMap, int healthPointsMax, in
 	m_autoTargetScanRemaining = static_cast<int>(getID() % targetScanInterval);
 
 	 // currentAnimation = pResManager->getUnitIdleAnimation(this, Direction::N); Does not work at this point since the object is currently created and unitidle works with virtual (typeid)
-	if (m_countsTowardFood && !getOwner()->isNeutral())
+	if (m_countsTowardFood && !getOwner()->isNeutral()) {
 		getOwner()->increaseUsedFood();
+		m_foodCounted = true;
+	}
 
 	// Setup StateMachine
 	m_pIdle = new StateIdle(this);
@@ -146,6 +149,11 @@ void Unit::handleEvent(const Event& event) {
 	// interval would dereference an empty occupied-tile list.
 	if (!isPlacedOnMap())
 		return;
+	if (TransportRules::shouldCancelPendingBoarding(m_internalBoardingMove)) {
+		for (Object* object : getOwner()->getObjects())
+			if (auto* transport = dynamic_cast<Transport*>(object))
+				transport->cancelBoarding(this);
+	}
 	const auto generalAction = static_cast<GeneralActions>(event.getEventID());
 	if (generalAction == GeneralActions::Move) {
 		m_commandMode = UnitCommandRules::Mode::Move;
@@ -162,8 +170,7 @@ void Unit::handleEvent(const Event& event) {
 		auto* transport = dynamic_cast<Transport*>(clicked);
 		if (transport && transport->getOwner() == getOwner()) {
 			if (Tile* approach = transport->requestBoard(this))
-				m_stateMachine.handleEvent(Event(getID(), GeneralActions::Move,
-					approach->getX(), approach->getY()));
+				moveToBoardingApproach(approach);
 			return;
 		}
 	}
@@ -242,6 +249,16 @@ void Unit::handleEvent(const Event& event) {
 }
 
 
+void Unit::moveToBoardingApproach(Tile* approach) {
+	if (!approach || !isPlacedOnMap())
+		return;
+	m_internalBoardingMove = true;
+	handleEvent(Event(getID(), GeneralActions::Move,
+		approach->getX(), approach->getY()));
+	m_internalBoardingMove = false;
+}
+
+
 bool Unit::isMoving() const {
 	return m_stateMachine.isCurrentStateMovingState();
 }
@@ -270,10 +287,7 @@ std::vector<Action> Unit::getActions() const {
 
 
 void Unit::doHandleDeath() {
-	// Only decrease food for player-controlled units, not for neutral creatures like sheep
-	if (m_countsTowardFood && getOwner() && getOwner() != getMap()->getNeutralPlayer()) {
-		getOwner()->decreaseUsedFood();
-	}
+	releaseUsedFood();
 	if (isPlacedOnMap()) {
 		getMap()->addAnimation(getTile(), g_pRessourceManager->getUnitAnimation(
 			this, m_facingDirection, ResourceManager_wartools::AnimationType::Dying).playOnce());
@@ -296,6 +310,7 @@ void Unit::setIdleAnimation(Direction direction) {
 
 Unit::~Unit() {
 	std::cerr << "Unit::~Unit()" << std::endl;
+	releaseUsedFood();
 
 	std::cerr << "\tUnit::~Unit() m_pIdle" << std::endl;
 	delete m_pIdle;
@@ -304,6 +319,14 @@ Unit::~Unit() {
 	delete m_pPatrol;
 	std::cerr << "\tUnit::~Unit() m_pDead" << std::endl;
 	delete m_pDead;
+}
+
+
+void Unit::releaseUsedFood() {
+	if (!m_foodCounted)
+		return;
+	getOwner()->decreaseUsedFood();
+	m_foodCounted = false;
 }
 
 

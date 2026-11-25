@@ -41,12 +41,19 @@ void StateCollectGold::onEnter(const Event* pEvent) {
 
 
 State* StateCollectGold::process() {
-    if (!m_pTileGoldMine)
-        return m_pIdle;
+	if (!m_pTileGoldMine)
+		return m_pIdle;
 
-    GoldMine* pGoldMine = dynamic_cast<GoldMine*>(m_pTileGoldMine->getSeaOrLandUnit());
+	GoldMine* pGoldMine = dynamic_cast<GoldMine*>(m_pTileGoldMine->getSeaOrLandUnit());
+	auto* peasant = dynamic_cast<Peasant*>(m_pOwner);
+	const bool mineExists = pGoldMine != nullptr;
+	const bool mineAlive = mineExists && !pGoldMine->isDead();
+	const int remainingGold = mineExists ? pGoldMine->availableResources().gold() : 0;
+	if (peasant && peasant->queueNearbyWoodHarvestIfGoldUnavailable(
+		mineExists, mineAlive, remainingGold))
+		return m_pIdle;
 
-    if (!m_enteringSuccessful) {
+	if (!m_enteringSuccessful) {
         // There should be a goldmine. If not, it is exhausted and/or destroyed
         if (!pGoldMine)
             return m_pIdle;

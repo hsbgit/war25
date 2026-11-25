@@ -74,6 +74,8 @@ public:
 		Object::Type domain = Object::Type::Land);
     Tile* getNextFreeTile(Tile* pTile, int maxDistance = 10,
 		Object::Type domain = Object::Type::Land);
+	Tile* getNextFreeTile(const Point& worldPos, const Object* object,
+		int maxDistance = 10);
 
     std::vector<Tile*> getNeighbourTiles(Tile* pTile, int distance = 1);
     Tile* getNeighbourTileWithWood(Tile* pTile, int distance = 1);

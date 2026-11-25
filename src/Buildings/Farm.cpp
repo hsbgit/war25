@@ -16,6 +16,7 @@
 */
 #include "Farm.h"
 #include "Player.h"
+#include "Global/FoodSupplyRules.h"
 #include "Resources/resourcemanager_wartools.h"
 
 
@@ -26,7 +27,7 @@ Farm::Farm(Peasant* pErecter, Map* pMap) : Building(pErecter, pMap, 100, 400, 3)
 
 Farm::Farm(Player* pOwner, Fraction fraction, Map* pMap, BuildingState state) : Building(pOwner, fraction, pMap, 400, 3) {
 	setProperties();
-	getOwner()->increaseTotalFood(4);
+	setFoodProvided(true);
 
 	m_sprite = g_pRessourceManager->getBuildingSprite(this, this->getFraction(), getOwner()->getColor());
 }
@@ -47,11 +48,22 @@ void Farm::setProperties() {
 
 
 Farm::~Farm() {
-	getOwner()->decreaseTotalFood(4);
+	setFoodProvided(false);
 }
 
 
 void Farm::onConstructionFinished() {
 	Building::onConstructionFinished();
-	getOwner()->increaseTotalFood(4);
+	setFoodProvided(true);
+}
+
+
+void Farm::setFoodProvided(bool provided) {
+	const int change = FoodSupplyRules::contributionChange(
+		m_foodProvided, provided, 4);
+	if (change > 0)
+		getOwner()->increaseTotalFood(change);
+	else if (change < 0)
+		getOwner()->decreaseTotalFood(-change);
+	m_foodProvided = provided;
 }

@@ -6,8 +6,12 @@
 #include "Magic/SpellRules.h"
 #include "Magic/RuneRules.h"
 #include "Map/MovementRules.h"
+#include "Map/PudMapRules.h"
+#include "Map/PlacementSearchRules.h"
+#include "Map/TerrainAutotileRules.h"
 #include "Global/SimulationSettings.h"
 #include "Global/ProductionRules.h"
+#include "Global/FoodSupplyRules.h"
 #include "Resources/Season.h"
 #include "Resources/AnimationRules.h"
 #include "Resources/AudioRules.h"
@@ -15,7 +19,9 @@
 #include "Units/ProjectileRules.h"
 #include "Units/UnitPresentationRules.h"
 #include "Units/UnitCommandRules.h"
+#include "Units/TransportRules.h"
 #include "Units/Resource/ResourceRules.h"
+#include "Units/Resource/ResourceFallbackRules.h"
 #include "GUI/DebugSpellRules.h"
 #include "GUI/SelectionRules.h"
 
@@ -36,6 +42,87 @@ TEST(MovementRulesTest, TransportCanDockButOtherUnitsCannotUseCoast) {
 		false, false, true, false, false, false));
 	EXPECT_FALSE(MovementRules::terrainAllows(true, false, false,
 		false, false, true, false, false, false));
+}
+
+TEST(PudMapRulesTest, MeleeStartMarkersCreateWorkersWhenNoPlayerForcesExist) {
+	const Pud_Unit_Info units[] = {
+		{10, 12, PUD_UNIT_HUMAN_START, PUD_PLAYER_RED, 1},
+		{40, 42, PUD_UNIT_ORC_START, PUD_PLAYER_BLUE, 1},
+		{24, 20, PUD_UNIT_GOLD_MINE, PUD_PLAYER_NEUTRAL, 25}
+	};
+	EXPECT_TRUE(PudMapRules::shouldCreateStartingWorkers(units, std::size(units)));
+}
+
+TEST(PudMapRulesTest, ScenarioForcesDoNotReceiveAdditionalStartWorkers) {
+	const Pud_Unit_Info units[] = {
+		{10, 12, PUD_UNIT_HUMAN_START, PUD_PLAYER_RED, 1},
+		{11, 12, PUD_UNIT_FOOTMAN, PUD_PLAYER_RED, 1}
+	};
+	EXPECT_FALSE(PudMapRules::shouldCreateStartingWorkers(units, std::size(units)));
+}
+
+TEST(TerrainAutotileRulesTest, DiagonalForestCornersHaveDistinctMasks) {
+	const auto straight = TerrainAutotileRules::neighbourMask(
+		{true, true, true, true, true, true, true, true});
+	const auto missingNorthEast = TerrainAutotileRules::neighbourMask(
+		{true, true, true, true, false, true, true, true});
+	EXPECT_NE(straight, missingNorthEast);
+	EXPECT_LT(TerrainAutotileRules::maskDifferenceCost(straight, missingNorthEast),
+		TerrainAutotileRules::maskDifferenceCost(straight, 0));
+	EXPECT_EQ(TerrainAutotileRules::maskDifferenceCost(0, 0xff), 16);
+}
+
+TEST(ResourceFallbackRulesTest, ExhaustedMineSwitchesOnlyWhenWoodIsNearby) {
+	EXPECT_TRUE(ResourceFallbackRules::shouldSwitchFromGoldToWood(true, true, 0, true));
+	EXPECT_TRUE(ResourceFallbackRules::shouldSwitchFromGoldToWood(false, false, 0, true));
+	EXPECT_FALSE(ResourceFallbackRules::shouldSwitchFromGoldToWood(true, true, 500, true));
+	EXPECT_FALSE(ResourceFallbackRules::shouldSwitchFromGoldToWood(true, false, 0, false));
+}
+
+TEST(FoodSupplyRulesTest, CapacityIsGrantedAndRemovedExactlyOnce) {
+	EXPECT_EQ(FoodSupplyRules::contributionChange(false, false, 4), 0);
+	EXPECT_EQ(FoodSupplyRules::contributionChange(false, true, 4), 4);
+	EXPECT_EQ(FoodSupplyRules::contributionChange(true, true, 4), 0);
+	EXPECT_EQ(FoodSupplyRules::contributionChange(true, false, 4), -4);
+}
+
+TEST(ResourceRulesTest, LumberBonusRequiresACompletedLivingMill) {
+	EXPECT_EQ(ResourceRules::lumberDeliveryBonus(true, true, false), 25);
+	EXPECT_EQ(ResourceRules::lumberDeliveryBonus(true, true, true), 0);
+	EXPECT_EQ(ResourceRules::lumberDeliveryBonus(true, false, false), 0);
+	EXPECT_EQ(ResourceRules::lumberDeliveryBonus(false, false, false), 0);
+}
+
+TEST(ResourceRulesTest, HiddenCollectorIgnoresCommandsWhileInsideMine) {
+	EXPECT_TRUE(ResourceRules::commandBlockedWhileInsideMine(false, true));
+	EXPECT_FALSE(ResourceRules::commandBlockedWhileInsideMine(false, false));
+	EXPECT_FALSE(ResourceRules::commandBlockedWhileInsideMine(true, true));
+}
+
+TEST(ResourceRulesTest, TankerInsideDestroyedOilRigIsDestroyed) {
+	EXPECT_TRUE(ResourceRules::tankerDiesWithDestroyedOilRig(true, true));
+	EXPECT_FALSE(ResourceRules::tankerDiesWithDestroyedOilRig(false, true));
+	EXPECT_FALSE(ResourceRules::tankerDiesWithDestroyedOilRig(true, false));
+}
+
+TEST(PlacementSearchRulesTest, FallbackValidatesTheCompleteUnitFootprint) {
+	std::vector<int> checkedSizes;
+	const auto result = PlacementSearchRules::nearestFreeTopLeft(
+		PlacementSearchRules::Position{1, 1}, 3, 6, 2,
+		[&checkedSizes](int x, int y, int size) {
+			checkedSizes.push_back(size);
+			return x == 3 && y == 3;
+		});
+	ASSERT_TRUE(result.has_value());
+	EXPECT_EQ(*result, (PlacementSearchRules::Position{3, 3}));
+	EXPECT_FALSE(checkedSizes.empty());
+	EXPECT_TRUE(std::all_of(checkedSizes.begin(), checkedSizes.end(),
+		[](int size) { return size == 2; }));
+}
+
+TEST(TransportRulesTest, ExternalCommandCancelsPendingBoarding) {
+	EXPECT_TRUE(TransportRules::shouldCancelPendingBoarding(false));
+	EXPECT_FALSE(TransportRules::shouldCancelPendingBoarding(true));
 }
 
 TEST(MovementRulesTest, OpenWaterAndClearLandRemainTraversable) {
@@ -414,6 +501,12 @@ TEST(ProductionRulesTest, HumanCavalrySoundSelectionRemainsCanonical) {
 		"human/units/knight/ready.wav");
 	EXPECT_EQ(ProductionRules::cavalryReadySound(Fraction::Alliance, true),
 		"human/units/paladin/ready.wav");
+}
+
+TEST(ProductionRulesTest, UnplacedCompletedUnitUsesOwnerManagedCleanup) {
+	EXPECT_TRUE(ProductionRules::shouldRetireUnplacedCompletedUnit(true, false));
+	EXPECT_FALSE(ProductionRules::shouldRetireUnplacedCompletedUnit(true, true));
+	EXPECT_FALSE(ProductionRules::shouldRetireUnplacedCompletedUnit(false, false));
 }
 
 TEST(SimulationSettingsTest, SpeedSupportsSixteenTimesAndClampsInvalidValues) {

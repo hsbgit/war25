@@ -19,6 +19,7 @@
 #include "Global/GlobalAttributes.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "Units/SeaUnits/Tanker.h"
+#include "Units/Resource/ResourceRules.h"
 #include "Map/Map.h"
 #include <algorithm>
 
@@ -52,8 +53,8 @@ bool OilRig::placeTanker(IResourceCollector* pCollector, bool withOil) {
 	auto* tanker = dynamic_cast<Tanker*>(pCollector);
 	Tile* freeTile = getMap()->getFreeTileAroundBuilding(this, tanker);
 	if (!freeTile)
-		freeTile = getMap()->getNextFreeTile(getTile(), getMap()->sideLength(),
-			Object::Type::Sea);
+		freeTile = getMap()->getNextFreeTile(getTile()->getPos(), tanker,
+			getMap()->sideLength());
 	if (!freeTile)
 		return false;
 	if (withOil) {
@@ -95,14 +96,19 @@ void OilRig::process() {
 
 
 void OilRig::die() {
-	for (auto it = m_mapWorkers.begin(); it != m_mapWorkers.end();) {
-		if (placeTanker(it->first, false))
-			it = m_mapWorkers.erase(it);
-		else
-			++it;
+	for (auto& [collector, remainingTicks] : m_mapWorkers) {
+		(void)remainingTicks;
+		auto* tanker = dynamic_cast<Tanker*>(collector);
+		if (!ResourceRules::tankerDiesWithDestroyedOilRig(true,
+			tanker != nullptr))
+			continue;
+		// A destroyed platform kills even magically protected tankers inside it.
+		tanker->removeBuff(BuffType::UnholyArmor);
+		tanker->setCurrentResourceMine(nullptr);
+		tanker->die();
 	}
-	if (m_mapWorkers.empty())
-		Object::die();
+	m_mapWorkers.clear();
+	Object::die();
 }
 
 

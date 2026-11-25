@@ -29,6 +29,7 @@ public:
 	void process() override;
 	void doHandleDeath() override;
 	Tile* requestBoard(Unit* passenger);
+	void cancelBoarding(const Unit* passenger);
 	std::size_t passengerCount() const { return m_passengers.size(); }
 	std::vector<Unit*> loadedPassengers() const;
 	bool isDocked() const;

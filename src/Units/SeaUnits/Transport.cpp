@@ -98,6 +98,14 @@ Tile* Transport::requestBoard(Unit* passenger) {
 	return approach;
 }
 
+void Transport::cancelBoarding(const Unit* passenger) {
+	if (!passenger)
+		return;
+	const EventProcessorID id = passenger->getID();
+	std::erase_if(m_pendingPassengers,
+		[id](const PendingPassenger& pending) { return pending.id == id; });
+}
+
 bool Transport::isDocked() const {
 	if (!isPlacedOnMap()) return false;
 	return std::any_of(getOccupiedTiles().begin(), getOccupiedTiles().end(),
@@ -148,8 +156,7 @@ void Transport::process() {
 			// A command may have ended because the old approach became occupied.
 			// Reissue only while idle; moving units handle temporary blockers themselves.
 			if (approach && !passenger->isMoving())
-				passenger->handleEvent(Event(passenger->getID(), GeneralActions::Move,
-					approach->getX(), approach->getY()));
+				passenger->moveToBoardingApproach(approach);
 			++it;
 			continue;
 		}

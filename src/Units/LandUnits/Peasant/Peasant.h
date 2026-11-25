@@ -50,6 +50,8 @@ public:
 	void handleEvent(const Event& event) override;
 	void process() override;
 	void onAttackedBy(Object* attacker) override;
+	bool queueNearbyWoodHarvestIfGoldUnavailable(bool mineExists,
+		bool mineAlive, int remainingGold, int searchDistance = 8);
 
 	// IResourceCollector
 	bool canCollectResource(ResourceType t) const override {

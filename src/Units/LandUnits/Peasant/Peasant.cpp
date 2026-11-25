@@ -25,6 +25,8 @@
 #include "CompositeStateChopWood/CompositeStateChopWood.h"
 #include "CompositeStateConstructBuilding/CompositeStateConstructBuilding.h"
 #include "Units/Resource/IResourceMine.h"
+#include "Units/Resource/ResourceRules.h"
+#include "Units/Resource/ResourceFallbackRules.h"
 
 // For the peasant actions (=build building)
 #include "Buildings/Church.h"
@@ -100,9 +102,8 @@ void Peasant::handleEvent(const Event& event) {
 	std::cerr << "Peasant: Received Event ID: " << std::dec << (int)event.getEventID() << std::endl;
 	if (!isPlacedOnMap()) {
 		IResourceMine* mine = currentResourceMine();
-		if (mine) {
-			if (!mine->leave(this))
-				return;
+		if (ResourceRules::commandBlockedWhileInsideMine(false, mine != nullptr)) {
+			return;
 		} else {
 			// Delivery buildings temporarily hide the worker as well. Remember the
 			// latest command and execute it as soon as the worker reappears.
@@ -166,6 +167,19 @@ void Peasant::process() {
 		m_pendingCommand.reset();
 		handleEvent(pending);
 	}
+}
+
+bool Peasant::queueNearbyWoodHarvestIfGoldUnavailable(bool mineExists,
+	bool mineAlive, int remainingGold, int searchDistance) {
+	if (!isPlacedOnMap())
+		return false;
+	Tile* wood = getMap()->getNeighbourTileWithWood(getTile(), searchDistance);
+	if (!ResourceFallbackRules::shouldSwitchFromGoldToWood(
+		mineExists, mineAlive, remainingGold, wood != nullptr))
+		return false;
+	m_pendingCommand = Event(getID(), PeasantActions::HarvestWood,
+		wood->getX(), wood->getY());
+	return true;
 }
 
 bool Peasant::isNextTo(const Object* target) const {

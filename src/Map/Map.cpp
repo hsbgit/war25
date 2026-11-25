@@ -21,6 +21,9 @@
 // ----------------------------------------------------------------------------
 
 #include "Map.h"
+#include "Map/PudMapRules.h"
+#include "Map/PlacementSearchRules.h"
+#include "Map/TerrainAutotileRules.h"
 #include "Units/IArmed.h"
 #include "Global/Viewport.h"
 #include "Global/DebugManager.h"
@@ -181,6 +184,21 @@ Tile* Map::getNextFreeTile(const Point& world_pos, int maxDistance, Object::Type
 Tile* Map::getNextFreeTile(Tile* pTile, int maxDistance, Object::Type domain) {
 	Point pos_world = { pTile->getX(), pTile->getY() };
 	return getNextFreeTile(pos_world, maxDistance, domain);
+}
+
+
+Tile* Map::getNextFreeTile(const Point& worldPos, const Object* object,
+	int maxDistance) {
+	if (!object || !gMapUnitTilesize.contains(typeid(*object)))
+		return nullptr;
+	const int footprint = gMapUnitTilesize.at(typeid(*object));
+	const auto position = PlacementSearchRules::nearestFreeTopLeft(
+		PlacementSearchRules::Position{worldPos.x, worldPos.y},
+		maxDistance, sideLength(), footprint,
+		[this, object](int x, int y, int size) {
+			return isSpaceAvailableForUnit(y, x, size, object->getType());
+		});
+	return position ? getTile({position->x, position->y}) : nullptr;
 }
 
 
@@ -1173,31 +1191,33 @@ void Map::identifyNeighbourTiles() {
 }
 
 std::uint8_t Map::woodNeighbourMask(int x, int y) const {
-	static constexpr int offsets[4][2] = {
-		{0, -1}, {1, 0}, {0, 1}, {-1, 0}
+	static constexpr int offsets[8][2] = {
+		{0, -1}, {1, 0}, {0, 1}, {-1, 0},
+		{1, -1}, {1, 1}, {-1, 1}, {-1, -1}
 	};
-	std::uint8_t mask = 0;
-	for (int i = 0; i < 4; ++i) {
+	std::array<bool, 8> neighbours{};
+	for (int i = 0; i < 8; ++i) {
 		const int nx = x + offsets[i][0];
 		const int ny = y + offsets[i][1];
 		if (nx >= 0 && ny >= 0 && nx < sideLength() && ny < sideLength() && m_arrTileMap[ny][nx]->isWood())
-			mask |= static_cast<std::uint8_t>(1u << i);
+			neighbours[static_cast<std::size_t>(i)] = true;
 	}
-	return mask;
+	return TerrainAutotileRules::neighbourMask(neighbours);
 }
 
 std::uint8_t Map::rockNeighbourMask(int x, int y) const {
-	static constexpr int offsets[4][2] = {
-		{0, -1}, {1, 0}, {0, 1}, {-1, 0}
+	static constexpr int offsets[8][2] = {
+		{0, -1}, {1, 0}, {0, 1}, {-1, 0},
+		{1, -1}, {1, 1}, {-1, 1}, {-1, -1}
 	};
-	std::uint8_t mask = 0;
-	for (int i = 0; i < 4; ++i) {
+	std::array<bool, 8> neighbours{};
+	for (int i = 0; i < 8; ++i) {
 		const int nx = x + offsets[i][0];
 		const int ny = y + offsets[i][1];
 		if (nx >= 0 && ny >= 0 && nx < sideLength() && ny < sideLength() && m_arrTileMap[ny][nx]->isRocks())
-			mask |= static_cast<std::uint8_t>(1u << i);
+			neighbours[static_cast<std::size_t>(i)] = true;
 	}
-	return mask;
+	return TerrainAutotileRules::neighbourMask(neighbours);
 }
 
 std::uint8_t Map::wallNeighbourMask(int x, int y) const {
@@ -1274,15 +1294,10 @@ void Map::retileWood(Tile* tile) {
 
 	// A freshly cut hole can create a combination not present in the source
 	// map. Use the transition with the smallest neighbour difference.
-	int bestDistance = 5;
+	int bestDistance = std::numeric_limits<int>::max();
 	std::uint16_t bestId = tile->getTileID();
 	for (const auto& [mask, id] : m_woodTilesByMask) {
-		unsigned difference = static_cast<unsigned>(mask ^ wanted);
-		int distance = 0;
-		while (difference) {
-			distance += static_cast<int>(difference & 1u);
-			difference >>= 1u;
-		}
+		const int distance = TerrainAutotileRules::maskDifferenceCost(wanted, mask);
 		if (distance < bestDistance) {
 			bestDistance = distance;
 			bestId = id;
@@ -1300,15 +1315,10 @@ void Map::retileRock(Tile* tile) {
 		return;
 	}
 
-	int bestDistance = 5;
+	int bestDistance = std::numeric_limits<int>::max();
 	std::uint16_t bestId = tile->getTileID();
 	for (const auto& [mask, id] : m_rockTilesByMask) {
-		unsigned difference = static_cast<unsigned>(mask ^ wanted);
-		int distance = 0;
-		while (difference) {
-			distance += static_cast<int>(difference & 1u);
-			difference >>= 1u;
-		}
+		const int distance = TerrainAutotileRules::maskDifferenceCost(wanted, mask);
 		if (distance < bestDistance) {
 			bestDistance = distance;
 			bestId = id;
@@ -1426,6 +1436,8 @@ void Map::addPlayersToMap(Pud* pPud) {
 
 // Add units (including critter and buildings)
 void Map::addUnitsToMap(Pud* pPud) {
+	const bool createStartingWorkers = PudMapRules::shouldCreateStartingWorkers(
+		pPud->units, pPud->units_count);
 	// Owner: 0 bis 3, 0x0f -> Critter (neutral)
 	for (std::size_t i = 0; i < pPud->units_count; ++i) {
 		Pud_Unit_Info& ui = pPud->units[i];
@@ -1460,6 +1472,8 @@ void Map::addUnitsToMap(Pud* pPud) {
 				m_humanPlayerStartPosition.x = ui.x;
 				m_humanPlayerStartPosition.y = ui.y;
 			}
+			if (createStartingWorkers)
+				placeUnit(m_arrTileMap[ui.y][ui.x], new Peasant(pOwner, pOwner->getFraction(), this));
 			break;
 
 		case PUD_UNIT_ORC_START:
@@ -1467,6 +1481,8 @@ void Map::addUnitsToMap(Pud* pPud) {
 				m_humanPlayerStartPosition.x = ui.x;
 				m_humanPlayerStartPosition.y = ui.y;
 			}
+			if (createStartingWorkers)
+				placeUnit(m_arrTileMap[ui.y][ui.x], new Peasant(pOwner, pOwner->getFraction(), this));
 			break;
 
 			// Resources            

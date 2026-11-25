@@ -19,6 +19,7 @@
 #include "Units/LandUnits/Peasant/Peasant.h"
 #include "Player.h"
 #include "Buildings/LumberMill.h"
+#include "Units/Resource/ResourceRules.h"
 #include <cassert>
 
 
@@ -58,7 +59,8 @@ State* StateEnterBuildingForDelivery::process() {
 	if (!pAcceptorBuilding || pAcceptorBuilding->isDead() ||
 		pAcceptorBuilding->getOwner() != m_pOwner->getOwner()) {
 		Tile* pFallback = m_pOwner->getMap()->getNextFreeTile(
-			m_pResourceAcceptorTile, m_pOwner->getMap()->sideLength());
+			m_pResourceAcceptorTile->getPos(), m_pOwner,
+			m_pOwner->getMap()->sideLength());
 		if (!pFallback)
 			return this;
 		m_pOwner->getMap()->placeUnit(pFallback, m_pOwner);
@@ -97,22 +99,16 @@ State* StateEnterBuildingForDelivery::process() {
 
             int woodAmount = rBasic.lumber() + rAdditional.lumber();
 
-            // Check if player has at least one lumber mill for +25 bonus
-            bool hasLumberMill = false;
+            int lumberMillBonus = 0;
             for (Object* obj : m_pOwner->getOwner()->getObjects()) {
                 LumberMill* lumberMill = dynamic_cast<LumberMill*>(obj);
-                if (lumberMill && !obj->isDead()) {
-                    // Check if building is constructed (for buildings, we can check health > 0)
-                    if (obj->getHealthPoints() > 0) {
-                        hasLumberMill = true;
-                        break;
-                    }
-                }
+				lumberMillBonus = ResourceRules::lumberDeliveryBonus(
+					lumberMill != nullptr, obj && !obj->isDead(),
+					lumberMill && lumberMill->isUnderConstruction());
+				if (lumberMillBonus > 0)
+					break;
             }
-
-            if (hasLumberMill) {
-                woodAmount += 25;
-            }
+			woodAmount += lumberMillBonus;
 
             Resources harvestedWood = Resources(0, woodAmount);
             m_pOwner->getOwner()->addToResources(harvestedWood);

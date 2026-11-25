@@ -21,6 +21,7 @@
 #include "Buildings/OilRig.h"
 #include "Global/Action.h"
 #include "Map/Map.h"
+#include "Units/Resource/ResourceRules.h"
 
 
 Tanker::Tanker(Player* pOwner, Fraction fraction, Map* pMap) : Unit(pOwner, fraction, pMap, 90, 0, 4, 10) {
@@ -54,8 +55,11 @@ Tanker::~Tanker() {
 
 
 void Tanker::handleEvent(const Event& event) {
-	if (!isPlacedOnMap())
+	if (ResourceRules::commandBlockedWhileInsideMine(
+		isPlacedOnMap(), currentResourceMine() != nullptr) ||
+		!isPlacedOnMap()) {
 		return;
+	}
 	Event normalized = event;
 	const EventID id = event.getEventID();
 	if ((GeneralActions)id == GeneralActions::Move ||

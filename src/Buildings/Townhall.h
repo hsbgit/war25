@@ -80,4 +80,6 @@ private:
 	void setTownhallProperties();
 	void setKeepProperties();
 	void setCastleProperties();
+	void setFoodProvided(bool provided);
+	bool m_foodProvided = false;
 };

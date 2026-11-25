@@ -56,11 +56,14 @@ BuildingEventProcessor::BuildingEventProcessor(Object* pObject, Fraction buildin
 
 
 BuildingEventProcessor::~BuildingEventProcessor() {
-    // Clean up any completed unit waiting for placement
-    if (m_pCompletedUnit) {
-        delete m_pCompletedUnit;
-        m_pCompletedUnit = nullptr;
-    }
+	// The completed unit is already owned by Player::m_vecObjects. Retire it
+	// through the normal dead-object cleanup instead of deleting it here and
+	// leaving a dangling owner-list entry behind.
+	if (ProductionRules::shouldRetireUnplacedCompletedUnit(
+		m_pCompletedUnit != nullptr,
+		m_pCompletedUnit && m_pCompletedUnit->isPlacedOnMap()))
+		m_pCompletedUnit->die();
+	m_pCompletedUnit = nullptr;
 	if (!m_pObjectOwner) return;
 	TechnologyManager* technology = m_pObjectOwner->getTechnologyCoordinator();
 	if (EventProcessor::isEventInProgress() && m_currEventInProgressItem.isResearchItem()) {

@@ -16,4 +16,9 @@ inline std::string_view cavalryReadySound(Fraction fraction, bool upgraded) {
 	return upgraded ? "orc/units/ogre-mage/ready.wav" : "orc/units/ogre/ready.wav";
 }
 
+inline bool shouldRetireUnplacedCompletedUnit(bool completedUnitExists,
+	bool placedOnMap) {
+	return completedUnitExists && !placedOnMap;
+}
+
 } // namespace ProductionRules

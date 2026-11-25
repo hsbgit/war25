@@ -21,6 +21,7 @@
 #include "Global/Action.h"
 #include "Global/TechnologyManager.h"
 #include "Global/GlobalAttributes.h"
+#include "Global/FoodSupplyRules.h"
 #include "Global/TechnologyManager.h"
 #include "Resources/resourcemanager_wartools.h"
 #include "Resources/SoundManager.h"
@@ -48,22 +49,34 @@ Townhall::Townhall(Player* pOwner, Fraction fraction, Map* pMap, UpgradeLevel up
 		setCastleProperties();
 	}
 	else {
-		onConstructionFinished();
+		setTownhallProperties();
 	}
 
 	m_sprite = g_pRessourceManager->getBuildingSprite(this, this->getFraction(), getOwner()->getColor());
-	getOwner()->increaseTotalFood(1);
+	setFoodProvided(true);
 }
 
 
 void Townhall::onConstructionFinished() {
-	getOwner()->increaseTotalFood(1);
+	Building::onConstructionFinished();
+	setFoodProvided(true);
 	setTownhallProperties();
 }
 
 
 Townhall::~Townhall() {
-	getOwner()->decreaseTotalFood(1);
+	setFoodProvided(false);
+}
+
+
+void Townhall::setFoodProvided(bool provided) {
+	const int change = FoodSupplyRules::contributionChange(
+		m_foodProvided, provided, 1);
+	if (change > 0)
+		getOwner()->increaseTotalFood(change);
+	else if (change < 0)
+		getOwner()->decreaseTotalFood(-change);
+	m_foodProvided = provided;
 }
 
 

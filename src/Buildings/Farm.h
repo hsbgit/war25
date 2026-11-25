@@ -30,4 +30,6 @@ protected:
 
 private:
 	void setProperties();
+	void setFoodProvided(bool provided);
+	bool m_foodProvided = false;
 };

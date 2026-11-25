@@ -67,6 +67,7 @@ public:
 	void onAttackedBy(Object* attacker) override;
 
 	void handleEvent(const Event& event) override;
+	void moveToBoardingApproach(Tile* approach);
 
 	void doHandleDeath() override;
 
@@ -131,6 +132,7 @@ protected:
 
 private:
 	void playRandomSound(const std::vector<std::string>& sounds);
+	void releaseUsedFood();
 	void updateCombat();
 	Object* selectAutomaticTarget(IArmed* armed) const;
 	int m_speed;
@@ -145,4 +147,6 @@ private:
 	bool m_attackAnimationActive = false;
 	int m_selectionClicks = 0;
 	bool m_countsTowardFood = true;
+	bool m_foodCounted = false;
+	bool m_internalBoardingMove = false;
 };
